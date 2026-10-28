@@ -1,5 +1,5 @@
 import { BookOpen, Search, ShieldCheck, type LucideIcon } from 'lucide-react'
-import { ChapterHead } from '../components/ChapterHead'
+import { SectionHeading } from '../components/SectionHeading'
 import { CountUp } from '../components/CountUp'
 import { Reveal } from '../components/Reveal'
 import { brand, home, lawyers, services } from '../content/lawyers.fa.js'
@@ -19,9 +19,9 @@ export function AboutSection() {
       <div className="container about__grid">
         <div className="about__side">
           <Reveal>
-            <ChapterHead
-              index="۰۱"
-              eyebrow="گروه حقوقی دادنوین"
+            <SectionHeading
+              index={1}
+              eyebrow={brand.legalName}
               title={about.title}
               id="about-title"
             />
@@ -47,7 +47,7 @@ export function AboutSection() {
               </div>
               <div className="stat">
                 <dd className="stat__num stat__num--city">{brand.city}</dd>
-                <dt className="stat__label">محل دفتر</dt>
+                <dt className="stat__label">{home.stats.cityLabel}</dt>
               </div>
             </dl>
           </Reveal>

@@ -1,6 +1,7 @@
 import { Link } from 'react-router-dom'
 import { ArrowLeft } from 'lucide-react'
 import { Reveal } from '../components/Reveal'
+import { SectionHeading } from '../components/SectionHeading'
 import { home } from '../content/lawyers.fa.js'
 
 const { picture } = home
@@ -35,16 +36,13 @@ export function PictureSection() {
         {/* text column — از سمت چپ (مقابل تصویر) وارد می‌شود */}
         <Reveal variant="x-end" className="picture__text">
           <div className="picture__copy">
-            <span className="chapter-head__eyebrow">
-              <span className="chapter-head__no" aria-hidden="true">
-                ۰۲
-              </span>
-              {picture.eyebrow}
-            </span>
-            <h2 id="picture-title" className="picture__title">
-              {picture.title}
-            </h2>
-            <p className="picture__lead">{picture.text}</p>
+            <SectionHeading
+              index={2}
+              eyebrow={picture.eyebrow}
+              title={picture.title}
+              id="picture-title"
+              lead={picture.text}
+            />
             <Link to={picture.link.to} className="picture__link">
               {picture.link.label}
               <ArrowLeft size={17} aria-hidden="true" />

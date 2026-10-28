@@ -3,6 +3,7 @@ import { Link, NavLink, useLocation } from 'react-router-dom'
 import { Menu, Phone, X } from 'lucide-react'
 import { brand, contact, nav } from '../content/lawyers.fa.js'
 import { useScrolled } from '../utils/useScrolled'
+import { getLenis } from './SmoothScroll'
 import './Header.css'
 
 export function Header() {
@@ -21,6 +22,10 @@ export function Header() {
     if (!open) return
     const nav = navRef.current
     const toggle = toggleRef.current
+    // freeze page scroll while the drawer is open — Lenis uses its own
+    // stopped class; the inline overflow covers the reduced-motion fallback
+    const lenis = getLenis()
+    lenis?.stop()
     // move focus into the drawer, trap Tab inside nav links + toggle
     nav?.querySelector<HTMLElement>('a.site-nav__link')?.focus()
     const onKey = (e: KeyboardEvent) => {
@@ -48,6 +53,7 @@ export function Header() {
     return () => {
       document.removeEventListener('keydown', onKey)
       document.documentElement.style.overflow = ''
+      lenis?.start()
     }
   }, [open])
 

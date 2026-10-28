@@ -1,3 +1,4 @@
+import { useEffect, useState, type ReactNode } from 'react'
 import { BrowserRouter, Route, Routes } from 'react-router-dom'
 import { AiFab } from './components/AiFab'
 import { Footer } from './components/Footer'
@@ -10,6 +11,25 @@ import { ContactPage } from './pages/ContactPage'
 import { HomePage } from './pages/HomePage'
 import { NotFoundPage } from './pages/NotFoundPage'
 import { ServicesPage } from './pages/ServicesPage'
+import { loadRemoteContent } from './content/remote'
+
+/**
+ * Pulls CMS content from the backend after mount; when the API is
+ * unreachable the static content stays exactly as shipped.
+ */
+function RemoteSync({ children }: { children: ReactNode }) {
+  const [, bump] = useState(0)
+  useEffect(() => {
+    let alive = true
+    void loadRemoteContent().then((changed) => {
+      if (changed && alive) bump((v) => v + 1)
+    })
+    return () => {
+      alive = false
+    }
+  }, [])
+  return children
+}
 
 /** Shell + routes — shared between BrowserRouter (client) and StaticRouter (prerender). */
 export function AppRoutes() {
@@ -40,7 +60,9 @@ export function AppRoutes() {
 export default function App() {
   return (
     <BrowserRouter>
-      <AppRoutes />
+      <RemoteSync>
+        <AppRoutes />
+      </RemoteSync>
     </BrowserRouter>
   )
 }

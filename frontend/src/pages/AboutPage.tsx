@@ -55,8 +55,8 @@ export function AboutPage() {
         </section>
 
         {/* نشانه‌های اعتماد */}
-        <section className="page__block" aria-labelledby="about-trust">
-          <ul className="trust" role="list" aria-label="نشانه‌های اعتماد">
+        <section className="page__block" aria-label={aboutPage.trustTitle}>
+          <ul className="trust" role="list">
             {aboutPage.trust.map((item, i) => {
               const Icon = TRUST_ICONS[item.icon] ?? ShieldCheck
               return (

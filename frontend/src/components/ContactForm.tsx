@@ -1,10 +1,11 @@
 import { useState, type FormEvent } from 'react'
 import { Check, ClipboardCopy } from 'lucide-react'
 import { contactPage } from '../content/lawyers.fa.js'
+import { api } from '../services/api'
+import { isValidPhone } from '../utils/phone'
 import './ConsultationForm.css'
 
 const F = contactPage.form
-const PHONE_RE = /^(?:\+98|0)?9\d{9}$|^0\d{10}$/
 
 interface Errors {
   name?: string
@@ -16,8 +17,9 @@ interface Errors {
 /**
  * Contact message form — a general note to the office (subject + message),
  * unlike the consultation form which requests a specific practice area.
- * No backend exists, so it never pretends to send: it composes a ready-to-copy
- * message summary the visitor can use when calling or emailing the office.
+ * Submits as a support ticket: the visitor gets a ticket number + access
+ * code to track replies. If the API is unreachable it falls back to an
+ * honest copyable summary.
  */
 export function ContactForm() {
   const [name, setName] = useState('')
@@ -28,6 +30,9 @@ export function ContactForm() {
   const [errors, setErrors] = useState<Errors>({})
   const [summary, setSummary] = useState<string | null>(null)
   const [copied, setCopied] = useState(false)
+  const [submitting, setSubmitting] = useState(false)
+  const [ticket, setTicket] = useState<{ number: string; code: string } | null>(null)
+  const [sendFailed, setSendFailed] = useState(false)
 
   const subjectLabel =
     F.fields.subjects.find((s: { value: string; label: string }) => s.value === subject)
@@ -51,26 +56,60 @@ export function ContactForm() {
     }
   }
 
-  const onSubmit = (e: FormEvent) => {
+  const onSubmit = async (e: FormEvent) => {
     e.preventDefault()
-    if (honey) return // honeypot tripped — silently drop the bot submission
     const next: Errors = {}
     if (name.trim().length < 2) next.name = F.errors.name
-    if (!PHONE_RE.test(phone.replace(/[\s-]/g, ''))) next.phone = F.errors.phone
+    if (!isValidPhone(phone)) next.phone = F.errors.phone
     if (!subject) next.subject = F.errors.subject
     if (message.trim().length < 5) next.message = F.errors.message
     setErrors(next)
     if (Object.keys(next).length > 0) return
     const text = buildSummary()
-    setSummary(text)
-    void copy(text)
+    setSubmitting(true)
+    try {
+      const created = await api.post<{ ticket_number: string; access_code: string }>(
+        '/tickets',
+        {
+          requester_name: name.trim(),
+          requester_phone: phone.trim(),
+          subject: subjectLabel || subject,
+          category: subject,
+          body: message.trim(),
+          website: honey,
+        },
+      )
+      setTicket({ number: created.ticket_number, code: created.access_code })
+    } catch {
+      setSendFailed(true)
+    } finally {
+      setSubmitting(false)
+      setSummary(text)
+      void copy(text)
+    }
   }
 
   if (summary !== null) {
     return (
       <div className="cform__result" role="status">
-        <h2 className="cform__result-title">{F.readyTitle}</h2>
-        <p className="cform__result-text">{F.readyText}</p>
+        <h2 className="cform__result-title">
+          {ticket ? F.readyTitle : 'پیام شما آماده شد'}
+        </h2>
+        {ticket ? (
+          <>
+            <p className="cform__result-text">{F.readyText}</p>
+            <p className="cform__ticket">
+              شمارهٔ تیکت: <b dir="ltr">{ticket.number}</b> — کد پیگیری:{' '}
+              <b dir="ltr">{ticket.code}</b>
+            </p>
+          </>
+        ) : sendFailed ? (
+          <p className="cform__result-text">
+            ثبت آنلاین در این لحظه ممکن نشد — این خلاصه را هنگام تماس با دفتر در اختیار داشته باشید.
+          </p>
+        ) : (
+          <p className="cform__result-text">{F.readyText}</p>
+        )}
         <pre className="cform__summary" dir="rtl">
           {summary}
         </pre>
@@ -194,8 +233,8 @@ export function ContactForm() {
       </div>
 
       <div className="cform__actions">
-        <button type="submit" className="btn btn--primary">
-          {F.fields.submit}
+        <button type="submit" className="btn btn--primary" disabled={submitting}>
+          {submitting ? 'در حال ارسال…' : F.fields.submit}
         </button>
         <p className="cform__privacy">{F.privacy}</p>
       </div>

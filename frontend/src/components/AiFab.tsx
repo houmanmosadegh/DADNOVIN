@@ -2,23 +2,37 @@ import { useEffect, useRef, useState } from 'react'
 import { Link } from 'react-router-dom'
 import { Send, X } from 'lucide-react'
 import { aiConsultant } from '../content/lawyers.fa.js'
+import { siteFlags } from '../content/remote'
+import { api } from '../services/api'
 import './AiFab.css'
 
 type Msg = { id: number; from: 'ai' | 'user'; text: string }
 
+const SESSION_KEY = 'dn_ai_session'
+
 /**
- * Floating AI-consultant button + chat panel — UI only, no backend.
- * Every sent message gets one honest canned reply pointing at the real
- * consultation form; nothing pretends an AI answered.
+ * Floating AI-consultant button + chat panel — backed by the site's
+ * knowledge-grounded assistant. When the API is unreachable it answers
+ * with the honest canned reply pointing at the consultation form.
  */
 export function AiFab() {
   const c = aiConsultant.chat
   const [open, setOpen] = useState(false)
   const [msgs, setMsgs] = useState<Msg[]>([])
   const [draft, setDraft] = useState('')
+  const [busy, setBusy] = useState(false)
+  const sessionKey = useRef('')
   const nextId = useRef(1)
   const inputRef = useRef<HTMLTextAreaElement>(null)
   const listRef = useRef<HTMLDivElement>(null)
+
+  useEffect(() => {
+    try {
+      sessionKey.current = localStorage.getItem(SESSION_KEY) ?? ''
+    } catch {
+      /* private mode */
+    }
+  }, [])
 
   useEffect(() => {
     if (!open) return
@@ -39,16 +53,36 @@ export function AiFab() {
     return () => window.removeEventListener('keydown', onKey)
   }, [open])
 
-  const send = () => {
+  const send = async () => {
     const text = draft.trim()
-    if (!text) return
+    if (!text || busy) return
     setDraft('')
+    setBusy(true)
     setMsgs((m) => [...m, { id: nextId.current++, from: 'user', text }])
-    window.setTimeout(
-      () => setMsgs((m) => [...m, { id: nextId.current++, from: 'ai', text: c.reply }]),
-      600,
-    )
+    try {
+      const res = await api.post<{ reply: string; session_key: string }>(
+        '/ai/chat',
+        {
+          session_key: sessionKey.current,
+          messages: [{ role: 'user', content: text }],
+        },
+      )
+      sessionKey.current = res.session_key
+      try {
+        localStorage.setItem(SESSION_KEY, res.session_key)
+      } catch {
+        /* private mode */
+      }
+      setMsgs((m) => [...m, { id: nextId.current++, from: 'ai', text: res.reply }])
+    } catch {
+      // offline/API down — honest canned fallback, not a fake AI answer
+      setMsgs((m) => [...m, { id: nextId.current++, from: 'ai', text: c.reply }])
+    } finally {
+      setBusy(false)
+    }
   }
+
+  if (!siteFlags.aiEnabled) return null
 
   return (
     <>
@@ -64,7 +98,10 @@ export function AiFab() {
         {open ? (
           <X size={22} strokeWidth={1.8} aria-hidden="true" />
         ) : (
-          <img className="ai-fab__img" src={aiConsultant.img} width="64" height="64" alt="" />
+          <picture>
+            <source type="image/webp" srcSet={aiConsultant.img} />
+            <img className="ai-fab__img" src={aiConsultant.imgFallback} width="64" height="64" alt="" />
+          </picture>
         )}
         <span className="ai-fab__label">{open ? c.close : aiConsultant.label}</span>
       </button>
@@ -72,7 +109,10 @@ export function AiFab() {
       {open ? (
         <div className="ai-chat" role="dialog" aria-label={c.title}>
           <header className="ai-chat__head">
-            <img className="ai-chat__avatar" src={aiConsultant.img} width="40" height="40" alt="" />
+            <picture>
+              <source type="image/webp" srcSet={aiConsultant.img} />
+              <img className="ai-chat__avatar" src={aiConsultant.imgFallback} width="40" height="40" alt="" />
+            </picture>
             <div className="ai-chat__id">
               <b>{c.title}</b>
               <span className="ai-chat__status">
@@ -96,6 +136,11 @@ export function AiFab() {
                 {m.text}
               </p>
             ))}
+            {busy ? (
+              <p className="ai-chat__msg ai-chat__msg--ai ai-chat__msg--typing" aria-live="polite">
+                …
+              </p>
+            ) : null}
             <Link className="ai-chat__cta" to={aiConsultant.to} onClick={() => setOpen(false)}>
               {c.cta}
             </Link>

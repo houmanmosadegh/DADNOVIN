@@ -12,7 +12,9 @@ interface CountUpProps {
 /** One-shot count-up on first viewport entry; instant under reduced-motion. */
 export function CountUp({ value, suffix = '', duration = 950, className }: CountUpProps) {
   const ref = useRef<HTMLSpanElement>(null)
-  const [display, setDisplay] = useState(0)
+  // initial render shows the real value — prerendered HTML stays correct for
+  // crawlers/no-JS; the effect rewinds to 0 only when the count actually starts
+  const [display, setDisplay] = useState(value)
 
   useEffect(() => {
     const el = ref.current
@@ -23,6 +25,7 @@ export function CountUp({ value, suffix = '', duration = 950, className }: Count
     }
     let raf = 0
     const start = () => {
+      setDisplay(0)
       const t0 = performance.now()
       const tick = (now: number) => {
         const t = Math.min(1, (now - t0) / duration)

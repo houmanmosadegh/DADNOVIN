@@ -1,19 +1,19 @@
-import { ChapterHead } from '../components/ChapterHead'
+import { SectionHeading } from '../components/SectionHeading'
 import { Reveal } from '../components/Reveal'
 import { LawyerCard } from '../components/LawyerCard'
-import { lawyers } from '../content/lawyers.fa.js'
+import { home, lawyers } from '../content/lawyers.fa.js'
 
 export function LawyersSection() {
   return (
     <section className="section lawyers" id="team" aria-labelledby="lawyers-title">
       <div className="container">
         <Reveal>
-          <ChapterHead
-            index="۰۴"
-            eyebrow="تیم حقوقی"
-            title="وکلا و مشاوران دادنوین"
+          <SectionHeading
+            index={4}
+            eyebrow={home.lawyers.eyebrow}
+            title={home.lawyers.title}
             id="lawyers-title"
-            lead="همراهی متخصصانی که پرونده شما را با دقت و صداقت پیش می‌برند."
+            lead={home.lawyers.lead}
           />
         </Reveal>
 

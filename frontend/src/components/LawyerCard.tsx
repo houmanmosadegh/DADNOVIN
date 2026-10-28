@@ -35,6 +35,8 @@ export function LawyerCard({
         {showImage ? (
           <img
             src={portrait as string}
+            srcSet={`${(portrait as string).replace('-720.webp', '-440.webp')} 440w, ${portrait} 720w`}
+            sizes="(max-width: 56rem) 19rem, 16.5rem"
             alt={`پرتره ${name}`}
             loading="lazy"
             decoding="async"

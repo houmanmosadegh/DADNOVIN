@@ -1,11 +1,12 @@
-import { useState, type FormEvent } from 'react'
+import { useEffect, useState, type FormEvent } from 'react'
 import { Link, useSearchParams } from 'react-router-dom'
 import { Check, ClipboardCopy } from 'lucide-react'
 import { consultationPage, services } from '../content/lawyers.fa.js'
+import { api } from '../services/api'
+import { isValidPhone } from '../utils/phone'
 import './ConsultationForm.css'
 
 const F = consultationPage.form
-const PHONE_RE = /^(?:\+98|0)?9\d{9}$|^0\d{10}$/
 
 interface Errors {
   name?: string
@@ -14,9 +15,9 @@ interface Errors {
 }
 
 /**
- * Consultation request form — real client-side validation; on success it
- * composes a request summary and copies it to the clipboard. There is no
- * backend, so it never pretends to "send" anything.
+ * Consultation request form — real client-side validation, submits to the
+ * backend and also produces a copyable request summary. If the API is
+ * unreachable the summary is still offered and the UI says so honestly.
  */
 export function ConsultationForm() {
   // /consultation?service=<slug> (from a service detail CTA) preselects the topic
@@ -32,6 +33,14 @@ export function ConsultationForm() {
   const [errors, setErrors] = useState<Errors>({})
   const [summary, setSummary] = useState<string | null>(null)
   const [copied, setCopied] = useState(false)
+  const [submitting, setSubmitting] = useState(false)
+  const [sent, setSent] = useState<boolean | null>(null)
+
+  // a fresh ?service=slug while the form stays mounted (e.g. another CTA)
+  // re-syncs the select — the useState initializer only covers first mount
+  useEffect(() => {
+    if (services.some((s) => s.slug === preselect)) setService(preselect)
+  }, [preselect])
 
   const serviceTitle =
     service === 'other'
@@ -58,25 +67,52 @@ export function ConsultationForm() {
     }
   }
 
-  const onSubmit = (e: FormEvent) => {
+  const onSubmit = async (e: FormEvent) => {
     e.preventDefault()
-    if (honey) return // honeypot tripped — silently drop the bot submission
     const next: Errors = {}
     if (name.trim().length < 2) next.name = F.errors.name
-    if (!PHONE_RE.test(phone.replace(/[\s-]/g, ''))) next.phone = F.errors.phone
+    if (!isValidPhone(phone)) next.phone = F.errors.phone
     if (!service) next.service = F.errors.service
     setErrors(next)
     if (Object.keys(next).length > 0) return
     const text = buildSummary()
-    setSummary(text)
-    void copy(text)
+    setSubmitting(true)
+    try {
+      // real submission — persisted server-side; the honeypot field is
+      // forwarded so the backend can silently drop bot traffic
+      await api.post('/consultations', {
+        full_name: name.trim(),
+        phone: phone.trim(),
+        service_slug: service === 'other' ? '' : service,
+        topic: service === 'other' ? F.fields.serviceOther : serviceTitle,
+        message: message.trim(),
+        source_page: '/consultation',
+        website: honey,
+      })
+      setSent(true)
+    } catch {
+      // backend unreachable — keep the copyable summary honest about it
+      setSent(false)
+    } finally {
+      setSubmitting(false)
+      setSummary(text)
+      void copy(text)
+    }
   }
 
   if (summary !== null) {
     return (
       <div className="cform__result" role="status">
         <h2 className="cform__result-title">{F.readyTitle}</h2>
-        <p className="cform__result-text">{F.readyText}</p>
+        {sent === true ? (
+          <p className="cform__result-text">
+            درخواست شما در سامانهٔ دفتر ثبت شد؛ برای پیگیری سریع‌تر می‌توانید با شماره‌های درج‌شده در صفحهٔ تماس در ارتباط باشید.
+          </p>
+        ) : (
+          <p className="cform__result-text">
+            ثبت آنلاین در این لحظه ممکن نشد — این خلاصه را هنگام تماس با دفتر در اختیار داشته باشید.
+          </p>
+        )}
         <pre className="cform__summary" dir="rtl">
           {summary}
         </pre>
@@ -197,8 +233,8 @@ export function ConsultationForm() {
       </div>
 
       <div className="cform__actions">
-        <button type="submit" className="btn btn--primary">
-          {F.fields.submit}
+        <button type="submit" className="btn btn--primary" disabled={submitting}>
+          {submitting ? 'در حال ارسال…' : F.fields.submit}
         </button>
       </div>
     </form>

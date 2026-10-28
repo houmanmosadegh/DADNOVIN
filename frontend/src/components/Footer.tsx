@@ -77,12 +77,6 @@ export function Footer() {
                 </a>
               </li>
             ) : null}
-            {contact.address ? (
-              <li>
-                <MapPin size={16} aria-hidden="true" />
-                <span className="site-footer__link">{contact.address}</span>
-              </li>
-            ) : null}
             <li>
               <span className="site-footer__note">
                 برای هماهنگی مشاوره، از طریق{' '}

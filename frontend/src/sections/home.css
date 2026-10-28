@@ -356,18 +356,13 @@
 .picture__copy {
   max-width: 32rem;
 }
-.picture__title {
-  margin-top: 0.65rem;
+.picture .sec-head__title {
   font-size: clamp(1.5rem, 1.05rem + 2.1vw, 2.3rem);
-  font-weight: 700;
-  line-height: 1.55;
-  text-wrap: balance;
 }
-.picture__lead {
+.picture .sec-head__lead {
   margin-top: 1rem;
   font-size: 1rem;
   line-height: 1.95;
-  color: var(--color-text-2);
 }
 .picture__link {
   display: inline-flex;
@@ -506,17 +501,12 @@
 .cta-band__copy {
   max-width: 42rem;
 }
-.cta-band__title {
-  margin-top: 0.7rem;
+.cta-band .sec-head__title {
   font-size: clamp(1.6rem, 1.15rem + 2vw, 2.4rem);
-  font-weight: 700;
-  line-height: 1.55;
-  text-wrap: balance;
 }
-.cta-band__text {
+.cta-band .sec-head__lead {
   margin-top: 0.8rem;
   max-width: 33rem;
-  color: var(--color-text-2);
 }
 .cta-band__side {
   display: grid;

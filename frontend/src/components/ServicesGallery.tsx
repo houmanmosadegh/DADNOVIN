@@ -3,6 +3,7 @@ import { Link } from 'react-router-dom'
 import { ArrowLeft } from 'lucide-react'
 import { Button } from './Button'
 import { Reveal } from './Reveal'
+import { SectionHeading } from './SectionHeading'
 import { StatueParticles } from './StatueParticles'
 import { trackGlow } from '../utils/pointerGlow'
 import { cta, home, services, servicesPage } from '../content/lawyers.fa.js'
@@ -42,7 +43,6 @@ function resetCard(e: React.PointerEvent<HTMLElement>) {
 export function ServicesGallery({ variant = 'home' }: { variant?: 'home' | 'page' }) {
   const isPage = variant === 'page'
   const [statueEl, setStatueEl] = useState<HTMLImageElement | null>(null)
-  const Title = isPage ? 'h1' : 'h2'
   const CardTitle = isPage ? 'h2' : 'h3'
   const head = {
     eyebrow: home.services.eyebrow,
@@ -107,21 +107,24 @@ export function ServicesGallery({ variant = 'home' }: { variant?: 'home' | 'page
             </span>
           </Reveal>
           <Reveal className="sg__text">
-            <span className="sg__eyebrow">
-              {isPage ? null : <b aria-hidden="true">۰۳</b>}
-              {head.eyebrow}
-            </span>
-            <Title className="sg__title" id={isPage ? 'services-page-title' : 'services-title'}>
-              {head.title}
-            </Title>
-            <p className="sg__lead">{head.lead}</p>
+            <SectionHeading
+              index={isPage ? undefined : 3}
+              eyebrow={head.eyebrow}
+              title={head.title}
+              id={isPage ? 'services-page-title' : 'services-title'}
+              lead={head.lead}
+              align="center"
+              level={isPage ? 1 : 2}
+            />
           </Reveal>
         </header>
 
         {/* six black-marble emblem cards — two per row */}
         <div className="sg__grid" role="list">
           {services.map((service, i) => {
-            const dim = SYMBOL_DIMS[service.symbol]
+            // a symbol missing from the table degrades to a square box —
+            // better than crashing the whole gallery on a data typo
+            const dim = SYMBOL_DIMS[service.symbol] ?? { w: 384, h: 384 }
             return (
               <Reveal key={service.slug} delay={delayFor(i)} className="sg__cell">
                 <Link

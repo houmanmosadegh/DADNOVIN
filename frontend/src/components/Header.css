@@ -48,6 +48,12 @@
   transform: scaleX(0);
   transform-origin: right center; /* RTL: grows from the reading edge */
   will-change: transform;
+  transition: opacity var(--dur-fast) var(--ease-out);
+}
+/* the open drawer lives inside .site-header__inner (z-2) — the progress
+   line must not slice across it */
+.site-header.is-open .site-header__progress {
+  opacity: 0;
 }
 
 .site-header__inner {
@@ -205,6 +211,13 @@
 
   .nav-toggle {
     display: grid;
+  }
+
+  /* keep the ✕ button above the open drawer (drawer is z-3 inside the
+     header-inner stacking context) */
+  .site-header__actions {
+    position: relative;
+    z-index: 4;
   }
 
   .nav-backdrop {

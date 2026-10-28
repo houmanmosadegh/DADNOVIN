@@ -69,11 +69,15 @@ export function HeroSection() {
           <dl className="hero__meta">
             <div className="hero__meta-item">
               <dt className="sr-only">تعداد وکلا</dt>
-              <dd>{faNum.format(lawyers.length)} وکیل و مشاور</dd>
+              <dd>
+                {faNum.format(lawyers.length)} {home.stats.lawyersSuffix}
+              </dd>
             </div>
             <div className="hero__meta-item">
               <dt className="sr-only">حوزه‌های خدمات</dt>
-              <dd>{faNum.format(services.length)} حوزهٔ تخصصی</dd>
+              <dd>
+                {faNum.format(services.length)} {home.stats.servicesSuffix}
+              </dd>
             </div>
             <div className="hero__meta-item">
               <dt className="sr-only">شهر</dt>
