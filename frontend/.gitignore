@@ -1,0 +1,18 @@
+node_modules/
+dist/
+dist-ssr/
+*.log
+.DS_Store
+
+# local agent/tooling dirs — never shipped
+.agents/
+.taste-skill/
+.devin/
+
+# env & editor junk
+.env
+.env.*
+!.env.example
+coverage/
+.idea/
+.vscode/

@@ -1,0 +1,81 @@
+:root {
+  /* ============ Dadnovin design tokens ============
+     Ink: warm near-black depth scale (channels for alpha compositing).
+     Gold: champagne/bronze — deep base, main, bright highlight.
+     Ivory: warm text — never pure white. */
+
+  /* --- channels (use as `rgb(var(--x) / <alpha>)`) --- */
+  --ink-rgb: 12 17 32;         /* #0c1120 page bg — deep navy, not black */
+  --ink-0-rgb: 8 11 21;        /* deepest — underlays, drawer shadow */
+  --ink-2-rgb: 18 26 48;       /* #121a30 raised surface */
+  --ink-3-rgb: 21 30 54;       /* #151e36 surface */
+  --ink-4-rgb: 34 43 64;       /* #222b40 graphite hairline base */
+  --gold-rgb: 215 181 109;     /* #d7b56d champagne */
+  --gold-hi-rgb: 255 203 101;  /* #ffcb65 bright */
+  --gold-deep-rgb: 166 130 58; /* #a6823a bronze */
+  --gold-soft-rgb: 223 192 132;/* #dfc084 light champagne */
+  --ivory-rgb: 243 240 232;    /* #f3f0e8 warm white */
+  --error-rgb: 217 122 108;    /* #d97a6c muted red */
+  --error-hi-rgb: 232 150 138; /* #e8968a brighter error text */
+  --gold-ink-rgb: 26 20 7;     /* warm near-black text on gold fills */
+
+  /* --- semantic colors --- */
+  --color-bg: rgb(var(--ink-rgb));
+  --color-bg-deep: rgb(var(--ink-0-rgb));
+  --color-surface: rgb(var(--ink-3-rgb));
+  --color-surface-2: rgb(var(--ink-2-rgb));
+  --color-gold: rgb(var(--gold-rgb));
+  --color-gold-hi: rgb(var(--gold-hi-rgb));
+  --color-gold-deep: rgb(var(--gold-deep-rgb));
+  --color-text: rgb(var(--ivory-rgb));
+  --color-text-2: #a7afbd;
+  --color-error: rgb(var(--error-rgb));
+
+  /* --- lines & borders --- */
+  --color-border: rgb(var(--ivory-rgb) / 0.08);
+  --color-border-gold: rgb(var(--gold-rgb) / 0.26);
+  --line-gold: linear-gradient(
+    90deg,
+    transparent 0%,
+    rgb(var(--gold-rgb) / 0.7) 50%,
+    transparent 100%
+  );
+
+  /* --- gold gradients (no flat yellow fills) --- */
+  --gradient-gold: linear-gradient(
+    135deg,
+    rgb(var(--gold-soft-rgb)) 0%,
+    rgb(var(--gold-rgb)) 45%,
+    rgb(var(--gold-deep-rgb)) 100%
+  );
+  --gradient-gold-text: linear-gradient(
+    100deg,
+    rgb(var(--gold-hi-rgb)) 0%,
+    rgb(var(--gold-rgb)) 55%,
+    rgb(var(--gold-deep-rgb)) 110%
+  );
+
+  /* --- typography ---
+     display: Markazi Text (Persian naskh serif) — headings, formal legal gravitas
+     body:    Vazirmatn (variable) — readable UI/body
+     latin:   Cormorant Garamond — wordmark serif */
+  --font-fa: 'Vazirmatn Variable', 'Vazirmatn', 'Segoe UI', Tahoma, system-ui, sans-serif;
+  --font-display: 'Markazi Text', 'Vazirmatn Variable', 'Vazirmatn', 'Segoe UI', Tahoma, serif;
+  --font-en: 'Cormorant Garamond', Georgia, 'Times New Roman', serif;
+
+  /* --- layout --- */
+  --container: 72rem;
+  --header-h: 4.5rem;
+  --radius-s: 0.625rem;
+  --radius-m: 0.875rem;
+  --radius-l: 1.25rem;
+
+  /* --- elevation --- */
+  --shadow-card: 0 10px 30px -12px rgb(var(--ink-0-rgb) / 0.75);
+  --shadow-gold: 0 8px 28px -10px rgb(var(--gold-rgb) / 0.3);
+
+  /* --- motion --- */
+  --ease-out: cubic-bezier(0.22, 0.61, 0.21, 1);
+  --dur-fast: 160ms;
+  --dur-med: 280ms;
+}

@@ -1,0 +1,110 @@
+.site-footer {
+  border-top: 1px solid transparent;
+  border-image: var(--line-gold) 1;
+  background: var(--color-bg-deep);
+}
+
+.site-footer__grid {
+  display: grid;
+  grid-template-columns: 1.5fr 1fr 1.1fr 1.3fr;
+  gap: 2.5rem;
+  padding-block: 3.5rem 2.75rem;
+}
+
+.site-footer__brand .brand__name {
+  font-size: 1.05rem;
+}
+.site-footer__desc {
+  margin-top: 1.15rem;
+  max-width: 26rem;
+  font-size: 0.9rem;
+  line-height: 1.9;
+  color: var(--color-text-2);
+}
+
+.site-footer__heading {
+  position: relative;
+  padding-bottom: 0.7rem;
+  font-size: 0.95rem;
+  font-weight: 700;
+  color: var(--color-gold-hi);
+}
+.site-footer__heading::after {
+  content: '';
+  position: absolute;
+  inset-inline-start: 0;
+  bottom: 0;
+  width: 2.2rem;
+  height: 2px;
+  border-radius: 2px;
+  background: var(--color-gold);
+}
+
+.site-footer__col ul {
+  display: grid;
+  gap: 0.55rem;
+  margin-top: 1.15rem;
+  padding: 0;
+  list-style: none;
+}
+
+.site-footer__link {
+  font-size: 0.9rem;
+  color: var(--color-text-2);
+  transition: color var(--dur-fast) var(--ease-out);
+}
+.site-footer__link:hover {
+  color: var(--color-gold-hi);
+}
+.site-footer__link--gold {
+  color: var(--color-gold);
+  font-weight: 600;
+}
+
+.site-footer__contact li {
+  display: flex;
+  align-items: baseline;
+  gap: 0.55rem;
+  color: var(--color-text-2);
+}
+.site-footer__contact svg {
+  flex: none;
+  color: var(--color-gold);
+  translate: 0 2px;
+}
+.site-footer__note {
+  font-size: 0.88rem;
+  line-height: 1.9;
+}
+
+.site-footer__bar {
+  border-top: 1px solid var(--color-border);
+  background: rgb(var(--ink-rgb) / 0.55);
+}
+.site-footer__bar-inner {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  padding: 1.35rem 1.25rem;
+  font-size: 0.82rem;
+  color: var(--color-text-2);
+  text-align: center;
+}
+
+@media (max-width: 56rem) {
+  .site-footer__grid {
+    grid-template-columns: 1fr 1fr;
+    gap: 2rem;
+  }
+}
+
+@media (max-width: 34rem) {
+  .site-footer__grid {
+    grid-template-columns: 1fr;
+  }
+  .site-footer__bar-inner {
+    flex-direction: column;
+    gap: 0.4rem;
+    text-align: center;
+  }
+}

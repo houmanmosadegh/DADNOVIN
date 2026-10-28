@@ -1,0 +1,565 @@
+/* ================================================================
+   Services gallery — statue on the bronze hairline (left) + six
+   black-marble emblem cards, two per row (reference card design:
+   3D symbol on a rock base → latin label → title → text → pill CTA).
+   ================================================================ */
+
+.sg {
+  position: relative;
+}
+.sg--page {
+  padding-top: 1.5rem;
+}
+
+/* ---------------- header — statue on the left ---------------- */
+.sg__head {
+  position: relative;
+  display: flex;
+  align-items: flex-end;
+  min-height: calc(var(--sg-statue-h, 20rem) + clamp(2.5rem, 6vw, 5rem));
+  margin-bottom: clamp(3.5rem, 6vw, 4.5rem);
+  --sg-statue-h: clamp(17rem, 24vw, 23rem);
+}
+.sg__stage {
+  position: absolute;
+  inset: 0;
+}
+/* statue zone — a wide band from the left edge toward mid-section;
+   the figure is centred inside it so it never hugs the frame edge */
+.sg__decor {
+  position: absolute;
+  inset-block: 0;
+  left: 0;
+  width: clamp(24rem, 46%, 46rem);
+}
+
+/* feet melt into the line via the bottom mask fade */
+.sg__statue {
+  position: absolute;
+  bottom: 0;
+  inset-inline-end: 50%; /* centred inside the decor zone */
+  height: var(--sg-statue-h);
+  width: auto;
+  -webkit-mask-image: linear-gradient(180deg, #000 92%, transparent 100%);
+  mask-image: linear-gradient(180deg, #000 92%, transparent 100%);
+  filter: drop-shadow(0 14px 26px rgb(0 0 0 / 0.55));
+  translate: calc(-50% + var(--sx, 0px)) var(--sy, 0px); /* centre + ≤8px parallax */
+}
+
+/* particle-reveal canvas — same box as the statue, painted beneath it.
+   Hard-clipped to the statue's own alpha so particles only ever exist
+   inside the figure — the reveal reads as points rising through the
+   surface, never scattering around it */
+.sg__points {
+  position: absolute;
+  bottom: 0;
+  inset-inline-end: 50%;
+  height: var(--sg-statue-h);
+  aspect-ratio: 561 / 755;
+  translate: calc(-50% + var(--sx, 0px)) var(--sy, 0px);
+  pointer-events: none;
+  -webkit-mask-image: url('/images/man-legal.webp'),
+    linear-gradient(180deg, #000 92%, transparent 100%);
+  mask-image: url('/images/man-legal.webp'),
+    linear-gradient(180deg, #000 92%, transparent 100%);
+  -webkit-mask-composite: source-in;
+  mask-composite: intersect;
+  -webkit-mask-size: 100% 100%;
+  mask-size: 100% 100%;
+}
+@media (max-width: 47.99rem) {
+  .sg__points {
+    inset-inline-end: 50%;
+    translate: -50% 0;
+  }
+}
+/* live mode: soft holes (--hx0…/--hy0…/--hr0…, JS-driven) dissolve the
+   photo locally to reveal the particles below; slot 0 is the big
+   whole-statue dissolve while the cloud is dragged/rotated.
+   The final url() layer is the statue's own alpha — intersect confines
+   every hole to the figure silhouette (never the transparent padding);
+   the linear layer keeps the foot fade */
+.sg__statue.is-live {
+  -webkit-mask-image:
+    radial-gradient(circle var(--hr0, 0px) at var(--hx0, -100px) var(--hy0, -100px), transparent 58%, #000 99%),
+    radial-gradient(circle var(--hr1, 0px) at var(--hx1, -100px) var(--hy1, -100px), transparent 58%, #000 99%),
+    radial-gradient(circle var(--hr2, 0px) at var(--hx2, -100px) var(--hy2, -100px), transparent 58%, #000 99%),
+    radial-gradient(circle var(--hr3, 0px) at var(--hx3, -100px) var(--hy3, -100px), transparent 58%, #000 99%),
+    radial-gradient(circle var(--hr4, 0px) at var(--hx4, -100px) var(--hy4, -100px), transparent 58%, #000 99%),
+    url('/images/man-legal.webp'),
+    linear-gradient(180deg, #000 92%, transparent 100%);
+  mask-image:
+    radial-gradient(circle var(--hr0, 0px) at var(--hx0, -100px) var(--hy0, -100px), transparent 58%, #000 99%),
+    radial-gradient(circle var(--hr1, 0px) at var(--hx1, -100px) var(--hy1, -100px), transparent 58%, #000 99%),
+    radial-gradient(circle var(--hr2, 0px) at var(--hx2, -100px) var(--hy2, -100px), transparent 58%, #000 99%),
+    radial-gradient(circle var(--hr3, 0px) at var(--hx3, -100px) var(--hy3, -100px), transparent 58%, #000 99%),
+    radial-gradient(circle var(--hr4, 0px) at var(--hx4, -100px) var(--hy4, -100px), transparent 58%, #000 99%),
+    url('/images/man-legal.webp'),
+    linear-gradient(180deg, #000 92%, transparent 100%);
+  -webkit-mask-composite: source-in;
+  mask-composite: intersect;
+  -webkit-mask-size: 100% 100%;
+  mask-size: 100% 100%;
+}
+/* reveal-only interaction — no grabbing; touch scrolls normally */
+.sg__decor {
+  touch-action: pan-y;
+}
+
+/* mirrored hint of the statue under the line */
+.sg__reflection {
+  position: absolute;
+  top: calc(100% + 1px);
+  inset-inline-end: 50%;
+  height: var(--sg-statue-h);
+  width: auto;
+  translate: -50% 0;
+  scale: 1 -1;
+  transform-origin: top;
+  opacity: 0.13;
+  filter: blur(1.5px) brightness(0.85);
+  -webkit-mask-image: linear-gradient(180deg, #000, transparent 22%);
+  mask-image: linear-gradient(180deg, #000, transparent 22%);
+}
+
+/* soft elliptical contact shadow on the line */
+.sg__shadow {
+  position: absolute;
+  bottom: -0.55rem;
+  inset-inline-end: 50%;
+  translate: -50% 0;
+  width: calc(var(--sg-statue-h) * 0.72);
+  height: 1.1rem;
+  border-radius: 50%;
+  background: radial-gradient(50% 50% at 50% 50%, rgb(0 0 0 / 0.62), transparent 72%);
+  filter: blur(3px);
+}
+
+/* the bronze hairline, drawn from the centre on entrance */
+.sg__line {
+  position: absolute;
+  left: 0;
+  right: 0;
+  bottom: 0;
+  height: 2px;
+  z-index: 3; /* passes in front of the robe */
+  background: linear-gradient(
+    90deg,
+    transparent,
+    rgb(var(--gold-rgb) / 0.5) 20%,
+    rgb(var(--gold-hi-rgb) / 0.85) 50%,
+    rgb(var(--gold-rgb) / 0.5) 80%,
+    transparent
+  );
+  box-shadow: 0 0 14px rgb(var(--gold-rgb) / 0.4);
+}
+.sg__line-diamond {
+  position: absolute;
+  top: 50%;
+  left: 50%;
+  width: 7px;
+  height: 7px;
+  transform: translate(-50%, -50%) rotate(45deg);
+  background: var(--color-gold-hi);
+  box-shadow: 0 0 10px rgb(var(--gold-hi-rgb) / 0.85);
+}
+/* entrance: line sweeps out from centre, statue rises 24px onto it */
+.reveal.is-visible .sg__line {
+  animation: sgLineIn 0.9s var(--ease-out) 0.15s both;
+}
+.reveal.is-visible .sg__statue {
+  animation: sgStatueIn 0.85s var(--ease-out) 0.4s both;
+}
+.reveal.is-visible .sg__reflection,
+.reveal.is-visible .sg__shadow {
+  animation: sgFade 1.1s var(--ease-out) 0.7s both;
+}
+@keyframes sgLineIn {
+  from {
+    transform: scaleX(0);
+  }
+  to {
+    transform: scaleX(1);
+  }
+}
+@keyframes sgStatueIn {
+  from {
+    opacity: 0;
+    transform: translateY(24px);
+  }
+  to {
+    opacity: 1;
+    transform: translateY(0);
+  }
+}
+@keyframes sgFade {
+  from {
+    opacity: 0;
+  }
+}
+
+/* centred title block — the statue side stays calm and empty */
+.sg__text {
+  position: relative;
+  z-index: 2;
+  margin-inline: 0 auto; /* right margin 0, left auto → block sits on the right */
+  max-width: 38rem;
+  padding-inline-end: clamp(2rem, 5vw, 5rem);
+  padding-bottom: clamp(2.2rem, 4vw, 3rem);
+  text-align: center;
+}
+.sg__eyebrow {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.6rem;
+  font-size: 0.8125rem;
+  font-weight: 600;
+  letter-spacing: 0.03em;
+  color: var(--color-gold);
+}
+.sg__eyebrow::before,
+.sg__eyebrow::after {
+  content: '';
+  width: 1.6rem;
+  height: 1px;
+  background: var(--color-gold);
+  opacity: 0.7;
+}
+.sg__eyebrow b {
+  font-weight: 700;
+  font-size: 0.95rem;
+}
+.sg__title {
+  margin-top: 0.7rem;
+  font-size: clamp(1.85rem, 1.25rem + 2.6vw, 2.8rem);
+  font-weight: 700;
+  line-height: 1.5;
+  text-wrap: balance;
+}
+.sg__lead {
+  margin-top: 0.9rem;
+  color: var(--color-text-2);
+  line-height: 1.9;
+}
+
+/* ---------------- black-marble emblem cards — two per row ---------------- */
+.sg__grid {
+  display: grid;
+  grid-template-columns: repeat(3, 1fr);
+  gap: clamp(1.1rem, 2.4vw, 1.9rem);
+  max-width: 66rem;
+  margin-inline: auto;
+}
+.sg__cell {
+  position: relative;
+  height: 100%;
+}
+
+.sg-card {
+  position: relative;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  height: 100%;
+  padding: clamp(1.5rem, 2.6vw, 2.2rem) clamp(1rem, 2vw, 1.6rem)
+    clamp(1.1rem, 1.8vw, 1.4rem);
+  text-align: center;
+  border: 1px solid rgb(var(--gold-rgb) / 0.38);
+  border-radius: var(--radius-m);
+  overflow: hidden;
+  /* clean deep-navy panel — soft top sheen + faint warm glow, no streaks */
+  background:
+    linear-gradient(168deg, rgb(255 255 255 / 0.05), transparent 34%),
+    radial-gradient(120% 80% at 50% -10%, rgb(var(--gold-rgb) / 0.07), transparent 55%),
+    linear-gradient(170deg, rgb(var(--ink-2-rgb)), rgb(var(--ink-0-rgb)) 78%);
+  box-shadow:
+    0 22px 40px -20px rgb(0 0 0 / 0.9),
+    inset 0 0 0 1px rgb(var(--gold-rgb) / 0.07);
+  transition:
+    transform var(--dur-med) var(--ease-out),
+    border-color var(--dur-med) var(--ease-out),
+    box-shadow var(--dur-med) var(--ease-out);
+  transform: perspective(900px) rotateX(var(--tx, 0deg)) rotateY(var(--ty, 0deg));
+}
+/* gold corner brackets — the reference's ornate frame */
+.sg-card::before {
+  content: '';
+  position: absolute;
+  inset: 0.55rem;
+  pointer-events: none;
+  background:
+    linear-gradient(rgb(var(--gold-rgb) / 0.6), rgb(var(--gold-rgb) / 0.6)) left top / 14px 1.5px,
+    linear-gradient(rgb(var(--gold-rgb) / 0.6), rgb(var(--gold-rgb) / 0.6)) left top / 1.5px 14px,
+    linear-gradient(rgb(var(--gold-rgb) / 0.6), rgb(var(--gold-rgb) / 0.6)) right top / 14px 1.5px,
+    linear-gradient(rgb(var(--gold-rgb) / 0.6), rgb(var(--gold-rgb) / 0.6)) right top / 1.5px 14px,
+    linear-gradient(rgb(var(--gold-rgb) / 0.6), rgb(var(--gold-rgb) / 0.6)) left bottom / 14px 1.5px,
+    linear-gradient(rgb(var(--gold-rgb) / 0.6), rgb(var(--gold-rgb) / 0.6)) left bottom / 1.5px 14px,
+    linear-gradient(rgb(var(--gold-rgb) / 0.6), rgb(var(--gold-rgb) / 0.6)) right bottom / 14px 1.5px,
+    linear-gradient(rgb(var(--gold-rgb) / 0.6), rgb(var(--gold-rgb) / 0.6)) right bottom / 1.5px 14px;
+  background-repeat: no-repeat;
+}
+/* pointer spotlight on the marble */
+.sg-card__halo {
+  position: absolute;
+  inset: 0;
+  background: radial-gradient(
+    11rem 11rem at var(--gx, 50%) var(--gy, 0%),
+    rgb(var(--gold-rgb) / 0.12),
+    transparent 65%
+  );
+  opacity: 0;
+  transition: opacity var(--dur-med) var(--ease-out);
+  pointer-events: none;
+}
+.sg-card:hover {
+  transform: perspective(900px) rotateX(var(--tx, 0deg)) rotateY(var(--ty, 0deg))
+    translateY(-6px);
+  border-color: rgb(var(--gold-rgb) / 0.5);
+  box-shadow:
+    0 28px 46px -20px rgb(0 0 0 / 0.8),
+    0 0 32px -10px rgb(var(--gold-rgb) / 0.28),
+    inset 0 0 0 1px rgb(var(--gold-rgb) / 0.09);
+}
+.sg-card:hover .sg-card__halo,
+.sg-card:focus-visible .sg-card__halo {
+  opacity: 1;
+}
+.sg-card:focus-visible {
+  outline: 2px solid var(--color-gold);
+  outline-offset: 3px;
+}
+.sg-card:target {
+  border-color: rgb(var(--gold-rgb) / 0.6);
+}
+.sg-card[id] {
+  scroll-margin-top: calc(var(--header-h) + 1.5rem);
+}
+
+/* figure zone — every emblem stands on the same rough rock plinth */
+.sg-card__figure {
+  position: relative;
+  display: grid;
+  align-items: end;
+  justify-items: center;
+  width: 100%;
+  height: clamp(9.5rem, 12vw, 12rem);
+  margin: 0 0 1.35rem;
+}
+/* thin gold ribbon under the emblem — same hairline as the CTA pill */
+.sg-card__figure::after {
+  content: '';
+  position: absolute;
+  bottom: -0.85rem;
+  left: 20%;
+  right: 20%;
+  height: 1px;
+  background: linear-gradient(
+    90deg,
+    transparent,
+    rgb(var(--gold-rgb) / 0.45) 30%,
+    rgb(var(--gold-rgb) / 0.45) 70%,
+    transparent
+  );
+}
+.sg-card__figure img {
+  position: relative;
+  z-index: 1;
+  display: block;
+  height: clamp(8rem, 10.5vw, 10.5rem);
+  width: 76%;
+  object-fit: contain;
+  object-position: bottom center;
+  filter: drop-shadow(0 14px 18px rgb(0 0 0 / 0.6));
+  transition:
+    transform var(--dur-med) var(--ease-out),
+    filter var(--dur-med) var(--ease-out);
+}
+.sg-card:hover .sg-card__figure img {
+  transform: translateY(-5px);
+  filter: drop-shadow(0 18px 22px rgb(0 0 0 / 0.6))
+    drop-shadow(0 0 16px rgb(var(--gold-rgb) / 0.4));
+}
+/* the rough rock plinth — irregular dark stone with a warm rim */
+.sg-card__base {
+  position: absolute;
+  bottom: -0.25rem;
+  left: 50%;
+  transform: translateX(-50%);
+  width: 58%;
+  height: 1.15rem;
+  border-radius: 48% 52% 46% 54% / 55% 60% 40% 45%;
+  border-top: 1px solid rgb(var(--gold-rgb) / 0.4);
+  background:
+    radial-gradient(70% 90% at 50% 0%, rgb(var(--ink-4-rgb)), transparent 75%),
+    linear-gradient(180deg, rgb(var(--ink-3-rgb)), rgb(var(--ink-0-rgb)));
+  box-shadow:
+    0 8px 16px rgb(0 0 0 / 0.65),
+    0 0 24px -6px rgb(var(--gold-rgb) / 0.3);
+}
+
+/* tiny latin caps under the emblem — exact translation of the title */
+.sg-card__latin {
+  display: block;
+  font-family: var(--font-en);
+  font-size: 0.82rem;
+  font-weight: 500;
+  letter-spacing: 0.26em;
+  padding-inline-start: 0.26em;
+  color: rgb(var(--gold-rgb) / 0.6);
+  text-transform: uppercase;
+}
+.sg-card__title {
+  margin-top: 0.45rem;
+  font-size: clamp(1.05rem, 0.95rem + 0.5vw, 1.25rem);
+  font-weight: 700;
+  line-height: 1.65;
+  text-wrap: balance;
+}
+.sg-card__text {
+  margin-top: 0.6rem;
+  font-size: 0.93rem;
+  line-height: 1.9;
+  color: var(--color-text-2);
+}
+.sg-card__example {
+  margin-top: 0.75rem;
+  padding-top: 0.75rem;
+  border-top: 1px solid var(--color-border);
+  font-size: 0.84rem;
+  line-height: 1.9;
+  color: rgb(var(--gold-soft-rgb) / 0.75);
+}
+/* the outlined pill at the bottom of every card */
+.sg-card__cta {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.5rem;
+  margin-top: auto;
+  padding: 0.55rem 1.3rem;
+  border: 1px solid rgb(var(--gold-rgb) / 0.4);
+  border-radius: 999px;
+  font-size: 0.83rem;
+  font-weight: 600;
+  color: var(--color-gold);
+  transform: translateY(0.9rem);
+  transition:
+    transform var(--dur-med) var(--ease-out),
+    border-color var(--dur-med) var(--ease-out),
+    background-color var(--dur-med) var(--ease-out),
+    color var(--dur-med) var(--ease-out);
+}
+.sg-card:hover .sg-card__cta,
+.sg-card:focus-visible .sg-card__cta {
+  transform: translateY(0.3rem);
+  border-color: var(--color-gold);
+  background: rgb(var(--gold-rgb) / 0.1);
+  color: var(--color-gold-hi);
+}
+
+.sg__cta {
+  display: flex;
+  justify-content: center;
+  margin-top: clamp(2.75rem, 5vw, 3.75rem);
+}
+
+/* ---------------- tablet — 2 per row ---------------- */
+@media (max-width: 61.99rem) {
+  .sg__head {
+    --sg-statue-h: clamp(15rem, 26vw, 19rem);
+  }
+  .sg__grid {
+    grid-template-columns: repeat(2, 1fr);
+    max-width: 46rem;
+  }
+}
+
+/* ---------------- mobile — statue centred over the line, 2×3 grid ---------------- */
+@media (max-width: 47.99rem) {
+  .sg__head {
+    flex-direction: column;
+    align-items: stretch; /* column axis — children must not collapse to 0 width */
+    min-height: 0;
+    --sg-statue-h: clamp(15rem, 56vw, 18rem);
+    margin-bottom: 3rem;
+  }
+  .sg__stage {
+    position: relative;
+    height: var(--sg-statue-h);
+    order: 0;
+  }
+  .sg__decor {
+    right: 0;
+    width: auto; /* full-width stage — statue stays centred */
+  }
+  /* centred via translate — transform stays free for the entrance */
+  .sg__statue,
+  .sg__reflection,
+  .sg__shadow {
+    inset-inline-end: 50%;
+    translate: -50% 0;
+  }
+  .sg__text {
+    order: 1;
+    padding-inline-end: 0;
+    padding-bottom: 0;
+    margin-top: 1.75rem;
+  }
+
+  .sg__grid {
+    gap: 0.8rem;
+  }
+  .sg-card {
+    padding: 1.25rem 0.7rem 0.9rem;
+  }
+  .sg-card__figure {
+    height: 7.25rem;
+    margin-bottom: 1.15rem;
+  }
+  .sg-card__figure::after {
+    left: 12%;
+    right: 12%;
+  }
+  .sg-card__figure img {
+    height: 6.25rem;
+    width: 82%;
+  }
+  .sg-card__latin {
+    font-size: 0.78rem;
+    letter-spacing: 0.18em;
+    padding-inline-start: 0.18em;
+  }
+  .sg-card__title {
+    font-size: 0.92rem;
+    line-height: 1.6;
+  }
+  .sg-card__text {
+    font-size: 0.8rem;
+    line-height: 1.85;
+  }
+  .sg-card__example {
+    font-size: 0.76rem;
+  }
+  .sg-card__cta {
+    padding: 0.45rem 0.85rem;
+    font-size: 0.74rem;
+    transform: translateY(0.5rem);
+  }
+  .sg-card:active .sg-card__cta {
+    transform: translateY(0.15rem);
+  }
+}
+
+/* ---------------- reduced motion ---------------- */
+@media (prefers-reduced-motion: reduce) {
+  .sg__statue,
+  .sg__reflection,
+  .sg__shadow,
+  .sg__line,
+  .sg-card,
+  .sg-card__figure img,
+  .sg-card__cta {
+    animation: none !important;
+    transition-duration: 0.01ms !important;
+    transform: none !important;
+  }
+}

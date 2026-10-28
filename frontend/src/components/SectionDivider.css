@@ -1,0 +1,58 @@
+.section-divider-wrap {
+  padding-block: 0.5rem;
+}
+
+.section-divider {
+  display: flex;
+  align-items: flex-end;
+  justify-content: center;
+  gap: 1.1rem;
+  padding-block: 0.25rem;
+  color: rgb(var(--gold-rgb) / 0.85);
+}
+
+.section-divider__line {
+  height: 1px;
+  width: min(11rem, 30vw);
+  margin-bottom: 1.15rem; /* runs along the column's plinth — one shared axis */
+  background: var(--line-gold);
+  transform: scaleX(0);
+  transition: transform 0.7s var(--ease-out) 0.15s;
+}
+.section-divider__line:first-child {
+  transform-origin: left center;
+}
+.section-divider__line:last-child {
+  transform-origin: right center;
+}
+
+.section-divider__mark {
+  flex: none;
+  width: auto;
+  height: 5.4rem;
+  max-width: 7rem;
+  object-fit: contain;
+  object-position: bottom;
+  opacity: 0;
+  transform: scale(0.72);
+  transition:
+    opacity 0.55s var(--ease-out) 0.05s,
+    transform 0.55s var(--ease-out) 0.05s;
+}
+
+.reveal--line.is-visible .section-divider__line {
+  transform: scaleX(1);
+}
+.reveal--line.is-visible .section-divider__mark {
+  opacity: 1;
+  transform: scale(1);
+}
+
+@media (max-width: 40rem) {
+  .section-divider__mark {
+    height: 4.2rem;
+  }
+  .section-divider__line {
+    margin-bottom: 0.95rem;
+  }
+}
