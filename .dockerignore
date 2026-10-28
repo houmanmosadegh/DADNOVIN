@@ -1,0 +1,15 @@
+# root build-context ignore (web/panel images build from repo root)
+**/node_modules
+**/dist
+**/dist-ssr
+**/__pycache__
+**/*.pyc
+**/.pytest_cache
+**/.venv
+**/venv
+**/*.egg-info
+.git
+.env
+**/*.log
+storage/
+skills-lock.json

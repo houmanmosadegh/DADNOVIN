@@ -1,0 +1,20 @@
+# Production overrides — applied on top of docker-compose.yml:
+#   docker compose -f docker-compose.yml -f docker-compose.prod.yml up -d --build
+#
+# Requires in .env: ENVIRONMENT=production, a strong SECRET_KEY,
+# COOKIE_SECURE=true (behind HTTPS), CORS_ORIGINS=https://your-domain
+services:
+  api:
+    environment:
+      ENVIRONMENT: production
+      COOKIE_SECURE: "true"
+      EXPOSE_DOCS: "false"
+      UVICORN_WORKERS: ${UVICORN_WORKERS:-2}
+    # app reads these from env/.env — refuse to boot on insecure prod config
+    # (config.py validates: no dev secret, secure cookies, no wildcard CORS)
+
+  gateway:
+    ports:
+      - "${HTTP_PORT:-80}:8080"
+    # Terminate TLS at your edge/load balancer, or add a TLS server block
+    # with real certificates in infrastructure/nginx/ — never ship self-signed.

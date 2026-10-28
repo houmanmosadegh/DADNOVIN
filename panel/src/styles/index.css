@@ -1,0 +1,90 @@
+@import "tailwindcss";
+@import "@fontsource-variable/vazirmatn";
+
+@theme {
+  --font-sans: "Vazirmatn Variable", ui-sans-serif, system-ui, sans-serif;
+
+  /* dark palette — sand = surfaces (deep navy, same family as the site),
+     ink = foreground scale (light ivory), gold = champagne accents */
+  --color-ink-0: #eceff7;
+  --color-ink-1: #b7bfd2;
+  --color-ink-2: #8790a8;
+  --color-ink-3: #5a6379;
+  --color-gold-1: #b98e46;
+  --color-gold-2: #d7b56d;
+  --color-gold-3: #f0e2c4;
+  --color-sand-0: #0c1120;
+  --color-sand-1: #151e36;
+  --color-sand-2: #242f4d;
+}
+
+html {
+  font-family: var(--font-sans);
+}
+
+body {
+  background: var(--color-sand-0);
+  color: var(--color-ink-0);
+  -webkit-font-smoothing: antialiased;
+}
+
+/* thin scrollbars */
+*::-webkit-scrollbar {
+  width: 8px;
+  height: 8px;
+}
+*::-webkit-scrollbar-thumb {
+  background: var(--color-sand-2);
+  border-radius: 8px;
+}
+
+input[type="text"],
+input[type="email"],
+input[type="password"],
+input[type="tel"],
+input[type="number"],
+input[type="url"],
+textarea,
+select {
+  @apply w-full rounded-lg border border-sand-2 bg-sand-0 px-3 py-2 text-sm text-ink-0 outline-none transition placeholder:text-ink-3 focus:border-gold-1 focus:ring-2 focus:ring-gold-2/20 disabled:opacity-60;
+}
+
+select option {
+  background: var(--color-sand-1);
+  color: var(--color-ink-0);
+}
+
+label {
+  @apply mb-1.5 block text-[13px] font-medium text-ink-1;
+}
+
+.btn,
+.btn-primary,
+.btn-gold,
+.btn-ghost,
+.btn-danger {
+  @apply inline-flex items-center justify-center gap-2 rounded-lg px-4 py-2 text-sm font-medium transition disabled:pointer-events-none disabled:opacity-50;
+}
+.btn-primary {
+  @apply bg-ink-0 text-sand-0 hover:bg-ink-1;
+}
+.btn-gold {
+  @apply bg-gold-2 text-[#1a1407] hover:bg-gold-2/90;
+}
+.btn-ghost {
+  @apply border border-sand-2 bg-sand-1 text-ink-1 hover:bg-sand-2;
+}
+.btn-danger {
+  @apply bg-red-700 text-white hover:bg-red-800;
+}
+.btn-sm {
+  @apply px-2.5 py-1.5 text-[13px];
+}
+
+.card {
+  @apply rounded-xl border border-sand-2 bg-sand-1 shadow-[0_1px_3px_rgba(0,0,0,0.35)];
+}
+
+.field-error {
+  @apply mt-1 text-[12px] text-red-400;
+}
