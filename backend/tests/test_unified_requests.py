@@ -301,3 +301,57 @@ async def test_call_log(client, admin_client):
     assert resp.status_code == 201
     detail = await admin_client.get(f"/api/v1/admin/requests/contact/{rid}")
     assert any(e["event_type"] == "call_logged" for e in detail.json()["events"])
+
+
+async def test_admin_contacts_module(admin_client, seeded_session):
+    """Convenience /admin/contacts endpoints wrap the unified model."""
+    resp = await admin_client.post(
+        "/api/v1/contacts",
+        json={
+            "full_name": "تست تماس",
+            "phone": "09120001111",
+            "email": "",
+            "subject": "درخواست تماس",
+            "message": "پیام تست",
+            "preferred_time": "",
+            "source_page": "/contact",
+            "website": "",
+        },
+    )
+    assert resp.status_code == 201
+    resp = await admin_client.get("/api/v1/admin/contacts")
+    assert resp.status_code == 200
+    body = resp.json()
+    assert body["total"] >= 1
+    cid = body["items"][0]["id"]
+
+    resp = await admin_client.get(f"/api/v1/admin/contacts/{cid}")
+    assert resp.status_code == 200
+    assert resp.json()["type"] == "contact"
+
+    resp = await admin_client.post(
+        f"/api/v1/admin/contacts/{cid}/call-log",
+        json={"outcome": "answered", "note": "صحبت شد"},
+    )
+    assert resp.status_code == 201
+    # status new → contacted after logged call
+    resp = await admin_client.get(f"/api/v1/admin/contacts/{cid}")
+    assert resp.json()["request"]["status"] == "contacted"
+
+    resp = await admin_client.post(
+        f"/api/v1/admin/contacts/{cid}/note", json={"note": "یادداشت"}
+    )
+    assert resp.status_code == 201
+
+    resp = await admin_client.get(
+        f"/api/v1/admin/contacts/{uuid.uuid4()}"
+    )
+    assert resp.status_code == 404
+
+
+async def test_public_content_bundle(client, seeded_session):
+    resp = await client.get("/api/v1/public/content")
+    assert resp.status_code == 200
+    body = resp.json()
+    assert set(body.keys()) == {"settings", "pages", "lawyers"}
+    assert isinstance(body["pages"], list)

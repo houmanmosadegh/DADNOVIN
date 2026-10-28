@@ -42,8 +42,8 @@ export function ToastProvider({ children }: { children: ReactNode }) {
     setTimeout(() => setToasts((t) => t.filter((x) => x.id !== id)), 4200);
   }, []);
   const icons = {
-    success: <CheckCircle2 size={17} className="text-emerald-600" />,
-    error: <XCircle size={17} className="text-red-600" />,
+    success: <CheckCircle2 size={17} className="text-emerald-400" />,
+    error: <XCircle size={17} className="text-red-400" />,
     info: <Info size={17} className="text-ink-1" />,
   };
   return (
@@ -99,28 +99,28 @@ export const STATUS_FA: Record<string, string> = {
 };
 
 const STATUS_TONE: Record<string, string> = {
-  new: "bg-sky-50 text-sky-700 border-sky-200",
-  reviewing: "bg-amber-50 text-amber-700 border-amber-200",
+  new: "bg-sky-500/10 text-sky-300 border-sky-500/30",
+  reviewing: "bg-amber-500/10 text-amber-300 border-amber-500/30",
   awaiting_call: "bg-violet-50 text-violet-700 border-violet-200",
   followed_up: "bg-indigo-50 text-indigo-700 border-indigo-200",
-  completed: "bg-emerald-50 text-emerald-700 border-emerald-200",
+  completed: "bg-emerald-500/10 text-emerald-300 border-emerald-500/30",
   cancelled: "bg-sand-0 text-ink-2 border-sand-2",
   waiting_reply: "bg-violet-50 text-violet-700 border-violet-200",
-  resolved: "bg-emerald-50 text-emerald-700 border-emerald-200",
+  resolved: "bg-emerald-500/10 text-emerald-300 border-emerald-500/30",
   closed: "bg-sand-0 text-ink-2 border-sand-2",
   contacted: "bg-teal-50 text-teal-700 border-teal-200",
-  urgent: "bg-red-50 text-red-700 border-red-200",
-  high: "bg-orange-50 text-orange-700 border-orange-200",
+  urgent: "bg-red-500/10 text-red-300 border-red-500/30",
+  high: "bg-orange-500/10 text-orange-300 border-orange-500/30",
   normal: "bg-sand-0 text-ink-2 border-sand-2",
   low: "bg-sand-0 text-ink-2 border-sand-2",
   consultation: "bg-indigo-50 text-indigo-700 border-indigo-200",
   ticket: "bg-violet-50 text-violet-700 border-violet-200",
   contact: "bg-teal-50 text-teal-700 border-teal-200",
   queued: "bg-sand-0 text-ink-2 border-sand-2",
-  sent: "bg-emerald-50 text-emerald-700 border-emerald-200",
-  failed: "bg-red-50 text-red-700 border-red-200",
+  sent: "bg-emerald-500/10 text-emerald-300 border-emerald-500/30",
+  failed: "bg-red-500/10 text-red-300 border-red-500/30",
   draft: "bg-sand-0 text-ink-2 border-sand-2",
-  published: "bg-emerald-50 text-emerald-700 border-emerald-200",
+  published: "bg-emerald-500/10 text-emerald-300 border-emerald-500/30",
 };
 
 export function StatusBadge({ value }: { value: string }) {
@@ -204,7 +204,7 @@ export function EmptyState({
 export function ErrorState({ text, onRetry }: { text: string; onRetry?: () => void }) {
   return (
     <div className="card flex flex-col items-center justify-center gap-2 px-6 py-14 text-center">
-      <AlertTriangle size={22} className="text-red-500" />
+      <AlertTriangle size={22} className="text-red-400" />
       <p className="text-sm font-medium text-ink-1">{text}</p>
       {onRetry && (
         <button className="btn-ghost btn-sm mt-1" onClick={onRetry}>

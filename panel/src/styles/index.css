@@ -4,18 +4,19 @@
 @theme {
   --font-sans: "Vazirmatn Variable", ui-sans-serif, system-ui, sans-serif;
 
-  /* light palette — sand = ivory surfaces, ink = charcoal text scale,
-     gold = champagne accent (restrained) */
-  --color-sand-0: #f6f4ef;
-  --color-sand-1: #ffffff;
-  --color-sand-2: #e6e1d6;
-  --color-ink-0: #1d2029;
-  --color-ink-1: #4b5063;
-  --color-ink-2: #7d8296;
-  --color-ink-3: #a8adbe;
-  --color-gold-1: #9a7b34;
+  /* dark palette — sand = surface scale, ink = light text scale,
+     gold = champagne accent (restrained), line = visible borders */
+  --color-sand-0: #0c1018;
+  --color-sand-1: #161c29;
+  --color-sand-2: #2b3448;
+  --color-line: #3b465f;
+  --color-ink-0: #eceef4;
+  --color-ink-1: #c3c8d6;
+  --color-ink-2: #8f96ab;
+  --color-ink-3: #626b81;
+  --color-gold-1: #d8b26a;
   --color-gold-2: #c9a45c;
-  --color-gold-3: #f0e5cc;
+  --color-gold-3: #332c1a;
 }
 
 html {
@@ -44,20 +45,29 @@ body {
   border-radius: 4px;
 }
 
+input:not([type]),
 input[type="text"],
 input[type="email"],
 input[type="password"],
 input[type="tel"],
 input[type="number"],
 input[type="url"],
+input[type="search"],
+input[type="date"],
+input[type="datetime-local"],
 textarea,
 select {
-  @apply w-full rounded-lg border border-sand-2 bg-sand-1 px-3 py-2 text-sm text-ink-0 outline-none transition placeholder:text-ink-3 focus:border-gold-2 focus:ring-2 focus:ring-gold-3 disabled:opacity-60;
+  @apply w-full rounded-lg border border-line bg-sand-0 px-3 py-2 text-sm text-ink-0 outline-none transition placeholder:text-ink-3 hover:border-ink-3 focus:border-gold-2 focus:ring-2 focus:ring-gold-2/20 disabled:opacity-60;
 }
 
 select option {
   background: var(--color-sand-1);
   color: var(--color-ink-0);
+}
+
+input[type="checkbox"],
+input[type="radio"] {
+  @apply accent-[#c9a45c];
 }
 
 label {
@@ -72,42 +82,42 @@ label {
   @apply inline-flex items-center justify-center gap-2 rounded-lg px-4 py-2 text-sm font-medium transition disabled:pointer-events-none disabled:opacity-50;
 }
 .btn-primary {
-  @apply bg-ink-0 text-sand-1 hover:bg-ink-1;
+  @apply bg-ink-0 text-sand-0 hover:bg-ink-1;
 }
 .btn-gold {
-  @apply bg-gold-2 text-[#241c0b] hover:bg-gold-1 hover:text-white;
+  @apply bg-gold-2 text-[#241c0b] hover:bg-gold-1 hover:text-[#241c0b];
 }
 .btn-ghost {
-  @apply border border-sand-2 bg-sand-1 text-ink-1 hover:border-ink-3 hover:text-ink-0;
+  @apply border border-line bg-sand-1 text-ink-1 hover:border-ink-3 hover:text-ink-0;
 }
 .btn-danger {
-  @apply bg-red-600 text-white hover:bg-red-700;
+  @apply bg-red-600 text-white hover:bg-red-500/100;
 }
 .btn-sm {
   @apply px-2.5 py-1.5 text-[13px];
 }
 
 .card {
-  @apply rounded-xl border border-sand-2 bg-sand-1 shadow-[0_1px_2px_rgba(29,32,41,0.05)];
+  @apply rounded-xl border border-sand-2 bg-sand-1 shadow-[0_1px_2px_rgba(0,0,0,0.35)];
 }
 
 .card-pad {
-  @apply rounded-xl border border-sand-2 bg-sand-1 p-4 shadow-[0_1px_2px_rgba(29,32,41,0.05)] lg:p-5;
+  @apply rounded-xl border border-sand-2 bg-sand-1 p-4 shadow-[0_1px_2px_rgba(0,0,0,0.35)] lg:p-5;
 }
 
 .field-error {
-  @apply mt-1 text-[12px] text-red-600;
+  @apply mt-1 text-[12px] text-red-400;
 }
 
 /* quick-filter chips above data tables */
 .chip {
-  @apply inline-flex cursor-pointer items-center gap-1.5 rounded-full border border-sand-2 bg-sand-1 px-3 py-1.5 text-[13px] text-ink-1 transition hover:border-ink-3;
+  @apply inline-flex cursor-pointer items-center gap-1.5 rounded-full border border-line bg-sand-1 px-3 py-1.5 text-[13px] text-ink-1 transition hover:border-ink-3 hover:text-ink-0;
 }
 .chip-active {
   @apply border-gold-2 bg-gold-3/60 font-medium text-ink-0;
 }
 .chip .count {
-  @apply rounded-full bg-sand-0 px-1.5 text-[11px] text-ink-2;
+  @apply rounded-full bg-sand-2 px-1.5 text-[11px] text-ink-2;
 }
 .chip-active .count {
   @apply bg-gold-2/30 text-ink-0;
@@ -129,7 +139,7 @@ label {
   @apply px-4 py-3 align-middle text-[13px];
 }
 .tr-hover {
-  @apply border-b border-sand-2 transition last:border-0 hover:bg-sand-0/70;
+  @apply border-b border-sand-2 transition last:border-0 hover:bg-sand-2/30;
 }
 
 /* timeline */
@@ -144,15 +154,15 @@ label {
   @apply hidden;
 }
 .tl-dot {
-  @apply mt-1.5 h-[15px] w-[15px] shrink-0 rounded-full border-2 border-sand-1 ring-1 ring-sand-2;
+  @apply mt-1.5 h-[15px] w-[15px] shrink-0 rounded-full border-2 border-sand-1 ring-1 ring-line;
 }
 
 /* sidebar nav link */
 .nav-item {
-  @apply mb-0.5 flex items-center gap-2.5 rounded-lg px-3 py-2 text-[13px] text-ink-1 transition hover:bg-sand-0 hover:text-ink-0;
+  @apply mb-0.5 flex items-center gap-2.5 rounded-lg px-3 py-2 text-[13px] text-ink-1 transition hover:bg-sand-2/50 hover:text-ink-0;
 }
 .nav-item-active {
-  @apply bg-gold-3/50 font-medium text-ink-0;
+  @apply bg-gold-3/60 font-medium text-ink-0;
 }
 .nav-item-active svg {
   color: var(--color-gold-1);
@@ -163,12 +173,12 @@ label {
 
 /* stat delta chip */
 .delta-up {
-  @apply text-emerald-700;
+  @apply text-emerald-400;
 }
 .delta-down {
-  @apply text-red-600;
+  @apply text-red-400;
 }
 
 kbd {
-  @apply rounded border border-sand-2 bg-sand-0 px-1.5 py-0.5 text-[11px] text-ink-2;
+  @apply rounded border border-line bg-sand-2 px-1.5 py-0.5 text-[11px] text-ink-2;
 }

@@ -274,7 +274,7 @@ export default function AppLayout() {
               value={query}
               onChange={(e) => setQuery(e.target.value)}
               placeholder="جستجوی درخواست، نام، تلفن، کد…"
-              className="!py-1.5 pr-9 text-[13px]"
+              className="!py-1.5 pr-10 text-[13px]"
               aria-label="جستجوی سراسری"
             />
           </form>
@@ -352,7 +352,7 @@ export default function AppLayout() {
                     </p>
                   </div>
                   <button
-                    className="mt-1 flex w-full items-center gap-2 rounded-lg px-3 py-2 text-[13px] text-red-600 hover:bg-red-50"
+                    className="mt-1 flex w-full items-center gap-2 rounded-lg px-3 py-2 text-[13px] text-red-400 hover:bg-red-500/10"
                     onClick={logout}
                   >
                     <LogOut size={15} /> خروج از حساب

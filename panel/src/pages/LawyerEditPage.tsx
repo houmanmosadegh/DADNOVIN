@@ -266,7 +266,7 @@ export default function LawyerEditPage() {
                   <label className="!mb-1 text-[11px]">متن</label>
                   <input className="!py-1.5 text-[13px]" value={h.text} onChange={(e) => setResume({ ...resume, highlights: resume.highlights.map((x, j) => j === i ? { ...x, text: e.target.value } : x) })} />
                 </div>
-                <button className="rounded-lg p-1.5 text-ink-3 hover:text-red-600" onClick={() => setResume({ ...resume, highlights: resume.highlights.filter((_, j) => j !== i) })} aria-label="حذف">
+                <button className="rounded-lg p-1.5 text-ink-3 hover:text-red-400" onClick={() => setResume({ ...resume, highlights: resume.highlights.filter((_, j) => j !== i) })} aria-label="حذف">
                   <Trash2 size={15} />
                 </button>
               </div>
@@ -332,7 +332,7 @@ function ListEditor({
               onChange={(e) => onItems(items.map((x, j) => (j === i ? e.target.value : x)))}
             />
             <button
-              className="shrink-0 rounded-lg p-1.5 text-ink-3 hover:text-red-600"
+              className="shrink-0 rounded-lg p-1.5 text-ink-3 hover:text-red-400"
               onClick={() => onItems(items.filter((_, j) => j !== i))}
               aria-label="حذف"
             >

@@ -117,7 +117,7 @@ export default function ArticlesPage() {
                 </div>
                 <StatusBadge value={a.status} />
                 <span className="hidden text-[11px] text-ink-3 sm:block">{fmtDate(a.updated_at)}</span>
-                <button className="rounded-lg p-1.5 text-ink-3 hover:text-red-600" onClick={() => setDeleting(a)} aria-label="حذف">
+                <button className="rounded-lg p-1.5 text-ink-3 hover:text-red-400" onClick={() => setDeleting(a)} aria-label="حذف">
                   <Trash2 size={15} />
                 </button>
               </div>

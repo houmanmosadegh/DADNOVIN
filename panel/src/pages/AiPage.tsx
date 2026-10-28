@@ -73,7 +73,7 @@ export default function AiPage() {
         <div className="card p-4">
           <p className="text-[12px] text-ink-1/60">وضعیت ارائه‌دهنده</p>
           <p className="mt-1 flex items-center gap-2 text-sm font-semibold">
-            <span className={`h-2 w-2 rounded-full ${status?.configured ? "bg-emerald-500" : "bg-amber-500"}`} />
+            <span className={`h-2 w-2 rounded-full ${status?.configured ? "bg-emerald-500/100" : "bg-amber-500/100"}`} />
             {status?.configured ? "متصل" : "بدون کلید — حالت بازیابی"}
           </p>
         </div>
@@ -88,7 +88,7 @@ export default function AiPage() {
       </div>
 
       {!status?.configured && (
-        <div className="card border-amber-500/30 bg-amber-500/10 p-4 text-[13px] text-amber-300">
+        <div className="card border-amber-500/30 bg-amber-500/100/10 p-4 text-[13px] text-amber-300">
           کلید API ارائه‌دهنده تنظیم نشده است (AI_API_KEY). دستیار در این حالت با
           پاسخ‌های مبتنی بر دانش سایت کار می‌کند، اما پاسخ‌های مولد تولید نمی‌شود.
         </div>

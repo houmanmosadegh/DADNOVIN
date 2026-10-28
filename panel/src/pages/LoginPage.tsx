@@ -74,7 +74,7 @@ export default function LoginPage() {
             )}
           </div>
           {errors.root && (
-            <p className="rounded-lg bg-red-50 px-3 py-2 text-[13px] text-red-600">
+            <p className="rounded-lg bg-red-500/10 px-3 py-2 text-[13px] text-red-400">
               {errors.root.message}
             </p>
           )}

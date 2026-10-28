@@ -287,7 +287,7 @@ export default function RequestDetailPage() {
             <StatusBadge value={d.request.status} />
             {d.request.sla_due_at && new Date(d.request.sla_due_at) < new Date() &&
               !["completed", "resolved", "closed", "cancelled"].includes(d.request.status) && (
-              <span className="rounded-full bg-red-50 px-2 py-0.5 text-[11px] font-medium text-red-600">معوق</span>
+              <span className="rounded-full bg-red-500/10 px-2 py-0.5 text-[11px] font-medium text-red-400">معوق</span>
             )}
           </div>
           <p className="mt-0.5 text-[13px] text-ink-2">{r.subject}</p>
@@ -434,7 +434,7 @@ export default function RequestDetailPage() {
                 {attachments.map((a) => (
                   <span key={a} className="rounded-full bg-sand-0 px-2 py-0.5 text-[11px] text-ink-2">
                     پیوست
-                    <button className="mr-1 text-red-500" onClick={() => setAttachments((x) => x.filter((y) => y !== a))}>×</button>
+                    <button className="mr-1 text-red-400" onClick={() => setAttachments((x) => x.filter((y) => y !== a))}>×</button>
                   </span>
                 ))}
               </div>
@@ -467,7 +467,7 @@ export default function RequestDetailPage() {
                 {d.allowed_transitions.map((s) => (
                   <button
                     key={s}
-                    className={`btn-sm w-full ${s === "cancelled" ? "btn-ghost text-red-600" : "btn-ghost"}`}
+                    className={`btn-sm w-full ${s === "cancelled" ? "btn-ghost text-red-400" : "btn-ghost"}`}
                     onClick={() => {
                       if (s === "cancelled") {
                         const reason = window.prompt("دلیل لغو را وارد کنید:");
@@ -485,7 +485,7 @@ export default function RequestDetailPage() {
               </div>
             )}
             {d.request.cancel_reason && (
-              <p className="mt-2 rounded-lg bg-red-50 p-2 text-[12px] text-red-700">
+              <p className="mt-2 rounded-lg bg-red-500/10 p-2 text-[12px] text-red-300">
                 دلیل لغو: {d.request.cancel_reason}
               </p>
             )}

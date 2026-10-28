@@ -28,7 +28,7 @@ export default function PagesPage() {
             <td className="px-4 py-3 text-ink-1/60" dir="ltr">/{p.slug === "home" ? "" : p.slug}</td>
             <td className="px-4 py-3">{p.sections.length.toLocaleString("fa-IR")}</td>
             <td className="px-4 py-3">
-              <span className={`rounded-full px-2.5 py-0.5 text-[12px] ${p.is_published ? "bg-emerald-500/10 text-emerald-400" : "bg-sand-1 text-ink-1/60"}`}>
+              <span className={`rounded-full px-2.5 py-0.5 text-[12px] ${p.is_published ? "bg-emerald-500/100/10 text-emerald-400" : "bg-sand-1 text-ink-1/60"}`}>
                 {p.is_published ? "منتشرشده" : "پیش‌نویس"}
               </span>
             </td>

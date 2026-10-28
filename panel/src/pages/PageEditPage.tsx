@@ -179,7 +179,7 @@ function ValueEditor({ name, value, onChange }: { name: string; value: unknown; 
                 value={it}
                 onChange={(e) => onChange(value.map((x, j) => (j === i ? e.target.value : x)))}
               />
-              <button className="rounded-lg p-1.5 text-ink-3 hover:text-red-600" onClick={() => onChange(value.filter((_, j) => j !== i))} aria-label="حذف">
+              <button className="rounded-lg p-1.5 text-ink-3 hover:text-red-400" onClick={() => onChange(value.filter((_, j) => j !== i))} aria-label="حذف">
                 <Trash2 size={14} />
               </button>
             </div>
@@ -202,7 +202,7 @@ function ValueEditor({ name, value, onChange }: { name: string; value: unknown; 
             <div key={i} className="rounded-lg border border-sand-2 p-3">
               <div className="mb-2 flex items-center justify-between">
                 <span className="text-[11px] text-ink-3">مورد {(i + 1).toLocaleString("fa-IR")}</span>
-                <button className="rounded p-1 text-ink-3 hover:text-red-600" onClick={() => onChange(value.filter((_, j) => j !== i))} aria-label="حذف">
+                <button className="rounded p-1 text-ink-3 hover:text-red-400" onClick={() => onChange(value.filter((_, j) => j !== i))} aria-label="حذف">
                   <Trash2 size={13} />
                 </button>
               </div>

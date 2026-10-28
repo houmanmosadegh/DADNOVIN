@@ -113,14 +113,14 @@ export default function DashboardPage() {
       </div>
 
       {(s.overdue > 0 || s.mine_open > 0) && (
-        <div className="card flex flex-wrap items-center gap-3 border-amber-200 bg-amber-50 px-4 py-3 text-[13px]">
+        <div className="card flex flex-wrap items-center gap-3 border-amber-500/30 bg-amber-500/10 px-4 py-3 text-[13px]">
           {s.overdue > 0 && (
-            <Link to="/inbox?tab=overdue" className="font-medium text-amber-800 hover:underline">
+            <Link to="/inbox?tab=overdue" className="font-medium text-amber-200 hover:underline">
               {s.overdue.toLocaleString("fa-IR")} درخواست معوق از مهلت پاسخ گذشته ←
             </Link>
           )}
           {s.mine_open > 0 && (
-            <Link to="/inbox?tab=mine" className="text-amber-700 hover:underline">
+            <Link to="/inbox?tab=mine" className="text-amber-300 hover:underline">
               {s.mine_open.toLocaleString("fa-IR")} پروندهٔ باز به نام شما ←
             </Link>
           )}

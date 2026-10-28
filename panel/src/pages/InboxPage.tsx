@@ -153,7 +153,7 @@ export default function InboxPage({
       <td className="td text-[12px] text-ink-1">{r.assignee_name || "—"}</td>
       <td className="td text-[12px] text-ink-2" title={new Date(r.updated_at).toLocaleString("fa-IR")}>
         {fmtRelative(r.updated_at)}
-        {r.overdue && <span className="mr-1 rounded-full bg-red-50 px-1.5 text-[10px] text-red-600">معوق</span>}
+        {r.overdue && <span className="mr-1 rounded-full bg-red-500/10 px-1.5 text-[10px] text-red-400">معوق</span>}
       </td>
     </>
   );

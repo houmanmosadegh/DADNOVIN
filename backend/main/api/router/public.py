@@ -43,6 +43,21 @@ async def lawyers(db: DbDep) -> list[PublicLawyerOut]:
     return [public_lawyer(lw) for lw in await list_lawyers(db, only_visible=True)]
 
 
+@router.get("/content")
+async def content_bundle(db: DbDep) -> dict:
+    """Bundled public content — one request for settings + pages + lawyers
+    so the public site can hydrate everything at once."""
+    return {
+        "settings": await public_settings_map(db),
+        "pages": [
+            _public_page(p) for p in await list_pages(db) if p.is_published
+        ],
+        "lawyers": [
+            public_lawyer(lw) for lw in await list_lawyers(db, only_visible=True)
+        ],
+    }
+
+
 @router.get("/lawyers/{slug}")
 async def lawyer_by_slug(slug: str, db: DbDep) -> PublicLawyerOut:
     row = (

@@ -20,6 +20,7 @@ from .api.router.admin import ai as admin_ai
 from .api.router.admin import articles as admin_articles
 from .api.router.admin import audit as admin_audit
 from .api.router.admin import consultations as admin_consultations
+from .api.router.admin import contacts as admin_contacts
 from .api.router.admin import dashboard as admin_dashboard
 from .api.router.admin import lawyers as admin_lawyers
 from .api.router.admin import media as admin_media
@@ -129,6 +130,7 @@ def create_app() -> FastAPI:
     app.include_router(admin_media.router, prefix=admin)
     app.include_router(admin_consultations.router, prefix=admin)
     app.include_router(admin_tickets.router, prefix=admin)
+    app.include_router(admin_contacts.router, prefix=admin)
     app.include_router(admin_requests.router, prefix=admin)
     app.include_router(admin_labels.router, prefix=admin)
     app.include_router(admin_articles.router, prefix=admin)

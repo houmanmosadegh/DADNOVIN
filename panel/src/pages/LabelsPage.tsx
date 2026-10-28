@@ -89,7 +89,7 @@ export default function LabelsPage() {
             <div key={l.id} className="flex items-center gap-3 px-4 py-2.5">
               <span className="h-3.5 w-3.5 rounded-full" style={{ backgroundColor: l.color }} />
               <span className="flex-1 text-[14px]">{l.name}</span>
-              <button className="rounded-lg p-1.5 text-ink-3 hover:text-red-600" onClick={() => setDeleting(l)} aria-label="حذف">
+              <button className="rounded-lg p-1.5 text-ink-3 hover:text-red-400" onClick={() => setDeleting(l)} aria-label="حذف">
                 <Trash2 size={15} />
               </button>
             </div>
