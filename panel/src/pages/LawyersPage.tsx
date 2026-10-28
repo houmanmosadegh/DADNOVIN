@@ -44,7 +44,7 @@ export default function LawyersPage() {
             افزودن، ویرایش و مدیریت نمایش وکلای سایت
           </p>
         </div>
-        <Link to="/lawyers/new" className="btn-gold">
+        <Link to="/content/lawyers/new" className="btn-gold">
           <Plus size={16} /> وکیل جدید
         </Link>
       </div>
@@ -75,7 +75,7 @@ export default function LawyersPage() {
                 <td className="px-4 py-3 text-ink-1/70">{l.title}</td>
                 <td className="px-4 py-3">
                   <button
-                    className={`flex items-center gap-1.5 text-[13px] ${l.is_visible ? "text-emerald-400" : "text-ink-1/50"}`}
+                    className={`flex items-center gap-1.5 text-[13px] ${l.is_visible ? "text-emerald-600" : "text-ink-1/50"}`}
                     onClick={() => toggle.mutate(l)}
                   >
                     {l.is_visible ? <Eye size={14} /> : <EyeOff size={14} />}
@@ -84,10 +84,10 @@ export default function LawyersPage() {
                 </td>
                 <td className="px-4 py-3">
                   <div className="flex gap-1.5">
-                    <Link to={`/lawyers/${l.id}`} className="btn-ghost btn-sm">
+                    <Link to={`/content/lawyers/${l.id}`} className="btn-ghost btn-sm">
                       <Pencil size={13} /> ویرایش
                     </Link>
-                    <button className="btn-ghost btn-sm !text-red-400" onClick={() => setConfirmDelete(l)}>
+                    <button className="btn-ghost btn-sm !text-red-600" onClick={() => setConfirmDelete(l)}>
                       <Trash2 size={13} />
                     </button>
                   </div>

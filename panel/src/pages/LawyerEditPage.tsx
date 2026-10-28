@@ -1,7 +1,7 @@
-/** Lawyer create/edit — fields, specialties, resume JSON, photo upload. */
+/** Lawyer create/edit — fields, specialties, structured résumé editor, photo upload. */
 
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
-import { Save, Upload } from "lucide-react";
+import { Plus, Save, Trash2, Upload } from "lucide-react";
 import { useEffect, useRef, useState } from "react";
 import { useNavigate, useParams } from "react-router-dom";
 import { api } from "../services/api";
@@ -14,12 +14,70 @@ const EMPTY = {
   title: "",
   bio: "",
   specialties: "",
-  resume: "{}",
   phone: "",
   email: "",
   is_visible: true,
   sort_order: 0,
 };
+
+/** Résumé shape consumed by the public ResumeCard component. */
+interface ResumeDraft {
+  role: string;
+  nameEn: string;
+  degree: string;
+  motto: string;
+  highlights: { icon: string; title: string; text: string }[];
+  expertiseTitle: string;
+  expertise: string[];
+  educationTitle: string;
+  education: string[];
+  /** anything the site template may carry that this editor doesn't know */
+  extra: Record<string, unknown>;
+}
+
+const KNOWN_KEYS = new Set([
+  "role", "nameEn", "degree", "motto", "highlights",
+  "expertiseTitle", "expertise", "educationTitle", "education",
+]);
+
+const EMPTY_RESUME: ResumeDraft = {
+  role: "", nameEn: "", degree: "", motto: "",
+  highlights: [],
+  expertiseTitle: "سوابق و تخصص‌ها", expertise: [],
+  educationTitle: "تحصیلات", education: [],
+  extra: {},
+};
+
+const ICONS = [
+  { value: "scale", label: "ترازو" },
+  { value: "landmark", label: "ساختمان/دادگستری" },
+  { value: "shield-check", label: "سپر تأیید" },
+  { value: "file-text", label: "سند" },
+];
+
+function resumeFromApi(raw: unknown): ResumeDraft {
+  const r = (raw && typeof raw === "object" ? raw : {}) as Record<string, unknown>;
+  const str = (v: unknown) => (typeof v === "string" ? v : "");
+  const arr = (v: unknown) => (Array.isArray(v) ? v.map((x) => str(x)).filter(Boolean) : []);
+  const hl = Array.isArray(r.highlights)
+    ? r.highlights.map((h) => ({
+        icon: str((h as Record<string, unknown>).icon) || "scale",
+        title: str((h as Record<string, unknown>).title),
+        text: str((h as Record<string, unknown>).text),
+      }))
+    : [];
+  const extra: Record<string, unknown> = {};
+  for (const [k, v] of Object.entries(r)) if (!KNOWN_KEYS.has(k)) extra[k] = v;
+  return {
+    role: str(r.role), nameEn: str(r.nameEn), degree: str(r.degree), motto: str(r.motto),
+    highlights: hl,
+    expertiseTitle: str(r.expertiseTitle) || "سوابق و تخصص‌ها",
+    expertise: arr(r.expertise),
+    educationTitle: str(r.educationTitle) || "تحصیلات",
+    education: arr(r.education),
+    extra,
+  };
+}
 
 export default function LawyerEditPage() {
   const { id } = useParams<{ id: string }>();
@@ -36,7 +94,7 @@ export default function LawyerEditPage() {
   });
 
   const [f, setF] = useState(EMPTY);
-  const [resumeErr, setResumeErr] = useState("");
+  const [resume, setResume] = useState<ResumeDraft>(EMPTY_RESUME);
   const [portraitPreview, setPortraitPreview] = useState<string>("");
 
   useEffect(() => {
@@ -47,12 +105,12 @@ export default function LawyerEditPage() {
         title: lawyer.title,
         bio: lawyer.bio,
         specialties: (lawyer.specialties ?? []).join("، "),
-        resume: JSON.stringify(lawyer.resume ?? {}, null, 2),
         phone: lawyer.phone,
         email: lawyer.email,
         is_visible: lawyer.is_visible,
         sort_order: lawyer.sort_order,
       });
+      setResume(resumeFromApi(lawyer.resume));
       if (lawyer.portrait) setPortraitPreview(`/api/v1/media/file/${lawyer.portrait.stored_name}`);
       else if (lawyer.portrait_path) setPortraitPreview(lawyer.portrait_path);
     }
@@ -60,21 +118,20 @@ export default function LawyerEditPage() {
 
   const save = useMutation({
     mutationFn: async () => {
-      let resume: unknown = {};
-      try {
-        resume = JSON.parse(f.resume || "{}");
-      } catch {
-        setResumeErr("JSON رزومه نامعتبر است.");
-        throw new Error("bad json");
-      }
-      setResumeErr("");
+      const { extra, ...core } = resume;
       const body = {
         slug: f.slug.trim(),
         name: f.name.trim(),
         title: f.title.trim(),
         bio: f.bio,
         specialties: f.specialties.split(/[،,]/).map((s) => s.trim()).filter(Boolean),
-        resume,
+        resume: {
+          ...extra,
+          ...core,
+          highlights: core.highlights.filter((h) => h.title || h.text),
+          expertise: core.expertise.filter(Boolean),
+          education: core.education.filter(Boolean),
+        },
         phone: f.phone.trim(),
         email: f.email.trim(),
         is_visible: f.is_visible,
@@ -86,12 +143,10 @@ export default function LawyerEditPage() {
     onSuccess: (saved) => {
       qc.invalidateQueries({ queryKey: ["admin-lawyers"] });
       toast("success", "ذخیره شد.");
-      if (isNew) navigate(`/lawyers/${saved.id}`, { replace: true });
+      if (isNew) navigate(`/content/lawyers/${saved.id}`, { replace: true });
       else qc.invalidateQueries({ queryKey: ["admin-lawyer", id] });
     },
-    onError: (e) => {
-      if (e.message !== "bad json") toast("error", e instanceof Error ? e.message : "خطا در ذخیره");
-    },
+    onError: (e) => toast("error", e instanceof Error ? e.message : "خطا در ذخیره"),
   });
 
   const upload = useMutation({
@@ -166,20 +221,125 @@ export default function LawyerEditPage() {
           <input value={f.specialties} onChange={(e) => setF({ ...f, specialties: e.target.value })} placeholder="امور کیفری، دعاوی ملکی" />
         </Field>
         <Field label="بیوگرافی کوتاه"><textarea rows={3} value={f.bio} onChange={(e) => setF({ ...f, bio: e.target.value })} /></Field>
-        <Field label="رزومه (JSON — ساختار کارت رزومهٔ سایت)">
-          <textarea dir="ltr" rows={10} className="font-mono text-[12.5px]" value={f.resume} onChange={(e) => setF({ ...f, resume: e.target.value })} />
-        </Field>
-        {resumeErr && <p className="field-error">{resumeErr}</p>}
         <label className="flex items-center gap-2 text-sm">
           <input type="checkbox" className="!w-4" checked={f.is_visible} onChange={(e) => setF({ ...f, is_visible: e.target.checked })} />
           نمایش در سایت
         </label>
-        <div className="flex justify-end gap-2">
-          <button className="btn-ghost" onClick={() => navigate("/lawyers")}>بازگشت</button>
-          <button className="btn-primary" onClick={() => save.mutate()} disabled={save.isPending || !f.name || !f.slug}>
-            <Save size={15} /> {save.isPending ? "در حال ذخیره…" : "ذخیره"}
-          </button>
+      </div>
+
+      {/* ——— structured résumé (same shape the public ResumeCard renders) ——— */}
+      <div className="card space-y-4 p-5">
+        <h2 className="text-[15px] font-semibold">کارت رزومهٔ صفحهٔ «دربارهٔ ما»</h2>
+        <div className="grid gap-4 sm:grid-cols-2">
+          <Field label="سمت (kicker)"><input value={resume.role} onChange={(e) => setResume({ ...resume, role: e.target.value })} placeholder="وکیل پایه یک دادگستری" /></Field>
+          <Field label="نام لاتین"><input dir="ltr" value={resume.nameEn} onChange={(e) => setResume({ ...resume, nameEn: e.target.value })} placeholder="Mohammad Vaziri" /></Field>
+          <Field label="مدرک تحصیلی"><input value={resume.degree} onChange={(e) => setResume({ ...resume, degree: e.target.value })} /></Field>
+          <Field label="شعار/جمله"><input value={resume.motto} onChange={(e) => setResume({ ...resume, motto: e.target.value })} /></Field>
         </div>
+
+        {/* highlights — the 3-cell stats strip */}
+        <div>
+          <div className="mb-2 flex items-center justify-between">
+            <p className="text-[13px] font-medium text-ink-1">نوار شاخص‌ها (۳ سلول زیر نام)</p>
+            <button
+              className="btn-ghost btn-sm"
+              onClick={() => setResume({ ...resume, highlights: [...resume.highlights, { icon: "scale", title: "", text: "" }] })}
+              disabled={resume.highlights.length >= 3}
+            >
+              <Plus size={13} /> افزودن
+            </button>
+          </div>
+          <div className="space-y-2">
+            {resume.highlights.map((h, i) => (
+              <div key={i} className="flex items-end gap-2 rounded-lg border border-sand-2 p-2.5">
+                <div className="w-36">
+                  <label className="!mb-1 text-[11px]">آیکن</label>
+                  <select className="!py-1.5 text-[13px]" value={h.icon} onChange={(e) => setResume({ ...resume, highlights: resume.highlights.map((x, j) => j === i ? { ...x, icon: e.target.value } : x) })}>
+                    {ICONS.map((ic) => <option key={ic.value} value={ic.value}>{ic.label}</option>)}
+                  </select>
+                </div>
+                <div className="w-36">
+                  <label className="!mb-1 text-[11px]">تیتر</label>
+                  <input className="!py-1.5 text-[13px]" value={h.title} onChange={(e) => setResume({ ...resume, highlights: resume.highlights.map((x, j) => j === i ? { ...x, title: e.target.value } : x) })} />
+                </div>
+                <div className="flex-1">
+                  <label className="!mb-1 text-[11px]">متن</label>
+                  <input className="!py-1.5 text-[13px]" value={h.text} onChange={(e) => setResume({ ...resume, highlights: resume.highlights.map((x, j) => j === i ? { ...x, text: e.target.value } : x) })} />
+                </div>
+                <button className="rounded-lg p-1.5 text-ink-3 hover:text-red-600" onClick={() => setResume({ ...resume, highlights: resume.highlights.filter((_, j) => j !== i) })} aria-label="حذف">
+                  <Trash2 size={15} />
+                </button>
+              </div>
+            ))}
+            {resume.highlights.length === 0 && <p className="text-[12px] text-ink-3">موردی نیست — حداکثر ۳ مورد اضافه کنید.</p>}
+          </div>
+        </div>
+
+        <ListEditor
+          title={resume.expertiseTitle}
+          onTitle={(v) => setResume({ ...resume, expertiseTitle: v })}
+          items={resume.expertise}
+          onItems={(v) => setResume({ ...resume, expertise: v })}
+          addLabel="افزودن تخصص/سابقه"
+        />
+        <ListEditor
+          title={resume.educationTitle}
+          onTitle={(v) => setResume({ ...resume, educationTitle: v })}
+          items={resume.education}
+          onItems={(v) => setResume({ ...resume, education: v })}
+          addLabel="افزودن مدرک"
+        />
+      </div>
+
+      <div className="flex justify-end gap-2">
+        <button className="btn-ghost" onClick={() => navigate("/content/lawyers")}>بازگشت</button>
+        <button className="btn-primary" onClick={() => save.mutate()} disabled={save.isPending || !f.name || !f.slug}>
+          <Save size={15} /> {save.isPending ? "در حال ذخیره…" : "ذخیره"}
+        </button>
+      </div>
+    </div>
+  );
+}
+
+/** Repeatable list of single-line entries with an editable section title. */
+function ListEditor({
+  title,
+  onTitle,
+  items,
+  onItems,
+  addLabel,
+}: {
+  title: string;
+  onTitle: (v: string) => void;
+  items: string[];
+  onItems: (v: string[]) => void;
+  addLabel: string;
+}) {
+  return (
+    <div>
+      <div className="mb-2 grid gap-2 sm:grid-cols-[1fr_auto]">
+        <Field label="تیتر بخش"><input value={title} onChange={(e) => onTitle(e.target.value)} /></Field>
+        <button className="btn-ghost btn-sm self-end" onClick={() => onItems([...items, ""])}>
+          <Plus size={13} /> {addLabel}
+        </button>
+      </div>
+      <div className="space-y-1.5">
+        {items.map((it, i) => (
+          <div key={i} className="flex items-center gap-2">
+            <input
+              className="!py-1.5 text-[13px]"
+              value={it}
+              onChange={(e) => onItems(items.map((x, j) => (j === i ? e.target.value : x)))}
+            />
+            <button
+              className="shrink-0 rounded-lg p-1.5 text-ink-3 hover:text-red-600"
+              onClick={() => onItems(items.filter((_, j) => j !== i))}
+              aria-label="حذف"
+            >
+              <Trash2 size={14} />
+            </button>
+          </div>
+        ))}
       </div>
     </div>
   );

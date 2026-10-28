@@ -34,7 +34,7 @@ export default function PagesPage() {
             </td>
             <td className="px-4 py-3">
               <div className="flex gap-1.5">
-                <Link to={`/pages/${p.slug}`} className="btn-ghost btn-sm">
+                <Link to={`/content/pages/${p.slug}`} className="btn-ghost btn-sm">
                   <Pencil size={13} /> ویرایش
                 </Link>
                 <a
