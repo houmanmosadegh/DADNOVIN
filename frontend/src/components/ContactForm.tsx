@@ -129,6 +129,14 @@ export function ContactForm() {
           >
             {F.edit}
           </button>
+          {ticket ? (
+            <a
+              className="btn btn--ghost"
+              href={`/track?code=${encodeURIComponent(ticket.number)}&access=${encodeURIComponent(ticket.code)}`}
+            >
+              پیگیری آنلاین
+            </a>
+          ) : null}
         </div>
       </div>
     )

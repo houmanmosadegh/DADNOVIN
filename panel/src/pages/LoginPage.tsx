@@ -38,37 +38,35 @@ export default function LoginPage() {
     <div className="flex min-h-screen items-center justify-center bg-sand-0 p-4">
       <div className="w-full max-w-sm">
         <div className="mb-8 flex flex-col items-center text-center">
-          <span className="mb-3 flex h-14 w-14 items-center justify-center rounded-2xl bg-gold-1/15 text-gold-2">
+          <span className="mb-3 flex h-14 w-14 items-center justify-center rounded-2xl bg-gold-3 text-gold-1">
             <Scale size={26} />
           </span>
-          <h1 className="text-lg font-semibold text-white">پنل مدیریت دادنوین</h1>
-          <p className="mt-1 text-[13px] text-ink-1/50">
+          <h1 className="text-lg font-semibold text-ink-0">پنل مدیریت دادنوین</h1>
+          <p className="mt-1 text-[13px] text-ink-2">
             برای ادامه وارد حساب مدیریت شوید
           </p>
         </div>
 
         <form
           onSubmit={handleSubmit(onSubmit)}
-          className="card space-y-4 !bg-sand-1 !border-sand-2 p-6"
+          className="card space-y-4 p-6"
         >
           <div>
-            <label className="!text-ink-1/80">نام کاربری</label>
+            <label>نام کاربری</label>
             <input
               type="text"
               dir="ltr"
               autoComplete="username"
-              className="!bg-sand-0 !border-sand-2 !text-ink-0"
               {...register("username")}
             />
             {errors.username && <p className="field-error">{errors.username.message}</p>}
           </div>
           <div>
-            <label className="!text-ink-1/80">رمز عبور</label>
+            <label>رمز عبور</label>
             <input
               type="password"
               dir="ltr"
               autoComplete="current-password"
-              className="!bg-sand-0 !border-sand-2 !text-ink-0"
               {...register("password")}
             />
             {errors.password && (
@@ -76,7 +74,7 @@ export default function LoginPage() {
             )}
           </div>
           {errors.root && (
-            <p className="rounded-lg bg-red-500/10 px-3 py-2 text-[13px] text-red-400">
+            <p className="rounded-lg bg-red-50 px-3 py-2 text-[13px] text-red-600">
               {errors.root.message}
             </p>
           )}
@@ -84,7 +82,7 @@ export default function LoginPage() {
             {isSubmitting ? "در حال ورود…" : "ورود به پنل"}
           </button>
         </form>
-        <p className="mt-5 text-center text-[11px] text-ink-1/40">
+        <p className="mt-5 text-center text-[11px] text-ink-3">
           گروه حقوقی دادنوین — مشهد
         </p>
       </div>

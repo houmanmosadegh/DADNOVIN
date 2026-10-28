@@ -4,18 +4,18 @@
 @theme {
   --font-sans: "Vazirmatn Variable", ui-sans-serif, system-ui, sans-serif;
 
-  /* dark palette — sand = surfaces (deep navy, same family as the site),
-     ink = foreground scale (light ivory), gold = champagne accents */
-  --color-ink-0: #eceff7;
-  --color-ink-1: #b7bfd2;
-  --color-ink-2: #8790a8;
-  --color-ink-3: #5a6379;
-  --color-gold-1: #b98e46;
-  --color-gold-2: #d7b56d;
-  --color-gold-3: #f0e2c4;
-  --color-sand-0: #0c1120;
-  --color-sand-1: #151e36;
-  --color-sand-2: #242f4d;
+  /* light palette — sand = ivory surfaces, ink = charcoal text scale,
+     gold = champagne accent (restrained) */
+  --color-sand-0: #f6f4ef;
+  --color-sand-1: #ffffff;
+  --color-sand-2: #e6e1d6;
+  --color-ink-0: #1d2029;
+  --color-ink-1: #4b5063;
+  --color-ink-2: #7d8296;
+  --color-ink-3: #a8adbe;
+  --color-gold-1: #9a7b34;
+  --color-gold-2: #c9a45c;
+  --color-gold-3: #f0e5cc;
 }
 
 html {
@@ -38,6 +38,12 @@ body {
   border-radius: 8px;
 }
 
+:focus-visible {
+  outline: 2px solid var(--color-gold-2);
+  outline-offset: 2px;
+  border-radius: 4px;
+}
+
 input[type="text"],
 input[type="email"],
 input[type="password"],
@@ -46,7 +52,7 @@ input[type="number"],
 input[type="url"],
 textarea,
 select {
-  @apply w-full rounded-lg border border-sand-2 bg-sand-0 px-3 py-2 text-sm text-ink-0 outline-none transition placeholder:text-ink-3 focus:border-gold-1 focus:ring-2 focus:ring-gold-2/20 disabled:opacity-60;
+  @apply w-full rounded-lg border border-sand-2 bg-sand-1 px-3 py-2 text-sm text-ink-0 outline-none transition placeholder:text-ink-3 focus:border-gold-2 focus:ring-2 focus:ring-gold-3 disabled:opacity-60;
 }
 
 select option {
@@ -66,25 +72,103 @@ label {
   @apply inline-flex items-center justify-center gap-2 rounded-lg px-4 py-2 text-sm font-medium transition disabled:pointer-events-none disabled:opacity-50;
 }
 .btn-primary {
-  @apply bg-ink-0 text-sand-0 hover:bg-ink-1;
+  @apply bg-ink-0 text-sand-1 hover:bg-ink-1;
 }
 .btn-gold {
-  @apply bg-gold-2 text-[#1a1407] hover:bg-gold-2/90;
+  @apply bg-gold-2 text-[#241c0b] hover:bg-gold-1 hover:text-white;
 }
 .btn-ghost {
-  @apply border border-sand-2 bg-sand-1 text-ink-1 hover:bg-sand-2;
+  @apply border border-sand-2 bg-sand-1 text-ink-1 hover:border-ink-3 hover:text-ink-0;
 }
 .btn-danger {
-  @apply bg-red-700 text-white hover:bg-red-800;
+  @apply bg-red-600 text-white hover:bg-red-700;
 }
 .btn-sm {
   @apply px-2.5 py-1.5 text-[13px];
 }
 
 .card {
-  @apply rounded-xl border border-sand-2 bg-sand-1 shadow-[0_1px_3px_rgba(0,0,0,0.35)];
+  @apply rounded-xl border border-sand-2 bg-sand-1 shadow-[0_1px_2px_rgba(29,32,41,0.05)];
+}
+
+.card-pad {
+  @apply rounded-xl border border-sand-2 bg-sand-1 p-4 shadow-[0_1px_2px_rgba(29,32,41,0.05)] lg:p-5;
 }
 
 .field-error {
-  @apply mt-1 text-[12px] text-red-400;
+  @apply mt-1 text-[12px] text-red-600;
+}
+
+/* quick-filter chips above data tables */
+.chip {
+  @apply inline-flex cursor-pointer items-center gap-1.5 rounded-full border border-sand-2 bg-sand-1 px-3 py-1.5 text-[13px] text-ink-1 transition hover:border-ink-3;
+}
+.chip-active {
+  @apply border-gold-2 bg-gold-3/60 font-medium text-ink-0;
+}
+.chip .count {
+  @apply rounded-full bg-sand-0 px-1.5 text-[11px] text-ink-2;
+}
+.chip-active .count {
+  @apply bg-gold-2/30 text-ink-0;
+}
+
+/* horizontal tabs */
+.tab {
+  @apply cursor-pointer border-b-2 border-transparent px-3 py-2 text-[13px] text-ink-2 transition hover:text-ink-0;
+}
+.tab-active {
+  @apply border-gold-2 font-medium text-ink-0;
+}
+
+/* data table header cells */
+.th {
+  @apply px-4 py-3 text-right text-[12px] font-medium text-ink-2;
+}
+.td {
+  @apply px-4 py-3 align-middle text-[13px];
+}
+.tr-hover {
+  @apply border-b border-sand-2 transition last:border-0 hover:bg-sand-0/70;
+}
+
+/* timeline */
+.tl-item {
+  @apply relative flex gap-3 pb-5 last:pb-0;
+}
+.tl-item::before {
+  content: "";
+  @apply absolute top-5 bottom-0 right-[7px] w-px bg-sand-2;
+}
+.tl-item:last-child::before {
+  @apply hidden;
+}
+.tl-dot {
+  @apply mt-1.5 h-[15px] w-[15px] shrink-0 rounded-full border-2 border-sand-1 ring-1 ring-sand-2;
+}
+
+/* sidebar nav link */
+.nav-item {
+  @apply mb-0.5 flex items-center gap-2.5 rounded-lg px-3 py-2 text-[13px] text-ink-1 transition hover:bg-sand-0 hover:text-ink-0;
+}
+.nav-item-active {
+  @apply bg-gold-3/50 font-medium text-ink-0;
+}
+.nav-item-active svg {
+  color: var(--color-gold-1);
+}
+.nav-group-label {
+  @apply mb-1.5 flex cursor-pointer items-center justify-between px-2 text-[11px] font-semibold text-ink-2;
+}
+
+/* stat delta chip */
+.delta-up {
+  @apply text-emerald-700;
+}
+.delta-down {
+  @apply text-red-600;
+}
+
+kbd {
+  @apply rounded border border-sand-2 bg-sand-0 px-1.5 py-0.5 text-[11px] text-ink-2;
 }

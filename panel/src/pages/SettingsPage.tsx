@@ -22,8 +22,20 @@ function useSetting(key: string) {
   });
 }
 
-export default function SettingsPage() {
-  const [tab, setTab] = useState<(typeof TABS)[number]["key"]>("brand");
+const TAB_ALIAS: Record<string, (typeof TABS)[number]["key"]> = {
+  contact: "contact",
+  address: "contact",
+  social: "socials",
+  general: "brand",
+  seo: "seo",
+  footer: "footer",
+  ai: "ai",
+};
+
+export default function SettingsPage({ tab: initialTab }: { tab?: string }) {
+  const [tab, setTab] = useState<(typeof TABS)[number]["key"]>(
+    (initialTab && TAB_ALIAS[initialTab]) || "brand",
+  );
   return (
     <div className="space-y-5">
       <h1 className="text-lg font-semibold">تنظیمات سایت</h1>

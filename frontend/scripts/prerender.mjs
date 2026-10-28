@@ -18,6 +18,7 @@ const routes = [
   ['/services', 'services'],
   ['/consultation', 'consultation'],
   ['/contact', 'contact'],
+  ['/track', 'track'],
 ]
 
 // meta values land inside HTML/attributes — escape so a stray & < > " in

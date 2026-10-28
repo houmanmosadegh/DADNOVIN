@@ -180,17 +180,165 @@ export interface DashboardOverview {
   stats: {
     consultations_total: number;
     consultations_new: number;
-    tickets_total: number;
+    consultations_week: number;
+    contacts_unanswered: number;
     tickets_open: number;
+    awaiting_followup: number;
+    consultations_completed: number;
+    overdue: number;
+    mine_open: number;
     lawyers_visible: number;
     users_active: number;
     ai_conversations: number;
+    avg_first_response_hours: number | null;
   };
   recent_consultations: {
     id: string;
     name: string;
-    service: string;
+    phone: string;
+    subject: string;
     status: string;
     created_at: string;
+    tracking_code: string;
   }[];
+  attention_tickets: {
+    id: string;
+    ticket_number: string;
+    subject: string;
+    client: string;
+    priority: string;
+    status: string;
+    sla_due_at: string | null;
+    updated_at: string;
+  }[];
+  recent_contacts: {
+    id: string;
+    name: string;
+    phone: string;
+    status: string;
+    tracking_code: string;
+    created_at: string;
+  }[];
+  activity: {
+    type: string;
+    event: string;
+    actor: string;
+    payload: Record<string, unknown>;
+    at: string;
+    request_id: string;
+  }[];
+}
+
+export interface TrendsOut {
+  days: number;
+  series: Record<"consultation" | "ticket" | "contact", Record<string, number>>;
+}
+
+// ---------- unified requests ----------
+
+export interface InboxRow {
+  type: "consultation" | "ticket" | "contact";
+  id: string;
+  tracking_code: string;
+  name: string;
+  phone: string;
+  subject: string;
+  status: string;
+  priority: string;
+  assigned_to: string | null;
+  assignee_name: string;
+  labels: { id: string; name: string; color: string }[];
+  unanswered: boolean;
+  overdue: boolean;
+  created_at: string;
+  updated_at: string;
+  sla_due_at: string | null;
+}
+
+export interface MessageOut {
+  id: string;
+  sender_type: string;
+  sender_id: string | null;
+  body: string;
+  is_note: boolean;
+  attachments: string[];
+  created_at: string;
+}
+
+export interface EventOut {
+  id: string;
+  event_type: string;
+  actor_username: string;
+  payload: Record<string, unknown>;
+  created_at: string;
+}
+
+export interface DeliveryOut {
+  id: string;
+  channel: string;
+  provider: string;
+  recipient: string;
+  status: string;
+  attempts: number;
+  last_error: string;
+  sent_at: string | null;
+  created_at: string;
+}
+
+export interface RequestDetail {
+  type: string;
+  request: {
+    id: string;
+    status: string;
+    priority: string;
+    assigned_to: string | null;
+    cancel_reason: string;
+    first_response_at: string | null;
+    last_response_at: string | null;
+    sla_due_at: string | null;
+    created_at: string;
+    updated_at: string;
+  };
+  messages: MessageOut[];
+  events: EventOut[];
+  deliveries: DeliveryOut[];
+  labels: { id: string; name: string; color: string }[];
+  allowed_transitions: string[];
+  requester: {
+    name: string;
+    phone: string;
+    email: string;
+    subject: string;
+    code: string;
+    body: string;
+    source_page: string;
+    extra: Record<string, string>;
+  };
+}
+
+export interface LabelOut {
+  id: string;
+  name: string;
+  color: string;
+  created_at: string;
+}
+
+export interface AssigneeOut {
+  id: string;
+  name: string;
+  username: string;
+}
+
+export interface ArticleOut {
+  id: string;
+  slug: string;
+  title: string;
+  excerpt: string;
+  body: string;
+  seo_title: string;
+  seo_description: string;
+  status: string;
+  published_at: string | null;
+  created_at: string;
+  updated_at: string;
 }

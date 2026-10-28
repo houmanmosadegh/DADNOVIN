@@ -35,6 +35,7 @@ export function ConsultationForm() {
   const [copied, setCopied] = useState(false)
   const [submitting, setSubmitting] = useState(false)
   const [sent, setSent] = useState<boolean | null>(null)
+  const [tracking, setTracking] = useState<{ code: string; access: string } | null>(null)
 
   // a fresh ?service=slug while the form stays mounted (e.g. another CTA)
   // re-syncs the select — the useState initializer only covers first mount
@@ -80,16 +81,22 @@ export function ConsultationForm() {
     try {
       // real submission — persisted server-side; the honeypot field is
       // forwarded so the backend can silently drop bot traffic
-      await api.post('/consultations', {
-        full_name: name.trim(),
-        phone: phone.trim(),
-        service_slug: service === 'other' ? '' : service,
-        topic: service === 'other' ? F.fields.serviceOther : serviceTitle,
-        message: message.trim(),
-        source_page: '/consultation',
-        website: honey,
-      })
+      const created = await api.post<{ tracking_code?: string; access_code?: string }>(
+        '/consultations',
+        {
+          full_name: name.trim(),
+          phone: phone.trim(),
+          service_slug: service === 'other' ? '' : service,
+          topic: service === 'other' ? F.fields.serviceOther : serviceTitle,
+          message: message.trim(),
+          source_page: '/consultation',
+          website: honey,
+        },
+      )
       setSent(true)
+      if (created.tracking_code && created.access_code) {
+        setTracking({ code: created.tracking_code, access: created.access_code })
+      }
     } catch {
       // backend unreachable — keep the copyable summary honest about it
       setSent(false)
@@ -105,9 +112,20 @@ export function ConsultationForm() {
       <div className="cform__result" role="status">
         <h2 className="cform__result-title">{F.readyTitle}</h2>
         {sent === true ? (
-          <p className="cform__result-text">
-            درخواست شما در سامانهٔ دفتر ثبت شد؛ برای پیگیری سریع‌تر می‌توانید با شماره‌های درج‌شده در صفحهٔ تماس در ارتباط باشید.
-          </p>
+          <>
+            <p className="cform__result-text">
+              درخواست شما در سامانهٔ دفتر ثبت شد.
+            </p>
+            {tracking ? (
+              <p className="cform__ticket">
+                کد پیگیری: <b dir="ltr">{tracking.code}</b> — کد دسترسی:{' '}
+                <b dir="ltr">{tracking.access}</b>
+              </p>
+            ) : null}
+            <p className="cform__result-text">
+              کدها را نگه دارید؛ با آن‌ها می‌توانید وضعیت درخواست را آنلاین دنبال کنید.
+            </p>
+          </>
         ) : (
           <p className="cform__result-text">
             ثبت آنلاین در این لحظه ممکن نشد — این خلاصه را هنگام تماس با دفتر در اختیار داشته باشید.
@@ -132,6 +150,14 @@ export function ConsultationForm() {
           >
             {F.edit}
           </button>
+          {tracking ? (
+            <Link
+              to={`/track?code=${encodeURIComponent(tracking.code)}&access=${encodeURIComponent(tracking.access)}`}
+              className="btn btn--ghost"
+            >
+              پیگیری آنلاین درخواست
+            </Link>
+          ) : null}
           <Link to="/contact" className="cform__contact-link">
             {F.contactCta}
           </Link>

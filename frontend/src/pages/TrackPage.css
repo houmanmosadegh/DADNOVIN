@@ -1,0 +1,273 @@
+/* Public request tracking — lookup card + status + office/customer thread. */
+
+.track {
+  max-width: 46rem;
+  margin-inline: auto;
+  display: grid;
+  gap: 1.25rem;
+}
+
+.track__lookup {
+  padding: 1.5rem;
+  border-radius: var(--radius-l);
+  border: 1px solid var(--color-border);
+  background: linear-gradient(160deg, var(--color-surface), var(--color-surface-2));
+  box-shadow: var(--shadow-card);
+}
+
+.track__fields {
+  display: grid;
+  gap: 1rem;
+}
+
+@media (min-width: 40rem) {
+  .track__fields {
+    grid-template-columns: 1fr 1fr;
+  }
+}
+
+.track__field label,
+.track__reply label {
+  display: block;
+  margin-bottom: 0.4rem;
+  font-size: 0.85rem;
+  font-weight: 600;
+  color: var(--color-text-2);
+}
+
+.track__field input,
+.track__reply textarea {
+  width: 100%;
+  border-radius: var(--radius-s);
+  border: 1px solid var(--color-border);
+  background: rgb(var(--ink-0-rgb) / 0.45);
+  color: var(--color-text);
+  padding: 0.65rem 0.8rem;
+  font-family: var(--font-fa);
+  font-size: 0.95rem;
+  transition: border-color 0.2s var(--ease-out), box-shadow 0.2s var(--ease-out);
+}
+
+.track__field input:focus-visible,
+.track__reply textarea:focus-visible {
+  outline: none;
+  border-color: var(--color-border-gold);
+  box-shadow: 0 0 0 3px rgb(var(--gold-rgb) / 0.18);
+}
+
+.track__error {
+  margin-top: 0.85rem;
+  font-size: 0.85rem;
+  color: var(--color-error);
+}
+
+.track__submit {
+  margin-top: 1.1rem;
+  width: 100%;
+}
+
+.track__spin {
+  animation: track-spin 0.9s linear infinite;
+}
+
+@keyframes track-spin {
+  to {
+    transform: rotate(360deg);
+  }
+}
+
+.track__result {
+  padding: 1.5rem;
+  border-radius: var(--radius-l);
+  border: 1px solid var(--color-border-gold);
+  background: linear-gradient(160deg, var(--color-surface), var(--color-surface-2));
+  box-shadow: var(--shadow-card);
+}
+
+.track__head {
+  display: flex;
+  align-items: flex-start;
+  justify-content: space-between;
+  gap: 1rem;
+  border-bottom: 1px solid var(--color-border);
+  padding-bottom: 1rem;
+}
+
+.track__code {
+  font-family: var(--font-en);
+  font-size: 0.9rem;
+  letter-spacing: 0.06em;
+  color: var(--color-gold);
+}
+
+.track__subject {
+  margin-top: 0.3rem;
+  font-family: var(--font-display);
+  font-size: 1.35rem;
+  font-weight: 700;
+  color: var(--color-text);
+}
+
+.track__badge {
+  flex-shrink: 0;
+  border-radius: 999px;
+  border: 1px solid var(--color-border-gold);
+  padding: 0.2rem 0.7rem;
+  font-size: 0.78rem;
+  color: var(--color-gold);
+  background: rgb(var(--gold-rgb) / 0.08);
+}
+
+.track__meta {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 0.9rem;
+  margin-top: 1rem;
+}
+
+.track__meta dt {
+  font-size: 0.78rem;
+  color: var(--color-text-2);
+}
+
+.track__meta dd {
+  margin-top: 0.25rem;
+  font-size: 0.95rem;
+  font-weight: 600;
+  color: var(--color-text);
+}
+
+.track__status {
+  color: var(--color-gold-hi);
+}
+
+.track__thread {
+  margin-top: 1.4rem;
+  border-top: 1px solid var(--color-border);
+  padding-top: 1.2rem;
+}
+
+.track__thread-title {
+  font-size: 0.95rem;
+  font-weight: 700;
+  color: var(--color-text);
+  margin-bottom: 0.9rem;
+}
+
+.track__empty {
+  font-size: 0.88rem;
+  line-height: 1.9;
+  color: var(--color-text-2);
+}
+
+.track__msgs {
+  display: grid;
+  gap: 0.85rem;
+  list-style: none;
+  padding: 0;
+  margin: 0;
+}
+
+.track__msg {
+  max-width: 85%;
+  border-radius: var(--radius-m);
+  padding: 0.75rem 0.9rem;
+  font-size: 0.9rem;
+  line-height: 1.9;
+}
+
+.track__msg--staff {
+  margin-inline-start: 0;
+  margin-inline-end: auto;
+  background: rgb(var(--gold-rgb) / 0.12);
+  border: 1px solid rgb(var(--gold-rgb) / 0.22);
+}
+
+.track__msg--customer {
+  margin-inline-start: auto;
+  margin-inline-end: 0;
+  background: rgb(var(--ink-0-rgb) / 0.5);
+  border: 1px solid var(--color-border);
+}
+
+.track__msg-who {
+  display: flex;
+  justify-content: space-between;
+  gap: 0.75rem;
+  font-size: 0.75rem;
+  color: var(--color-text-2);
+  margin-bottom: 0.3rem;
+}
+
+.track__msg--staff .track__msg-who {
+  color: var(--color-gold);
+}
+
+.track__msg-who time {
+  font-size: 0.72rem;
+}
+
+.track__msg-body {
+  white-space: pre-wrap;
+  color: var(--color-text);
+}
+
+.track__reply {
+  margin-top: 1.4rem;
+  border-top: 1px solid var(--color-border);
+  padding-top: 1.2rem;
+}
+
+.track__reply textarea {
+  resize: vertical;
+}
+
+.track__reply-row {
+  margin-top: 0.7rem;
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 0.75rem;
+}
+
+.track__sent {
+  font-size: 0.82rem;
+  color: rgb(var(--gold-hi-rgb));
+}
+
+.track__reply-row .btn {
+  margin-inline-start: auto;
+}
+
+.track__closed {
+  margin-top: 1.2rem;
+  border-radius: var(--radius-s);
+  background: rgb(var(--ink-0-rgb) / 0.45);
+  border: 1px solid var(--color-border);
+  padding: 0.7rem 0.9rem;
+  font-size: 0.85rem;
+  color: var(--color-text-2);
+}
+
+.track__again {
+  margin-top: 1.1rem;
+  background: none;
+  border: none;
+  padding: 0;
+  font-family: var(--font-fa);
+  font-size: 0.85rem;
+  color: var(--color-gold);
+  cursor: pointer;
+  text-decoration: underline;
+  text-underline-offset: 4px;
+}
+
+.track__again:hover {
+  color: var(--color-gold-hi);
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .track__spin {
+    animation: none;
+  }
+}

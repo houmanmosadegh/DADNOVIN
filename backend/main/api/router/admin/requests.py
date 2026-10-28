@@ -60,6 +60,7 @@ def _request_dict(row) -> dict:
         "id": str(row.id),
         "status": row.status,
         "priority": row.priority,
+        "assigned_to": str(row.assigned_to) if row.assigned_to else None,
         "cancel_reason": getattr(row, "cancel_reason", ""),
         "first_response_at": row.first_response_at.isoformat()
         if getattr(row, "first_response_at", None)

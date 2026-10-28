@@ -11,6 +11,7 @@ import { ContactPage } from './pages/ContactPage'
 import { HomePage } from './pages/HomePage'
 import { NotFoundPage } from './pages/NotFoundPage'
 import { ServicesPage } from './pages/ServicesPage'
+import { TrackPage } from './pages/TrackPage'
 import { loadRemoteContent } from './content/remote'
 
 /**
@@ -48,6 +49,7 @@ export function AppRoutes() {
           <Route path="/services" element={<ServicesPage />} />
           <Route path="/consultation" element={<ConsultationPage />} />
           <Route path="/contact" element={<ContactPage />} />
+          <Route path="/track" element={<TrackPage />} />
           <Route path="*" element={<NotFoundPage />} />
         </Routes>
       </main>

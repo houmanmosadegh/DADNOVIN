@@ -62,7 +62,7 @@ export default function DashboardPage() {
       <div className="card p-5">
         <div className="mb-4 flex items-center justify-between">
           <h2 className="text-[15px] font-semibold">آخرین درخواست‌های مشاوره</h2>
-          <Link to="/consultations" className="text-[13px] text-gold-1 hover:underline">
+          <Link to="/requests/consultations" className="text-[13px] text-gold-1 hover:underline">
             مشاهده همه
           </Link>
         </div>
@@ -76,7 +76,7 @@ export default function DashboardPage() {
               <li key={r.id} className="flex items-center gap-3 py-2.5 text-sm">
                 <span className="font-medium">{r.name}</span>
                 <span className="text-[12px] text-ink-1/50" dir="ltr">
-                  {r.service || "—"}
+                  {r.subject || "—"}
                 </span>
                 <span className="mr-auto"><StatusBadge value={r.status} /></span>
                 <span className="text-[12px] text-ink-1/50">{fmtDate(r.created_at)}</span>
