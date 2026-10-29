@@ -55,6 +55,12 @@
   transform: scaleX(0);
   transform-origin: right center; /* RTL: grows from the reading edge */
   will-change: transform;
+  transition: opacity 0.25s ease;
+}
+
+/* never paint the progress line over the open nav drawer */
+.site-header.is-open .site-header__progress {
+  opacity: 0;
 }
 
 .site-header__inner {

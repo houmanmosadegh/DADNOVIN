@@ -8,9 +8,9 @@ dadnovin/
 ├── panel/           پنل مدیریت — Vite + React + TS + Tailwind (SPA جدا، base=/panel)
 ├── backend/         FastAPI + SQLAlchemy async + Alembic + PostgreSQL
 │   ├── main/        app, api/router, models, schemas, security, ai, services
-│   ├── alembic/     مایگریشن‌ها (0001 initial, 0002 ticket fix)
+│   ├── alembic/     مایگریشن‌ها (0001–0005)
 │   ├── seed/        site_content.json — محتوای استخراج‌شده از فرانت
-│   └── tests/       ۳۶ تست pytest (SQLite + httpx)
+│   └── tests/       ۴۹ تست pytest (SQLite + httpx)
 ├── infrastructure/nginx/   gateway.conf / web.conf / panel.conf
 ├── storage/         فایل‌های آپلودی (ولوم persistent)
 ├── docker-compose.yml        استک کامل: db + api + web + panel + gateway

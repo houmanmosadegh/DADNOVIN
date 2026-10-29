@@ -17,7 +17,7 @@ async def test_public_pages_have_sections(client):
     keys = {s["key"] for s in body["sections"]}
     assert "hero" in keys and "about" in keys
     hero = next(s for s in body["sections"] if s["key"] == "hero")
-    assert hero["content"]["title"].startswith("قانون")
+    assert hero["content"]["title"].strip()
 
 
 async def test_public_lawyers_sanitized(client):

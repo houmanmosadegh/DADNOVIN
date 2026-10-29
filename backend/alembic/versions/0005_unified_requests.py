@@ -17,7 +17,6 @@ Create Date: 2026-10-28
 import sqlalchemy as sa
 from alembic import op
 from sqlalchemy.dialects.postgresql import JSONB
-from sqlalchemy import JSON
 
 revision = "0005_unified_requests"
 down_revision = "0004_audit_actor_username"

@@ -97,16 +97,20 @@ def _page_sections(c: dict) -> dict[str, dict[str, dict]]:
     h = c["home"]
     cp = c["consultationPage"]
     ctp = c["contactPage"]
+    home: dict[str, dict] = {
+        "hero": {"kind": "hero", "content": h["hero"]},
+        "stats": {"kind": "stats", "content": h["stats"]},
+        "about": {"kind": "rich", "content": h["about"]},
+        "services_head": {"kind": "text", "content": h["services"]},
+        "picture": {"kind": "media", "content": h["picture"]},
+    }
+    # Optional home blocks — not every site revision ships them.
+    if "lawyers" in h:
+        home["lawyers_head"] = {"kind": "text", "content": h["lawyers"]}
+    if "ctaBand" in h:
+        home["cta_band"] = {"kind": "cta", "content": h["ctaBand"]}
     return {
-        "home": {
-            "hero": {"kind": "hero", "content": h["hero"]},
-            "stats": {"kind": "stats", "content": h["stats"]},
-            "about": {"kind": "rich", "content": h["about"]},
-            "services_head": {"kind": "text", "content": h["services"]},
-            "picture": {"kind": "media", "content": h["picture"]},
-            "lawyers_head": {"kind": "text", "content": h["lawyers"]},
-            "cta_band": {"kind": "cta", "content": h["ctaBand"]},
-        },
+        "home": home,
         "about": {
             "head": {
                 "kind": "head",

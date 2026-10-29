@@ -28,6 +28,8 @@ storage/*
 .taste-skill/
 .devin/
 .claude/
+/frontend/agent/
+/frontend/.git-backup/
 
 # editors
 .idea/
