@@ -17,6 +17,7 @@ from ..models.account import (
 from ..models.content import SiteSetting
 from ..models.consultation import ConsultationRequest
 from ..models.user import User
+from . import commission_engine as engine
 from . import wallet
 
 REFERRAL_DEFAULTS = {
@@ -27,6 +28,7 @@ REFERRAL_DEFAULTS = {
     "commission_enabled": False,  # OFF by default — see README compliance note
     "monthly_cap": 0,
     "reapply_days": 14,  # min days before re-applying after a rejection
+    "attribution_model": "first_touch",  # first_touch | last_touch
 }
 
 
@@ -39,23 +41,32 @@ async def referral_settings(db: AsyncSession) -> dict:
 
 
 async def pick_rule(
-    db: AsyncSession, marketer_id: uuid.UUID, accepted_count: int
+    db: AsyncSession,
+    marketer_id: uuid.UUID,
+    accepted_count: int,
+    now: datetime | None = None,
 ) -> CommissionRule | None:
-    """Per-marketer override first, then the highest global tier reached."""
+    """Per-marketer override first, then the highest global tier reached —
+    honouring each rule's validity window via the pure engine."""
     rows = (
-        await db.execute(
-            select(CommissionRule)
-            .where(CommissionRule.is_active.is_(True))
-            .order_by(CommissionRule.tier_min.desc())
-        )
+        await db.execute(select(CommissionRule).order_by(CommissionRule.tier_min.desc()))
     ).scalars().all()
-    for r in rows:
-        if r.marketer_id == marketer_id:
-            return r
-    for r in rows:
-        if r.marketer_id is None and accepted_count >= r.tier_min:
-            return r
-    return None
+    return engine.resolve_rule(list(rows), marketer_id, accepted_count, now)
+
+
+async def monthly_commission_total(db: AsyncSession, marketer_id: uuid.UUID) -> int:
+    """Pending+approved+paid commissions this calendar month — for the cap."""
+    now = datetime.now(UTC)
+    month_start = now.replace(day=1, hour=0, minute=0, second=0, microsecond=0)
+    return (
+        await db.execute(
+            select(func.coalesce(func.sum(Commission.amount), 0)).where(
+                Commission.marketer_id == marketer_id,
+                Commission.status.in_(["pending", "approved", "paid"]),
+                Commission.created_at >= month_start,
+            )
+        )
+    ).scalar_one()
 
 
 async def accepted_count(db: AsyncSession, marketer_id: uuid.UUID) -> int:
@@ -110,12 +121,16 @@ async def on_request_accepted(
     if rule is None:
         return None
     fee = getattr(row, "fee_amount", 0) or 0
-    if rule.kind == "percent":
-        amount = fee * rule.value // 100
-    else:
-        amount = rule.value
+    amount = engine.compute_amount(rule, fee)
     if amount <= 0:
         return None
+    # monthly cap — remaining headroom shrinks the commission, never blocks fully
+    cap = int(cfg.get("monthly_cap") or 0)
+    if cap > 0:
+        headroom = cap - await monthly_commission_total(db, attr.marketer_id)
+        if headroom <= 0:
+            return None
+        amount = min(amount, headroom)
     comm = Commission(
         marketer_id=attr.marketer_id,
         request_type=request_type,
@@ -125,10 +140,46 @@ async def on_request_accepted(
         amount=amount,
         status="pending",
         hold_until=datetime.now(UTC) + timedelta(days=int(cfg.get("hold_days", 14))),
+        rule_snapshot=engine.snapshot_rule(rule),
     )
     db.add(comm)
     await db.flush()
     return comm
+
+
+async def preview_commission(
+    db: AsyncSession,
+    marketer_id: uuid.UUID | None,
+    basis_amount: int,
+    accepted_count: int | None = None,
+) -> dict:
+    """What-if calculator for admins — runs the same engine without writes."""
+    rows = (
+        await db.execute(select(CommissionRule).order_by(CommissionRule.tier_min.desc()))
+    ).scalars().all()
+    count = (
+        accepted_count
+        if accepted_count is not None
+        else (await accepted_count(db, marketer_id) if marketer_id else 0)
+    )
+    rule = engine.resolve_rule(list(rows), marketer_id, count)
+    if rule is None:
+        return {"matched": False, "amount": 0, "rule": None, "accepted_count": count}
+    amount = engine.compute_amount(rule, basis_amount)
+    return {
+        "matched": True,
+        "amount": amount,
+        "accepted_count": count,
+        "rule": {
+            "id": str(rule.id),
+            "kind": rule.kind,
+            "value": rule.value,
+            "tier_min": rule.tier_min,
+            "marketer_id": str(rule.marketer_id) if rule.marketer_id else None,
+            "min_amount": rule.min_amount,
+            "max_amount": rule.max_amount,
+        },
+    }
 
 
 async def settle_due(db: AsyncSession, actor_id: uuid.UUID | None = None) -> int:

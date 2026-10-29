@@ -9,10 +9,8 @@ import {
   LayoutDashboard,
   LogOut,
   Menu,
-  PenSquare,
   Share2,
   UserRound,
-  Wallet,
   X,
 } from 'lucide-react'
 import { api } from '../../services/api'
@@ -25,7 +23,6 @@ import NotificationsPage from './NotificationsPage'
 import ProfilePage from './ProfilePage'
 import RequestDetailPage from './RequestDetailPage'
 import RequestsPage from './RequestsPage'
-import WalletPage from './WalletPage'
 import './account.css'
 import type { Notif } from './types'
 
@@ -80,16 +77,12 @@ export default function AccountApp() {
   }
 
   const isStaff = me.roles.some((r) => STAFF_ROLES.includes(r))
+  // منوی ۵‌تایی (spec §5) — اعلان‌ها زنگ topbar؛ «درخواست جدید» CTA است
   const items: { to: string; label: string; icon: React.ReactNode; end?: boolean; badge?: number }[] = [
     { to: '/panel', label: 'داشبورد', icon: <LayoutDashboard size={17} />, end: true },
-    { to: '/panel/requests', label: 'درخواست‌های مشاوره', icon: <FileText size={17} /> },
-    { to: '/panel/requests/new', label: 'ثبت درخواست جدید', icon: <PenSquare size={17} /> },
+    { to: '/panel/requests', label: 'درخواست‌های من', icon: <FileText size={17} /> },
     { to: '/panel/marketing', label: 'بازاریابی', icon: <Share2 size={17} /> },
-    { to: '/panel/notifications', label: 'اعلان‌ها', icon: <Bell size={17} />, badge: unread },
-    ...(me.is_marketer
-      ? [{ to: '/panel/wallet', label: 'کیف پول', icon: <Wallet size={17} />, badge: 0 }]
-      : []),
-    { to: '/panel/profile', label: 'پروفایل', icon: <UserRound size={17} />, badge: 0 },
+    { to: '/panel/profile', label: 'پروفایل', icon: <UserRound size={17} /> },
   ]
 
   return (
@@ -151,17 +144,19 @@ export default function AccountApp() {
               {!!it.badge && <span className="acc__badge-mini">{it.badge.toLocaleString('fa-IR')}</span>}
             </NavLink>
           ))}
+          {/* آیتم پنجم — خروج */}
+          <button
+            className="acc__navlink acc__navlink--logout"
+            onClick={() => void logout().then(() => navigate('/'))}
+          >
+            <LogOut size={17} />
+            <span className="acc__navlabel">خروج</span>
+          </button>
         </nav>
 
         <div className="acc__side-foot">
           {isStaff && <a className="acc__stafflink" href="/admin/">ورود به پنل مدیریت ←</a>}
           <a href="/" className="acc__sitelink">مشاهدهٔ سایت</a>
-          <button
-            className="acc__logout"
-            onClick={() => void logout().then(() => navigate('/'))}
-          >
-            <LogOut size={14} /> خروج
-          </button>
         </div>
       </aside>
 
@@ -173,7 +168,7 @@ export default function AccountApp() {
           <Route path="/panel/requests/:id" element={<RequestDetailPage />} />
           <Route path="/panel/notifications" element={<NotificationsPage />} />
           <Route path="/panel/marketing" element={<MarketingPage />} />
-          <Route path="/panel/wallet" element={<WalletPage />} />
+          <Route path="/panel/wallet" element={<Navigate to="/panel/marketing?tab=wallet" replace />} />
           <Route path="/panel/profile" element={<ProfilePage />} />
           <Route path="*" element={<Navigate to="/panel" replace />} />
         </Routes>

@@ -148,7 +148,7 @@
 .authp__field input[aria-invalid="true"] { border-color: rgb(var(--error-rgb) / .55); }
 
 .authp__pw { position: relative; }
-.authp__pw input { padding-inline-end: 2.6rem; }
+.authp__pw input { padding-inline-end: 4.5rem; }
 .authp__eye {
   position: absolute;
   inset-inline-end: .55rem;
@@ -174,8 +174,20 @@
 .authp__meter-fill--2 { inline-size: 70%; background: rgb(var(--gold-rgb)); }
 .authp__meter-fill--3 { inline-size: 100%; background: rgb(var(--online-rgb)); }
 
-.authp__hint { font-style: normal; font-size: .76rem; color: var(--color-text-2); }
+.authp__hint { font-style: normal; font-size: .76rem; color: var(--color-text-2); display: inline-flex; align-items: center; gap: .3rem; min-height: 1em; }
+.authp__hint:empty { display: none; }
 .authp__hint--err { color: rgb(var(--error-hi-rgb)); }
+.authp__hint--ok { color: rgb(var(--online-rgb)); }
+.authp__spin-inline { animation: authp-rot .8s linear infinite; }
+.authp__otp-btn {
+  position: absolute; inset-inline-end: .35rem; inset-block-start: 50%; translate: 0 -50%;
+  block-size: calc(100% - .7rem);
+  font-size: .72rem; color: var(--color-gold);
+  border-inline-start: 1px solid rgb(var(--border-rgb) / .5);
+  padding-inline: .75rem;
+  white-space: nowrap;
+}
+.authp__otp-btn:disabled { opacity: .55; }
 
 .authp__check {
   display: flex; align-items: flex-start; gap: .5rem;
@@ -768,4 +780,52 @@ a.acc__stat:hover .acc__stat-ico { color: var(--color-gold-hi); border-color: va
 }
 @media (prefers-reduced-motion: reduce) {
   .acc__side { transition: none; }
+}
+
+/* ── marketing hub (spec §4.6) ─────────────────────────────────── */
+
+.acc__navlink--logout {
+  border: 0; background: none; cursor: pointer;
+  font: inherit; text-align: start; inline-size: 100%;
+  color: var(--color-text-muted);
+}
+.acc__navlink--logout:hover { color: var(--color-error); }
+
+.acc__share { display: flex; flex-wrap: wrap; gap: .5rem; margin-block-start: .8rem; }
+
+.acc__hint { display: block; font-size: .82rem; margin-block-start: .8rem; }
+
+.acc__funnel { display: grid; gap: .6rem; }
+.acc__funnel-row { display: grid; grid-template-columns: 7rem 1fr 3.5rem; align-items: center; gap: .7rem; }
+.acc__funnel-label { font-size: .82rem; color: var(--color-text-muted); }
+.acc__funnel-track {
+  block-size: .55rem; border-radius: 99px;
+  background: rgb(var(--ink-3-rgb) / .35); overflow: hidden;
+}
+.acc__funnel-bar {
+  block-size: 100%; border-radius: 99px;
+  background: linear-gradient(90deg, var(--color-gold), var(--color-gold-hi));
+  transition: inline-size .5s ease;
+}
+.acc__funnel-num { font-weight: 600; font-size: .9rem; text-align: end; }
+
+.acc__row-actions { display: inline-flex; gap: .35rem; }
+.acc__row-actions .acc__iconbtn { padding: .35rem; }
+.acc__iconbtn--danger:hover { color: var(--color-error); border-color: var(--color-error); }
+
+.acc__badge--gold { border-color: var(--color-border-gold); color: var(--color-gold-hi); background: rgb(var(--gold-rgb) / .08); }
+
+.acc__guidelist {
+  margin: 0; padding-inline-start: 1.2rem;
+  display: grid; gap: .55rem;
+  font-size: .9rem; line-height: 1.9; color: var(--color-text-muted);
+}
+.acc__guidelist li::marker { color: var(--color-gold); }
+
+@media (prefers-reduced-motion: reduce) {
+  .acc__funnel-bar { transition: none; }
+}
+@media (max-width: 40rem) {
+  .acc__funnel-row { grid-template-columns: 5.5rem 1fr 3rem; gap: .5rem; }
+  .acc__row--link { grid-template-columns: 1fr; }
 }

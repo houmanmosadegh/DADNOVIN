@@ -6,23 +6,16 @@ import { AuthProvider, useAuth } from "../stores/auth";
 import { PageSkeleton } from "../components/ui";
 import type { ReactNode } from "react";
 
-import AiPage from "../pages/AiPage";
-import ArticlesPage from "../pages/ArticlesPage";
-import AuditPage from "../pages/AuditPage";
-import ConversationsPage from "../pages/ConversationsPage";
+import ContentHubPage from "../pages/ContentHubPage";
 import DashboardPage from "../pages/DashboardPage";
-import InboxPage from "../pages/InboxPage";
-import LabelsPage from "../pages/LabelsPage";
 import LawyerEditPage from "../pages/LawyerEditPage";
-import LawyersPage from "../pages/LawyersPage";
 import LoginPage from "../pages/LoginPage";
-import MarketersPage from "../pages/MarketersPage";
-import MediaPage from "../pages/MediaPage";
+import MarketingHubPage from "../pages/MarketingHubPage";
 import PageEditPage from "../pages/PageEditPage";
-import PagesPage from "../pages/PagesPage";
 import RequestDetailPage from "../pages/RequestDetailPage";
-import SettingsPage from "../pages/SettingsPage";
-import UsersPage from "../pages/UsersPage";
+import RequestsHubPage from "../pages/RequestsHubPage";
+import SystemHubPage from "../pages/SystemHubPage";
+import UsersHubPage from "../pages/UsersHubPage";
 
 const qc = new QueryClient({
   defaultOptions: {
@@ -58,9 +51,14 @@ function RoleGate({ roles, children }: { roles: string[]; children: ReactNode })
   return <>{children}</>;
 }
 
-function SettingsTabRoute() {
-  const { tab } = useParams();
-  return <SettingsPage key={tab} tab={tab} />;
+/** ریدایرکت legacy با حفظ پارامتر روت (/:slug و /:id). */
+function ParamRedirect({ to }: { to: string }) {
+  const p = useParams();
+  const target = to
+    .replace(":slug", p.slug ?? "")
+    .replace(":id", p.id ?? "")
+    .replace(/\/$/, "");
+  return <Navigate to={target} replace />;
 }
 
 export default function App() {
@@ -80,41 +78,59 @@ export default function App() {
               >
                 <Route index element={<DashboardPage />} />
 
-                {/* unified request operations */}
-                <Route path="inbox" element={<RoleGate roles={REQUEST_ROLES}><InboxPage /></RoleGate>} />
-                <Route path="requests/consultations" element={<RoleGate roles={REQUEST_ROLES}><InboxPage fixedType="consultation" title="درخواست‌های مشاوره" subtitle="فرم‌های مشاورهٔ ثبت‌شده از سایت" /></RoleGate>} />
-                <Route path="requests/contacts" element={<RoleGate roles={REQUEST_ROLES}><InboxPage fixedType="contact" title="درخواست‌های تماس" subtitle="تماس‌ها و درخواست‌های تماس مجدد" /></RoleGate>} />
-                <Route path="requests/tickets" element={<RoleGate roles={REQUEST_ROLES}><InboxPage fixedType="ticket" title="تیکت‌ها" subtitle="تیکت‌های پشتیبانی مشتریان" /></RoleGate>} />
-                <Route path="requests/:type/:id" element={<RoleGate roles={REQUEST_ROLES}><RequestDetailPage /></RoleGate>} />
+                {/* ۶ آیتم سایدبار — همهٔ محتوا داخل تب‌های هر هاب */}
+                <Route
+                  path="requests"
+                  element={<RoleGate roles={REQUEST_ROLES}><RequestsHubPage /></RoleGate>}
+                />
+                <Route
+                  path="requests/:type/:id"
+                  element={<RoleGate roles={REQUEST_ROLES}><RequestDetailPage /></RoleGate>}
+                />
+                <Route
+                  path="users"
+                  element={<RoleGate roles={["super_admin"]}><UsersHubPage /></RoleGate>}
+                />
+                <Route
+                  path="marketing"
+                  element={<RoleGate roles={["super_admin"]}><MarketingHubPage /></RoleGate>}
+                />
+                <Route
+                  path="content"
+                  element={<RoleGate roles={["super_admin", "admin", "editor"]}><ContentHubPage /></RoleGate>}
+                />
+                <Route
+                  path="content/pages/:slug"
+                  element={<RoleGate roles={["super_admin", "admin", "editor"]}><PageEditPage /></RoleGate>}
+                />
+                <Route
+                  path="content/lawyers/:id"
+                  element={<RoleGate roles={["super_admin", "admin", "editor"]}><LawyerEditPage /></RoleGate>}
+                />
+                <Route
+                  path="system"
+                  element={<RoleGate roles={["super_admin", "admin"]}><SystemHubPage /></RoleGate>}
+                />
 
-                {/* content management */}
-                <Route path="content/pages" element={<RoleGate roles={["super_admin", "admin", "editor"]}><PagesPage /></RoleGate>} />
-                <Route path="content/pages/:slug" element={<RoleGate roles={["super_admin", "admin", "editor"]}><PageEditPage /></RoleGate>} />
-                <Route path="content/articles" element={<RoleGate roles={["super_admin", "admin", "editor"]}><ArticlesPage /></RoleGate>} />
-                <Route path="content/lawyers" element={<RoleGate roles={["super_admin", "admin", "editor"]}><LawyersPage /></RoleGate>} />
-                <Route path="content/lawyers/:id" element={<RoleGate roles={["super_admin", "admin", "editor"]}><LawyerEditPage /></RoleGate>} />
-                <Route path="content/media" element={<RoleGate roles={["super_admin", "admin", "editor"]}><MediaPage /></RoleGate>} />
-
-                {/* settings */}
-                <Route path="settings" element={<RoleGate roles={["super_admin", "admin", "editor"]}><SettingsPage /></RoleGate>} />
-                <Route path="settings/:tab" element={<RoleGate roles={["super_admin", "admin", "editor"]}><SettingsTabRoute /></RoleGate>} />
-
-                {/* system */}
-                <Route path="labels" element={<RoleGate roles={REQUEST_ROLES}><LabelsPage /></RoleGate>} />
-                <Route path="ai" element={<RoleGate roles={["super_admin", "admin"]}><AiPage /></RoleGate>} />
-                <Route path="ai/conversations" element={<RoleGate roles={["super_admin", "admin"]}><ConversationsPage /></RoleGate>} />
-                <Route path="marketers" element={<RoleGate roles={["super_admin"]}><MarketersPage /></RoleGate>} />
-                <Route path="users" element={<RoleGate roles={["super_admin"]}><UsersPage /></RoleGate>} />
-                <Route path="audit" element={<RoleGate roles={["super_admin", "admin"]}><AuditPage /></RoleGate>} />
-
-                {/* legacy redirects */}
-                <Route path="pages" element={<Navigate to="/content/pages" replace />} />
-                <Route path="pages/:slug" element={<Navigate to="/content/pages" replace />} />
-                <Route path="media" element={<Navigate to="/content/media" replace />} />
-                <Route path="lawyers" element={<Navigate to="/content/lawyers" replace />} />
-                <Route path="lawyers/:id" element={<Navigate to="/content/lawyers" replace />} />
-                <Route path="consultations" element={<Navigate to="/requests/consultations" replace />} />
-                <Route path="tickets" element={<Navigate to="/requests/tickets" replace />} />
+                {/* legacy redirects → hub tabs */}
+                <Route path="inbox" element={<Navigate to="/requests" replace />} />
+                <Route path="requests/consultations" element={<Navigate to="/requests?tab=consultations" replace />} />
+                <Route path="requests/contacts" element={<Navigate to="/requests?tab=contacts" replace />} />
+                <Route path="requests/tickets" element={<Navigate to="/requests?tab=tickets" replace />} />
+                <Route path="labels" element={<Navigate to="/requests?tab=labels" replace />} />
+                <Route path="marketers" element={<Navigate to="/marketing" replace />} />
+                <Route path="settings" element={<Navigate to="/content?tab=site" replace />} />
+                <Route path="settings/:tab" element={<Navigate to="/content?tab=site" replace />} />
+                <Route path="ai" element={<Navigate to="/system?tab=ai" replace />} />
+                <Route path="ai/conversations" element={<Navigate to="/system?tab=conversations" replace />} />
+                <Route path="audit" element={<Navigate to="/system?tab=audit" replace />} />
+                <Route path="pages" element={<Navigate to="/content?tab=pages" replace />} />
+                <Route path="pages/:slug" element={<ParamRedirect to="/content/pages/:slug" />} />
+                <Route path="media" element={<Navigate to="/content?tab=media" replace />} />
+                <Route path="lawyers" element={<Navigate to="/content?tab=lawyers" replace />} />
+                <Route path="lawyers/:id" element={<ParamRedirect to="/content/lawyers/:id" />} />
+                <Route path="consultations" element={<Navigate to="/requests?tab=consultations" replace />} />
+                <Route path="tickets" element={<Navigate to="/requests?tab=tickets" replace />} />
 
                 <Route path="*" element={<Navigate to="/" replace />} />
               </Route>

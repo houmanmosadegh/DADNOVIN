@@ -17,10 +17,19 @@ PHONE_M = "09121110003"
 USER_PASS = "Passw0rd!23"
 
 
-async def _register(client, phone, name="کاربر تست", password=USER_PASS, ref=""):
+async def _register(
+    client, phone, name="کاربر تست", password=USER_PASS, ref="", username=None, otp=""
+):
     return await client.post(
         "/api/v1/account-auth/register",
-        json={"full_name": name, "phone": phone, "password": password, "ref_code": ref},
+        json={
+            "full_name": name,
+            "username": username or f"user_{phone[-6:]}",
+            "phone": phone,
+            "password": password,
+            "ref_code": ref,
+            "otp": otp,
+        },
     )
 
 
@@ -262,3 +271,184 @@ class TestCommissionWallet:
         assert "رضایی" not in str(rows)
         assert "topic" not in rows[0] and "message" not in rows[0]
         assert rows[0]["masked_name"].startswith("ع.")
+
+
+class TestUsernameOtp:
+    async def test_check_username_live(self, client):
+        r = await client.get("/api/v1/account-auth/check-username?u=karimi_92")
+        assert r.json() == {"available": True, "reason": ""}
+        await _register(client, PHONE_A, username="karimi_92")
+        r = await client.get("/api/v1/account-auth/check-username?u=karimi_92")
+        assert r.json()["available"] is False
+        r = await client.get("/api/v1/account-auth/check-username?u=نام!خراب")
+        assert r.json()["reason"] == "format"
+
+    async def test_register_requires_username(self, client):
+        r = await client.post(
+            "/api/v1/account-auth/register",
+            json={"full_name": "تست تستی", "phone": PHONE_A, "password": USER_PASS},
+        )
+        assert r.status_code == 422  # missing username
+
+    async def test_duplicate_username_rejected(self, client):
+        await _register(client, PHONE_A, username="ali_law")
+        r = await _register(client, PHONE_B, username="ali_law")
+        assert r.status_code == 409
+
+    async def test_login_with_username(self, client):
+        await _register(client, PHONE_A, username="user_a1")
+        r = await client.post(
+            "/api/v1/account-auth/login",
+            json={"identifier": "user_a1", "password": USER_PASS},
+        )
+        assert r.status_code == 200
+
+    async def test_otp_flow_when_enabled(self, client, seeded_session):
+        row = await seeded_session.get(SiteSetting, "auth")
+        if row is None:
+            seeded_session.add(SiteSetting(key="auth", value={}, is_public=False))
+            await seeded_session.flush()
+            row = await seeded_session.get(SiteSetting, "auth")
+        row.value = {**(row.value or {}), "otp_enabled": True}
+        await seeded_session.commit()
+
+        r = await client.get("/api/v1/account-auth/config")
+        assert r.json()["otp_enabled"] is True
+
+        # register without otp → required error
+        r = await _register(client, PHONE_A)
+        assert r.status_code == 422
+        assert r.json()["detail"]["code"] == "otp_required"
+
+        # request a code → token lands in db; mock provider just logs
+        r = await client.post(
+            "/api/v1/account-auth/otp/request", json={"phone": PHONE_A}
+        )
+        assert r.status_code == 200
+        from sqlalchemy import select as sel
+
+        from main.models.account import OtpToken
+
+        tok = (
+            await seeded_session.execute(
+                sel(OtpToken).where(OtpToken.phone == PHONE_A)
+            )
+        ).scalar_one()
+        # can't know the raw code — simulate verify attempts then expiry path
+        tok.code_hash = "0" * 64  # impossible hash
+        await seeded_session.commit()
+        r = await _register(client, PHONE_A, username="otp_user", otp="000000")
+        assert r.status_code == 400  # bad_otp
+
+    async def test_otp_disabled_by_default(self, client):
+        r = await client.get("/api/v1/account-auth/config")
+        assert r.json()["otp_enabled"] is False
+        r = await client.post(
+            "/api/v1/account-auth/otp/request", json={"phone": PHONE_A}
+        )
+        assert r.status_code == 400
+
+
+class TestReferralLinks:
+    async def test_redirect_records_click_and_cookie(self, client):
+        code = await _make_marketer(client, PHONE_M)
+        r = await client.get(
+            f"/api/v1/referrals/r/{code}?src=instagram", follow_redirects=False
+        )
+        assert r.status_code == 302
+        assert r.headers["location"] == "/"
+        assert "dn_ref" in r.headers["set-cookie"]
+
+    async def test_bad_code_still_redirects(self, client):
+        r = await client.get("/api/v1/referrals/r/DN-NOPE", follow_redirects=False)
+        assert r.status_code == 302
+
+    async def test_labeled_links_crud_and_stats(self, client):
+        code = await _make_marketer(client, PHONE_M)
+        r = await client.post(
+            "/api/v1/account/marketer/links", json={"label": "instagram"}
+        )
+        assert r.status_code == 201, r.text
+        assert r.json()["url"] == f"/r/{code}?src=instagram"
+
+        # click through the labeled link then check per-link stats
+        await client.get(f"/api/v1/referrals/r/{code}?src=instagram")
+        r = await client.get("/api/v1/account/marketer/links")
+        rows = r.json()
+        assert len(rows) == 1 and rows[0]["label"] == "instagram"
+        assert rows[0]["clicks"] == 1 and rows[0]["unique_clicks"] == 1
+
+        link_id = rows[0]["id"]
+        r = await client.delete(f"/api/v1/account/marketer/links/{link_id}")
+        assert r.status_code == 204
+        r = await client.get("/api/v1/account/marketer/links")
+        assert r.json() == []
+
+    async def test_qr_svg(self, client):
+        await _make_marketer(client, PHONE_M)
+        r = await client.get("/api/v1/account/marketer/qr?src=telegram")
+        assert r.status_code == 200
+        assert r.text.startswith("<svg") or "<svg" in r.text[:200]
+
+    async def test_links_forbidden_for_non_marketer(self, client):
+        await _register(client, PHONE_A)
+        r = await client.get("/api/v1/account/marketer/links")
+        assert r.status_code == 403
+
+
+class TestAdminMarketing:
+    async def test_preview_calculator(self, client, seeded_session):
+        seeded_session.add(
+            CommissionRule(kind="percent", value=10, max_amount=1_000_000)
+        )
+        await seeded_session.commit()
+        await _admin(client)
+        r = await client.post(
+            "/api/v1/admin/commissions/preview",
+            json={"basis_amount": 5_000_000},
+        )
+        assert r.status_code == 200
+        body = r.json()
+        assert body["matched"] is True
+        assert body["amount"] == 500_000  # 10% of 5M
+        r = await client.post(
+            "/api/v1/admin/commissions/preview",
+            json={"basis_amount": 50_000_000},
+        )
+        assert r.json()["amount"] == 1_000_000  # clamped by max_amount
+
+    async def test_rule_validity_window_and_clamps(self, client, seeded_session):
+        await _admin(client)
+        r = await client.post(
+            "/api/v1/admin/commissions/rules",
+            json={
+                "kind": "fixed", "value": 100_000, "min_amount": 200_000,
+                "ends_at": "2000-01-01T00:00:00Z",
+            },
+        )
+        assert r.status_code == 201, r.text
+        r = await client.get("/api/v1/admin/commissions/rules")
+        rule = r.json()[0]
+        assert rule["min_amount"] == 200_000 and rule["ends_at"] is not None
+
+    async def test_report_and_csv(self, client, seeded_session):
+        await _make_marketer(client, PHONE_M)
+        await _admin(client)
+        r = await client.get("/api/v1/admin/marketers/report")
+        assert r.status_code == 200
+        body = r.json()
+        assert len(body["leaderboard"]) == 1
+        assert "funnel" in body and "suspicious" in body
+        r = await client.get("/api/v1/admin/marketers/report.csv")
+        assert r.status_code == 200
+        assert "ref_code" in r.text and "DN-" in r.text
+
+    async def test_suspicious_click_flood_flagged(self, client, seeded_session):
+        code = await _make_marketer(client, PHONE_M)
+        for _ in range(21):
+            await client.get(f"/api/v1/referrals/r/{code}")
+        await _admin(client)
+        r = await client.get("/api/v1/admin/marketers/report")
+        suspicious = r.json()["suspicious"]
+        assert len(suspicious) >= 1
+        assert suspicious[0]["reason"] == "click_flood"

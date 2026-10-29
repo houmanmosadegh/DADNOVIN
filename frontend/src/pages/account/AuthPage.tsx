@@ -1,9 +1,9 @@
 /** صفحهٔ ورود/ثبت‌نام — یک کارت مرکزی مینیمال (سبک اینستاگرام).
  *  گیتِ /panel؛ بعد از ورود ریدایرکت نقش‌محور (یا ?next=). */
 
-import { useMemo, useRef, useState } from 'react'
+import { useEffect, useMemo, useRef, useState } from 'react'
 import { useLocation, useNavigate, useSearchParams } from 'react-router-dom'
-import { AlertCircle, ArrowLeft, CheckCircle2, Eye, EyeOff } from 'lucide-react'
+import { AlertCircle, ArrowLeft, CheckCircle2, Eye, EyeOff, Loader2 } from 'lucide-react'
 import { api } from '../../services/api'
 import { useAuth } from '../../services/auth'
 import { readRefCookie } from '../../services/referral'
@@ -36,9 +36,37 @@ export default function AuthPage() {
   const [showRef, setShowRef] = useState(!!readRefCookie())
   const [touched, setTouched] = useState<Record<string, boolean>>({})
   const [f, setF] = useState({
-    name: '', phone: '', password: '', ref: readRefCookie(), token: '', newPassword: '',
+    name: '', username: '', phone: '', password: '', ref: readRefCookie(),
+    token: '', newPassword: '', otp: '',
   })
   const firstRef = useRef<HTMLInputElement>(null)
+
+  // OTP feature flag — the field only renders when admin enables it
+  const [otpEnabled, setOtpEnabled] = useState(false)
+  const [otpSent, setOtpSent] = useState(false)
+  useEffect(() => {
+    api
+      .get<{ otp_enabled: boolean }>('/account-auth/config')
+      .then((c) => setOtpEnabled(c.otp_enabled))
+      .catch(() => {})
+  }, [])
+
+  // live username availability — debounced probe against the same rules
+  // RegisterIn enforces server-side
+  const [uState, setUState] = useState<'idle' | 'checking' | 'ok' | 'taken' | 'bad'>('idle')
+  useEffect(() => {
+    const u = f.username.trim().toLowerCase()
+    if (mode !== 'register' || !u) return setUState('idle')
+    if (!/^[a-z0-9_]{3,24}$/.test(u)) return setUState('bad')
+    setUState('checking')
+    const t = setTimeout(() => {
+      api
+        .get<{ available: boolean }>(`/account-auth/check-username?u=${encodeURIComponent(u)}`)
+        .then((r) => setUState(r.available ? 'ok' : 'taken'))
+        .catch(() => setUState('idle'))
+    }, 400)
+    return () => clearTimeout(t)
+  }, [f.username, mode])
 
   const { pathname } = useLocation()
   const next = params.get('next')
@@ -82,10 +110,15 @@ export default function AuthPage() {
     }
     if (mode === 'register' && touched.name && f.name.trim().length < 3)
       out.name = 'نام کامل را وارد کنید.'
+    if (mode === 'register' && touched.username) {
+      if (!/^[a-z0-9_]{3,24}$/.test(f.username.trim().toLowerCase()))
+        out.username = 'حروف لاتین کوچک، عدد یا _ — ۳ تا ۲۴ کاراکتر.'
+      else if (uState === 'taken') out.username = 'این نام کاربری گرفته شده است.'
+    }
     if (mode === 'register' && touched.password && f.password.length < 8)
       out.password = 'رمز عبور باید حداقل ۸ کاراکتر باشد.'
     return out
-  }, [f, mode, touched])
+  }, [f, mode, touched, uState])
 
   const submit = async (e: React.FormEvent) => {
     e.preventDefault()
@@ -99,9 +132,11 @@ export default function AuthPage() {
         done(
           await register({
             full_name: f.name.trim(),
+            username: f.username.trim().toLowerCase(),
             phone,
             password: f.password,
             ref_code: f.ref.trim().toUpperCase(),
+            otp: f.otp.trim(),
           }),
         )
       } else if (mode === 'forgot') {
@@ -162,18 +197,43 @@ export default function AuthPage() {
 
         <form key={mode} onSubmit={submit} className="authp__form" noValidate>
           {mode === 'register' && (
-            <div className="authp__field">
-              <input
-                ref={firstRef}
-                autoComplete="name"
-                placeholder="نام و نام خانوادگی"
-                value={f.name}
-                onChange={set('name')}
-                onBlur={blur('name')}
-                aria-invalid={!!fieldErr.name}
-              />
-              {fieldErr.name && <em className="authp__hint authp__hint--err">{fieldErr.name}</em>}
-            </div>
+            <>
+              <div className="authp__field">
+                <input
+                  ref={firstRef}
+                  autoComplete="name"
+                  placeholder="نام و نام خانوادگی"
+                  value={f.name}
+                  onChange={set('name')}
+                  onBlur={blur('name')}
+                  aria-invalid={!!fieldErr.name}
+                />
+                {fieldErr.name && <em className="authp__hint authp__hint--err">{fieldErr.name}</em>}
+              </div>
+              <div className="authp__field">
+                <input
+                  dir="ltr"
+                  autoComplete="username"
+                  placeholder="نام کاربری (لاتین — مثل ali_law)"
+                  value={f.username}
+                  onChange={set('username')}
+                  onBlur={blur('username')}
+                  aria-invalid={!!fieldErr.username}
+                  aria-describedby="uname-hint"
+                />
+                <em id="uname-hint" className={`authp__hint${uState === 'ok' ? ' authp__hint--ok' : ''}${fieldErr.username ? ' authp__hint--err' : ''}`}>
+                  {uState === 'checking' && <Loader2 size={11} className="authp__spin-inline" />}
+                  {fieldErr.username ??
+                    (uState === 'checking'
+                      ? 'در حال بررسی…'
+                      : uState === 'ok'
+                        ? 'نام کاربری آزاد است ✓'
+                        : uState === 'bad'
+                          ? 'حروف لاتین کوچک، عدد یا _ — ۳ تا ۲۴ کاراکتر.'
+                          : '')}
+                </em>
+              </div>
+            </>
           )}
 
           {mode !== 'reset' && (
@@ -223,6 +283,39 @@ export default function AuthPage() {
                 </div>
               )}
               {fieldErr.password && <em className="authp__hint authp__hint--err">{fieldErr.password}</em>}
+            </div>
+          )}
+
+          {mode === 'register' && otpEnabled && (
+            <div className="authp__field">
+              <div className="authp__pw">
+                <input
+                  dir="ltr"
+                  inputMode="numeric"
+                  placeholder="کد تأیید پیامکی"
+                  autoComplete="one-time-code"
+                  value={f.otp}
+                  onChange={set('otp')}
+                />
+                <button
+                  type="button"
+                  className="authp__eye authp__otp-btn"
+                  disabled={busy || otpSent}
+                  onClick={async () => {
+                    try {
+                      await api.post('/account-auth/otp/request', {
+                        phone: faToEn(f.phone.trim()),
+                      })
+                      setOtpSent(true)
+                      setNotice('کد تأیید پیامک شد.')
+                    } catch (ex) {
+                      setErr(ex instanceof Error ? ex.message : 'خطا در ارسال کد.')
+                    }
+                  }}
+                >
+                  {otpSent ? 'ارسال شد' : 'دریافت کد'}
+                </button>
+              </div>
             </div>
           )}
 

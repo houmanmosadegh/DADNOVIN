@@ -30,6 +30,7 @@ class UserOut(BaseModel):
     username: str
     email: str
     full_name: str
+    phone: str = ""
     is_active: bool
     roles: list[RoleOut]
     created_at: datetime

@@ -21,6 +21,7 @@ dependencies = [
     "python-multipart==0.0.20",
     "email-validator==2.3.0",
     "cryptography==43.0.3",
+    "segno==1.6.6",
 ]
 
 [project.optional-dependencies]

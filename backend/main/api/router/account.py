@@ -1,13 +1,15 @@
 """Public account endpoints — register/login/reset, my requests, marketer, wallet."""
 
 import hashlib
+import re
 import secrets
 import uuid
 from datetime import UTC, datetime, timedelta
 from typing import Annotated
 
-from fastapi import APIRouter, Depends, HTTPException, Request, Response
-from sqlalchemy import func, select
+from fastapi import APIRouter, Depends, HTTPException, Query, Request, Response
+from pydantic import BaseModel, Field
+from sqlalchemy import func, or_, select
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from ...core.config import get_settings
@@ -16,10 +18,12 @@ from ...db.session import get_db
 from ...models.account import (
     InboxNotification,
     MarketerApplication,
+    OtpToken,
     PasswordResetToken,
     PayoutRequest,
     ReferralAttribution,
     Commission,
+    CommissionRule,
 )
 from ...models.consultation import ConsultationRequest
 from ...models.request_ops import RequestEvent, RequestMessage
@@ -32,6 +36,7 @@ from ...schemas.account import (
     ForgotIn,
     LoginPhoneIn,
     MarketerApplyIn,
+    OtpRequestIn,
     PasswordChangeIn,
     PayoutIn,
     ProfilePatchIn,
@@ -51,6 +56,8 @@ from ..dependencies.auth import CurrentUser
 router = APIRouter(prefix="/account", tags=["account"])
 auth_router = APIRouter(prefix="/account-auth", tags=["account-auth"])
 DbDep = Annotated[AsyncSession, Depends(get_db)]
+
+REF_COOKIE = "dn_ref"
 
 
 async def _role(db: AsyncSession, name: str) -> Role:
@@ -94,6 +101,94 @@ async def _link_prior_requests(db: AsyncSession, user: User) -> int:
 # ─── register / login / reset ───────────────────────────────────────
 
 
+async def _auth_settings(db: AsyncSession) -> dict:
+    from ...models.content import SiteSetting
+
+    row = await db.get(SiteSetting, "auth")
+    cfg = {"otp_enabled": False, "otp_ttl_minutes": 5, "otp_length": 6}
+    if row and isinstance(row.value, dict):
+        cfg.update({k: v for k, v in row.value.items() if k in cfg})
+    return cfg
+
+
+def _hash_code(code: str) -> str:
+    return hashlib.sha256(code.encode()).hexdigest()
+
+
+async def _verify_otp(db: AsyncSession, phone: str, code: str, purpose: str) -> bool:
+    """Latest unconsumed code for this phone; bounded attempts, marked used."""
+    tok = (
+        await db.execute(
+            select(OtpToken)
+            .where(
+                OtpToken.phone == phone,
+                OtpToken.purpose == purpose,
+                OtpToken.used_at.is_(None),
+            )
+            .order_by(OtpToken.created_at.desc())
+            .limit(1)
+        )
+    ).scalar_one_or_none()
+    if tok is None or tok.attempts >= 5 or aware(tok.expires_at) < datetime.now(UTC):
+        return False
+    tok.attempts += 1
+    if tok.code_hash != _hash_code(code.strip()):
+        await db.flush()
+        return False
+    tok.used_at = datetime.now(UTC)
+    await db.flush()
+    return True
+
+
+@auth_router.get("/config")
+async def auth_config(db: DbDep) -> dict:
+    """Feature flags for the auth form — the UI asks before rendering OTP."""
+    cfg = await _auth_settings(db)
+    return {"otp_enabled": bool(cfg["otp_enabled"])}
+
+
+@auth_router.get("/check-username")
+async def check_username(db: DbDep, u: Annotated[str, Query(max_length=30)]) -> dict:
+    """Live availability probe — same rules as RegisterIn."""
+    u = u.strip().lower()
+    if not re.fullmatch(r"[a-z0-9_]{3,24}", u):
+        return {"available": False, "reason": "format"}
+    clash = (
+        await db.execute(select(User.id).where(User.username == u))
+    ).scalar_one_or_none()
+    return {"available": clash is None, "reason": "taken" if clash else ""}
+
+
+@auth_router.post("/otp/request")
+async def otp_request(payload: OtpRequestIn, request: Request, db: DbDep) -> dict:
+    """Issue a verification code through the configured provider (log/mock
+    until a real SMS gateway is wired). No-op leak — same reply either way."""
+    settings = get_settings()
+    limiter.check("otp", client_key(request), settings.rate_limit_login_per_minute)
+    cfg = await _auth_settings(db)
+    if not cfg["otp_enabled"]:
+        raise HTTPException(
+            400, {"code": "otp_disabled", "message": "تأیید پیامکی فعال نیست."}
+        )
+    code = "".join(secrets.choice("0123456789") for _ in range(int(cfg["otp_length"])))
+    db.add(
+        OtpToken(
+            phone=payload.phone,
+            purpose=payload.purpose,
+            code_hash=_hash_code(code),
+            expires_at=datetime.now(UTC)
+            + timedelta(minutes=int(cfg["otp_ttl_minutes"])),
+        )
+    )
+    provider = get_provider()
+    await provider.send_sms(
+        to=payload.phone,
+        body=f"دادنوین — کد تأیید شما:\n{code}\n({int(cfg['otp_ttl_minutes'])} دقیقه معتبر است)",
+    )
+    await db.commit()
+    return {"message": "کد تأیید ارسال شد.", "ttl_minutes": int(cfg["otp_ttl_minutes"])}
+
+
 @auth_router.post("/register", status_code=201)
 async def register(
     payload: RegisterIn, request: Request, response: Response, db: DbDep
@@ -101,22 +196,45 @@ async def register(
     settings = get_settings()
     limiter.check("register", client_key(request), settings.rate_limit_login_per_minute)
     clash = (
-        await db.execute(select(User.id).where(User.phone == payload.phone))
+        await db.execute(
+            select(User.id).where(
+                (User.phone == payload.phone) | (User.username == payload.username)
+            )
+        )
     ).scalar_one_or_none()
     if clash is not None:
         raise HTTPException(
-            409, {"code": "phone_taken", "message": "با این شماره قبلاً ثبت‌نام شده است؛ وارد شوید."}
+            409,
+            {
+                "code": "identity_taken",
+                "message": "با این شماره یا نام کاربری قبلاً ثبت‌نام شده است؛ وارد شوید.",
+            },
         )
-    if payload.ref_code.strip():
-        if await ref_svc.resolve_code(db, payload.ref_code) is None:
+    # referral priority: manual code → dn_ref cookie → none (spec §4.2)
+    ref_code = payload.ref_code.strip() or request.cookies.get(REF_COOKIE, "")
+    referred_profile = None
+    if ref_code:
+        referred_profile = await ref_svc.resolve_code(db, ref_code)
+        if referred_profile is None:
             raise HTTPException(
                 400, {"code": "bad_ref", "message": "کد معرف معتبر یا فعال نیست."}
             )
+    cfg = await _auth_settings(db)
+    if cfg["otp_enabled"]:
+        if not payload.otp.strip():
+            raise HTTPException(
+                422, {"code": "otp_required", "message": "کد تأیید پیامکی الزامی است."}
+            )
+        if not await _verify_otp(db, payload.phone, payload.otp, "register"):
+            raise HTTPException(
+                400, {"code": "bad_otp", "message": "کد تأیید نادرست یا منقضی است."}
+            )
     user = User(
-        username=payload.phone,
+        username=payload.username,
         phone=payload.phone,
         full_name=payload.full_name.strip(),
         password_hash=hash_password(payload.password),
+        referred_code=referred_profile.ref_code if referred_profile else "",
         roles=[await _role(db, "user")],
     )
     db.add(user)
@@ -506,21 +624,107 @@ async def marketer_home(db: DbDep, user: CurrentUser) -> dict:
             out["applied_at"] = app.created_at.isoformat()
         return out
     stats = await ref_svc.stats_for(db, prof.id)
+    links = await ref_svc.links_for(db, prof)
+    now = datetime.now(UTC)
+    rules = (
+        await db.execute(
+            select(CommissionRule)
+            .where(
+                CommissionRule.is_active.is_(True),
+                or_(
+                    CommissionRule.marketer_id.is_(None),
+                    CommissionRule.marketer_id == prof.id,
+                ),
+                or_(
+                    CommissionRule.starts_at.is_(None),
+                    CommissionRule.starts_at <= now,
+                ),
+                or_(
+                    CommissionRule.ends_at.is_(None),
+                    CommissionRule.ends_at >= now,
+                ),
+            )
+            .order_by(CommissionRule.tier_min.desc())
+        )
+    ).scalars().all()
     return {
         "status": "approved",
         "ref_code": prof.ref_code,
-        "ref_link": f"/?ref={prof.ref_code}",
+        "ref_link": f"/r/{prof.ref_code}",
         "is_active": prof.is_active,
         "commission_enabled": bool(cfg.get("commission_enabled")),
         "cookie_days": int(cfg.get("cookie_days", 30)),
         "stats": stats,
+        "links": links,
         "iban_masked": _iban_masked(prof),
+        "rules": [
+            {
+                "kind": r.kind,
+                "value": r.value,
+                "tier_min": r.tier_min,
+                "own": r.marketer_id == prof.id,
+            }
+            for r in rules
+        ],
     }
 
 
 def _iban_masked(prof) -> str:
     raw = decrypt_field(prof.iban_enc) if prof.iban_enc else ""
     return mask_digits(raw) if raw else ""
+
+
+class LinkIn(BaseModel):
+    label: str = Field(min_length=2, max_length=40)
+
+
+@router.get("/marketer/links")
+async def marketer_links(db: DbDep, user: CurrentUser) -> list[dict]:
+    prof = await ref_svc.profile_for_user(db, user.id)
+    if prof is None:
+        raise HTTPException(403, {"code": "not_marketer", "message": "حساب بازاریاب نیستید."})
+    return await ref_svc.links_for(db, prof)
+
+
+@router.post("/marketer/links", status_code=201)
+async def marketer_link_create(db: DbDep, user: CurrentUser, payload: LinkIn) -> dict:
+    prof = await ref_svc.profile_for_user(db, user.id)
+    if prof is None:
+        raise HTTPException(403, {"code": "not_marketer", "message": "حساب بازاریاب نیستید."})
+    link = await ref_svc.link_or_404(db, prof.id, payload.label)
+    await db.commit()
+    return {"id": str(link.id), "label": link.label, "url": f"/r/{prof.ref_code}?src={link.label}"}
+
+
+@router.delete("/marketer/links/{link_id}", status_code=204)
+async def marketer_link_delete(db: DbDep, user: CurrentUser, link_id: uuid.UUID) -> Response:
+    prof = await ref_svc.profile_for_user(db, user.id)
+    if prof is None:
+        raise HTTPException(403, {"code": "not_marketer", "message": "حساب بازاریاب نیستید."})
+    await ref_svc.delete_link(db, prof.id, link_id)
+    await db.commit()
+    return Response(status_code=204)
+
+
+@router.get("/marketer/qr")
+async def marketer_qr(
+    db: DbDep, user: CurrentUser, src: Annotated[str, Query(max_length=40)] = ""
+) -> Response:
+    """QR of the marketer's link — segno renders a crisp SVG, no JS needed."""
+    import io
+
+    import segno
+
+    prof = await ref_svc.profile_for_user(db, user.id)
+    if prof is None:
+        raise HTTPException(403, {"code": "not_marketer", "message": "حساب بازاریاب نیستید."})
+    label = ref_svc.normalize_label(src)
+    url = f"{get_settings().public_base_url}/r/{prof.ref_code}" + (
+        f"?src={label}" if label else ""
+    )
+    buf = io.BytesIO()
+    segno.make(url, error="m").save(buf, kind="svg", scale=6, border=2, dark="#0e1a3a")
+    return Response(buf.getvalue(), media_type="image/svg+xml")
 
 
 @router.get("/marketer/referrals")

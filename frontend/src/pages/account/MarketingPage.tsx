@@ -1,38 +1,495 @@
-import { useEffect, useState } from 'react'
-import { Link } from 'react-router-dom'
-import { Clock3, Copy, Share2, XCircle } from 'lucide-react'
-import { api } from '../../services/api'
+/** بازاریابی — نمای کلی · لینک‌ها و ابزارها · ارجاع‌های من · درآمد و کیف پول ·
+ *  قوانین و راهنما (۵ تب داخلی، spec §4.6). */
+
+import { useEffect, useMemo, useState } from 'react'
+import { useSearchParams } from 'react-router-dom'
+import {
+  Clock3,
+  Copy,
+  Plus,
+  QrCode,
+  Send,
+  Share2,
+  Trash2,
+  Wallet,
+  XCircle,
+} from 'lucide-react'
+import { api, apiAsset } from '../../services/api'
 import { useAuth } from '../../services/auth'
-import type { MarketerHome, Referral } from './types'
-import { STATUS_FA, faDate } from './types'
+import type { MarketerHome, MarketerLink, Payout, Referral, WalletView } from './types'
+import { LEDGER_FA, PAYOUT_FA, STATUS_FA, faDate, rial } from './types'
 
 const CHANNELS = [
   'اینستاگرام', 'تلگرام', 'واتس‌اپ', 'وب‌سایت / وبلاگ', 'معرفی حضوری', 'سایر',
 ]
 
+const TABS = [
+  { key: 'overview', label: 'نمای کلی' },
+  { key: 'links', label: 'لینک‌ها و ابزارها' },
+  { key: 'referrals', label: 'ارجاع‌های من' },
+  { key: 'wallet', label: 'درآمد و کیف پول' },
+  { key: 'guide', label: 'قوانین و راهنما' },
+]
+
+const fa = (n: number) => n.toLocaleString('fa-IR')
+
 export default function MarketingPage() {
   const { me, refresh } = useAuth()
+  const [params, setParams] = useSearchParams()
+  const tab = params.get('tab') ?? 'overview'
   const [home, setHome] = useState<MarketerHome | null>(null)
-  const [refs, setRefs] = useState<Referral[]>([])
+  const [msg, setMsg] = useState('')
+  const isMarketer = me?.is_marketer ?? false
+
+  const load = () => {
+    api.get<MarketerHome>('/account/marketer').then(setHome).catch(() => setHome({ status: 'none' }))
+  }
+  useEffect(load, [isMarketer]) // eslint-disable-line react-hooks/exhaustive-deps
+
+  const copy = (text: string, what = 'کپی شد') => {
+    void navigator.clipboard?.writeText(text).then(() => setMsg(what))
+  }
+
+  if (!home) return <div className="acc__page"><p className="acc__muted">در حال بارگذاری…</p></div>
+
+  if (!isMarketer) {
+    return <ApplyGate home={home} onApplied={async () => { await refresh(); load() }} />
+  }
+
+  const base = window.location.origin
+  const mainUrl = `${base}${home.ref_link ?? `/r/${home.ref_code}`}`
+
+  return (
+    <div className="acc__page">
+      <h1 className="acc__title">بازاریابی</h1>
+      {home.is_active === false && (
+        <p className="acc__err">کد ارجاع شما توسط مدیریت غیرفعال شده است.</p>
+      )}
+
+      <div className="acc__chips" role="tablist" aria-label="بخش‌های بازاریابی">
+        {TABS.map((t) => (
+          <button
+            key={t.key}
+            role="tab"
+            aria-selected={tab === t.key}
+            className={`acc__chip${tab === t.key ? ' is-active' : ''}`}
+            onClick={() => setParams({ tab: t.key }, { replace: true })}
+          >
+            {t.label}
+          </button>
+        ))}
+      </div>
+      {msg && <p className="acc__notice">{msg}</p>}
+
+      {tab === 'overview' && <OverviewTab home={home} mainUrl={mainUrl} copy={copy} />}
+      {tab === 'links' && <LinksTab home={home} base={base} copy={copy} reload={load} />}
+      {tab === 'referrals' && <ReferralsTab />}
+      {tab === 'wallet' && <WalletTab />}
+      {tab === 'guide' && <GuideTab home={home} />}
+    </div>
+  )
+}
+
+/* ── نمای کلی ─────────────────────────────────────────────── */
+
+function OverviewTab({ home, mainUrl, copy }: {
+  home: MarketerHome; mainUrl: string
+  copy: (t: string, m?: string) => void
+}) {
+  const s = home.stats
+  const funnel: [string, number][] = [
+    ['کلیک', s?.clicks ?? 0],
+    ['کلیک یکتا', s?.unique_clicks ?? 0],
+    ['درخواست منسوب', s?.requests ?? 0],
+    ['پذیرفته‌شده', s?.accepted ?? 0],
+  ]
+  const maxBar = funnel[0][1] || 1
+
+  return (
+    <>
+      {/* کد + لینک اصلی + اشتراک */}
+      <div className="acc__card">
+        <h2><Share2 size={16} /> کد و لینک ارجاع شما</h2>
+        <div className="acc__refbox">
+          <code dir="ltr">{home.ref_code}</code>
+          <button className="btn btn--ghost" onClick={() => copy(home.ref_code ?? '', 'کد کپی شد')}>
+            <Copy size={14} /> کپی کد
+          </button>
+          <button className="btn btn--ghost" onClick={() => copy(mainUrl, 'لینک کپی شد')}>
+            <Copy size={14} /> کپی لینک
+          </button>
+        </div>
+        <div className="acc__share">
+          <a
+            className="btn btn--ghost btn--sm"
+            href={`https://t.me/share/url?url=${encodeURIComponent(mainUrl)}`}
+            target="_blank" rel="noopener noreferrer"
+          >
+            <Send size={14} /> اشتراک در تلگرام
+          </a>
+          <a
+            className="btn btn--ghost btn--sm"
+            href={`https://wa.me/?text=${encodeURIComponent(mainUrl)}`}
+            target="_blank" rel="noopener noreferrer"
+          >
+            اشتراک در واتس‌اپ
+          </a>
+          <a
+            className="btn btn--ghost btn--sm"
+            href={apiAsset('/api/v1/account/marketer/qr')}
+            target="_blank" rel="noopener noreferrer"
+            download={`qr-${home.ref_code}.svg`}
+          >
+            <QrCode size={14} /> دانلود QR
+          </a>
+        </div>
+        <p className="acc__muted acc__hint">
+          اعتبار کوکی ارجاع {fa(home.cookie_days ?? 30)} روز است — هر بازدیدکننده‌ای
+          که در این بازه ثبت درخواست کند به شما منسوب می‌شود.
+        </p>
+      </div>
+
+      {/* KPIها */}
+      <div className="acc__stats">
+        <div className="acc__card acc__stat"><p className="acc__stat-num">{fa(s?.unique_clicks ?? 0)}</p><p className="acc__muted">کلیک یکتا</p></div>
+        <div className="acc__card acc__stat"><p className="acc__stat-num">{fa(s?.requests ?? 0)}</p><p className="acc__muted">درخواست منسوب</p></div>
+        <div className="acc__card acc__stat"><p className="acc__stat-num">{fa(s?.accepted ?? 0)}</p><p className="acc__muted">پذیرفته‌شده</p></div>
+        <div className="acc__card acc__stat"><p className="acc__stat-num">{fa(s?.conversion ?? 0)}٪</p><p className="acc__muted">نرخ تبدیل</p></div>
+      </div>
+
+      {/* قیف */}
+      <div className="acc__card">
+        <h2>قیف ارجاع</h2>
+        <div className="acc__funnel">
+          {funnel.map(([label, n]) => (
+            <div key={label} className="acc__funnel-row">
+              <span className="acc__funnel-label">{label}</span>
+              <div className="acc__funnel-track">
+                <div
+                  className="acc__funnel-bar"
+                  style={{ width: `${Math.max(n ? 4 : 0, (n / maxBar) * 100)}%` }}
+                />
+              </div>
+              <span className="acc__funnel-num" dir="ltr">{fa(n)}</span>
+            </div>
+          ))}
+        </div>
+      </div>
+    </>
+  )
+}
+
+/* ── لینک‌ها و ابزارها ─────────────────────────────────────── */
+
+function LinksTab({ home, base, copy, reload }: {
+  home: MarketerHome; base: string
+  copy: (t: string, m?: string) => void
+  reload: () => void
+}) {
+  const [label, setLabel] = useState('')
+  const [err, setErr] = useState('')
+  const [busy, setBusy] = useState(false)
+  const links = home.links ?? []
+
+  const create = async () => {
+    setErr('')
+    setBusy(true)
+    try {
+      await api.post('/account/marketer/links', { label })
+      setLabel('')
+      reload()
+    } catch (e) {
+      setErr(e instanceof Error ? e.message : 'خطا')
+    } finally {
+      setBusy(false)
+    }
+  }
+  const remove = async (id: string) => {
+    try {
+      await api.del(`/account/marketer/links/${id}`)
+      reload()
+    } catch (e) {
+      setErr(e instanceof Error ? e.message : 'خطا')
+    }
+  }
+
+  return (
+    <>
+      <div className="acc__card">
+        <h2><Plus size={16} /> ساخت لینک برچسب‌دار</h2>
+        <p className="acc__muted">
+          برای هر کانال (مثلاً اینستاگرام، تلگرام، واتس‌اپ) یک لینک جدا بسازید تا آمار هر منبع جدا دیده شود.
+        </p>
+        <div className="acc__payout">
+          <input
+            dir="ltr"
+            placeholder="instagram"
+            maxLength={40}
+            value={label}
+            onChange={(e) => setLabel(e.target.value)}
+          />
+          <button className="btn btn--primary" disabled={busy || label.trim().length < 2} onClick={create}>
+            ساخت لینک
+          </button>
+        </div>
+        {err && <p className="acc__err">{err}</p>}
+      </div>
+
+      <div className="acc__card">
+        <h2>لینک‌های شما</h2>
+        {links.length === 0 ? (
+          <p className="acc__muted">هنوز لینک برچسب‌داری نساخته‌اید — لینک اصلی همیشه فعال است.</p>
+        ) : (
+          <div className="acc__list">
+            {links.map((l: MarketerLink) => {
+              const url = `${base}${l.url}`
+              return (
+                <div key={l.id} className="acc__row acc__row--link">
+                  <span className="acc__row-topic" dir="ltr">{l.label}</span>
+                  <span className="acc__muted">{fa(l.clicks)} کلیک · {fa(l.unique_clicks)} یکتا</span>
+                  <span className="acc__row-actions">
+                    <button className="acc__iconbtn" title="کپی لینک" onClick={() => copy(url, 'لینک کپی شد')}>
+                      <Copy size={15} />
+                    </button>
+                    <a
+                      className="acc__iconbtn" title="دانلود QR"
+                      href={apiAsset(`/api/v1/account/marketer/qr?src=${encodeURIComponent(l.label)}`)}
+                      target="_blank" rel="noopener noreferrer"
+                      download={`qr-${l.label}.svg`}
+                    >
+                      <QrCode size={15} />
+                    </a>
+                    <button className="acc__iconbtn acc__iconbtn--danger" title="حذف لینک" onClick={() => remove(l.id)}>
+                      <Trash2 size={15} />
+                    </button>
+                  </span>
+                </div>
+              )
+            })}
+          </div>
+        )}
+      </div>
+    </>
+  )
+}
+
+/* ── ارجاع‌های من (محرمانگی: نام ماسک‌شده، بدون جزئیات پرونده) ── */
+
+function ReferralsTab() {
+  const [refs, setRefs] = useState<Referral[] | null>(null)
+  useEffect(() => {
+    api.get<Referral[]>('/account/marketer/referrals').then(setRefs).catch(() => setRefs([]))
+  }, [])
+  return (
+    <div className="acc__card">
+      <h2>ارجاع‌های من</h2>
+      <p className="acc__muted acc__hint">
+        برای حفظ محرمانگی موکل، فقط نام کوتاه‌شده و وضعیت کلی نمایش داده می‌شود.
+      </p>
+      {!refs ? (
+        <p className="acc__muted">در حال بارگذاری…</p>
+      ) : refs.length === 0 ? (
+        <p className="acc__muted">هنوز ارجاعی ثبت نشده است — لینک‌تان را منتشر کنید.</p>
+      ) : (
+        <div className="acc__list">
+          {refs.map((r, i) => (
+            <div key={i} className="acc__row">
+              <span className="acc__row-topic">{r.masked_name}</span>
+              <span className="acc__badge">{STATUS_FA[r.status] ?? r.status}</span>
+              <span className="acc__muted">{faDate(r.created_at)}</span>
+            </div>
+          ))}
+        </div>
+      )}
+    </div>
+  )
+}
+
+/* ── درآمد و کیف پول ───────────────────────────────────────── */
+
+function WalletTab() {
+  const [wallet, setWallet] = useState<WalletView | null>(null)
+  const [payouts, setPayouts] = useState<Payout[]>([])
+  const [iban, setIban] = useState('')
+  const [amount, setAmount] = useState('')
+  const [msg, setMsg] = useState('')
+  const [err, setErr] = useState('')
+  const [home, setHome] = useState<MarketerHome | null>(null)
+
+  const load = () => {
+    api.get<WalletView>('/account/wallet').then(setWallet).catch((e) => setErr(e instanceof Error ? e.message : 'خطا'))
+    api.get<Payout[]>('/account/payouts').then(setPayouts).catch(() => {})
+    api.get<MarketerHome>('/account/marketer').then(setHome).catch(() => {})
+  }
+  useEffect(load, []) // eslint-disable-line react-hooks/exhaustive-deps
+
+  const saveBank = async () => {
+    try {
+      await api.post('/account/marketer/bank', { iban, card: '' })
+      setMsg('شماره شبا ذخیره شد.')
+      setIban('')
+      load()
+    } catch (e) {
+      setErr(e instanceof Error ? e.message : 'خطا')
+    }
+  }
+  const requestPayout = async () => {
+    try {
+      await api.post('/account/payouts', { amount: parseInt(amount.replace(/[,،]/g, ''), 10) })
+      setMsg('درخواست برداشت ثبت شد.')
+      setAmount('')
+      load()
+    } catch (e) {
+      setErr(e instanceof Error ? e.message : 'خطا')
+    }
+  }
+
+  if (err && !wallet) return <p className="acc__err">{err}</p>
+  if (!wallet) return <p className="acc__muted">در حال بارگذاری…</p>
+  if (!wallet.commission_enabled) {
+    return (
+      <div className="acc__card acc__empty">
+        <p>سیستم کمیسیون فعلاً غیرفعال است — آمار ارجاع همچنان ثبت می‌شود.</p>
+      </div>
+    )
+  }
+
+  return (
+    <>
+      {msg && <p className="acc__notice">{msg}</p>}
+      {err && <p className="acc__err">{err}</p>}
+      <div className="acc__stats">
+        <div className="acc__card acc__stat"><p className="acc__stat-num">{rial(wallet.balance)}</p><p className="acc__muted">قابل برداشت</p></div>
+        <div className="acc__card acc__stat"><p className="acc__stat-num">{rial(wallet.pending_commissions)}</p><p className="acc__muted">کمیسیون در انتظار</p></div>
+        <div className="acc__card acc__stat"><p className="acc__stat-num">{rial(wallet.pending_payouts)}</p><p className="acc__muted">برداشت در صف</p></div>
+      </div>
+
+      <div className="acc__card">
+        <h2><Wallet size={16} /> درخواست برداشت</h2>
+        <div className="acc__payout">
+          <input
+            dir="ltr" inputMode="numeric"
+            placeholder={`حداقل ${fa(wallet.min_payout)} ریال`}
+            value={amount}
+            onChange={(e) => setAmount(e.target.value)}
+          />
+          <button className="btn btn--primary" disabled={!amount} onClick={requestPayout}>
+            درخواست برداشت
+          </button>
+        </div>
+        {!home?.iban_masked && <p className="acc__err">قبل از برداشت، شماره شبا را ثبت کنید.</p>}
+      </div>
+
+      <div className="acc__card">
+        <h2>اطلاعات بانکی</h2>
+        <p className="acc__muted">شبا فعلی: <span dir="ltr">{home?.iban_masked || 'ثبت نشده'}</span></p>
+        <div className="acc__payout">
+          <input dir="ltr" placeholder="IR06…" value={iban} onChange={(e) => setIban(e.target.value)} />
+          <button className="btn btn--ghost" disabled={!iban} onClick={saveBank}>ذخیره شبا</button>
+        </div>
+        {payouts.length > 0 && (
+          <div className="acc__list">
+            <h3 className="acc__h3">تاریخچهٔ برداشت</h3>
+            {payouts.map((p) => (
+              <div key={p.id} className="acc__row">
+                <span>{rial(p.amount)}</span>
+                <span className="acc__badge">{PAYOUT_FA[p.status] ?? p.status}</span>
+                <span className="acc__muted" dir="ltr">{p.payment_ref || '—'}</span>
+                <span className="acc__muted">{faDate(p.created_at)}</span>
+              </div>
+            ))}
+          </div>
+        )}
+      </div>
+
+      <div className="acc__card">
+        <h2>تراکنش‌ها</h2>
+        {wallet.entries.length === 0 ? <p className="acc__muted">تراکنشی نیست.</p> : (
+          <div className="acc__list">
+            {wallet.entries.map((e) => (
+              <div key={e.id} className="acc__row">
+                <span className={`acc__amt ${e.amount >= 0 ? 'is-pos' : 'is-neg'}`} dir="ltr">
+                  {e.amount >= 0 ? '+' : '−'}{rial(Math.abs(e.amount))}
+                </span>
+                <span className="acc__row-topic">{LEDGER_FA[e.kind] ?? e.kind}{e.memo ? ` — ${e.memo}` : ''}</span>
+                <span className="acc__muted">{faDate(e.created_at)}</span>
+              </div>
+            ))}
+          </div>
+        )}
+      </div>
+    </>
+  )
+}
+
+/* ── قوانین و راهنما ───────────────────────────────────────── */
+
+function GuideTab({ home }: { home: MarketerHome }) {
+  const rules = useMemo(
+    () => [...(home.rules ?? [])].sort((a, b) => b.tier_min - a.tier_min),
+    [home.rules],
+  )
+  return (
+    <>
+      <div className="acc__card">
+        <h2>قواعد فعلی کمیسیون</h2>
+        {!home.commission_enabled ? (
+          <p className="acc__muted">سیستم کمیسیون فعلاً غیرفعال است.</p>
+        ) : rules.length === 0 ? (
+          <p className="acc__muted">هنوز قاعده‌ای تعریف نشده است.</p>
+        ) : (
+          <div className="acc__list">
+            {rules.map((r, i) => (
+              <div key={i} className="acc__row">
+                <span className="acc__row-topic">
+                  {r.tier_min > 0 ? `از ${fa(r.tier_min + 1)}مین پروندهٔ پذیرفته‌شده` : 'از اولین پرونده'}
+                  {r.own && <span className="acc__badge acc__badge--gold">اختصاصی شما</span>}
+                </span>
+                <span className="acc__muted">
+                  {r.kind === 'percent' ? `${fa(r.value)}٪ از مبنای پرونده` : rial(r.value)}
+                </span>
+              </div>
+            ))}
+          </div>
+        )}
+      </div>
+
+      <div className="acc__card">
+        <h2>قواعد رفتار حرفه‌ای</h2>
+        <ul className="acc__guidelist">
+          <li>هیچ‌گاه وعدهٔ نتیجهٔ پرونده یا خروجی قطعی دعوا ندهید — معرفی شما صرفاً برای دریافت مشاوره است.</li>
+          <li>اطلاعات افرادی که با لینک شما می‌آیند محرمانه است؛ فقط وضعیت کلی به شما نمایش داده می‌شود.</li>
+          <li>ثبت درخواست‌های صوری یا ارجاع خود به عنوان مشتری، کمیسیون نمی‌سازد و موجب تعلیم کد می‌شود.</li>
+          <li>هر شمارهٔ موبایل فقط یک‌بار «مشتری جدید» محسوب می‌شود.</li>
+          <li>کلیک‌های غیرعادی و تکراری به‌طور خودکار شناسایی و برای بررسی مدیریت پرچم می‌خورند.</li>
+        </ul>
+      </div>
+
+      <div className="acc__card">
+        <h2>چطور کار می‌کند؟</h2>
+        <ol className="acc__guidelist">
+          <li>لینک اختصاصی خود را در شبکه‌های اجتماعی منتشر کنید.</li>
+          <li>بازدیدکننده با لینک شما وارد سایت می‌شود و کوکی ارجاع {fa(home.cookie_days ?? 30)} روزه ثبت می‌گردد.</li>
+          <li>اگر در این بازه درخواست مشاوره ثبت کند، ارجاع به شما منسوب و قفل می‌شود.</li>
+          <li>پس از پذیرش پرونده توسط مدیریت، کمیسیون طبق قواعد ثبت و پس از دورهٔ نگهداری قابل برداشت می‌شود.</li>
+        </ol>
+      </div>
+    </>
+  )
+}
+
+/* ── درخواست بازاریاب شدن (حالت غیربازاریاب) ───────────────── */
+
+function ApplyGate({ home, onApplied }: { home: MarketerHome; onApplied: () => Promise<void> }) {
   const [note, setNote] = useState('')
   const [channel, setChannel] = useState(CHANNELS[0])
   const [terms, setTerms] = useState(false)
   const [termsErr, setTermsErr] = useState(false)
   const [busy, setBusy] = useState(false)
   const [msg, setMsg] = useState('')
-  const isMarketer = me?.is_marketer ?? false
+  const reapplyDate = home.reapply_at ? new Date(home.reapply_at) : null
+  const mustWait = reapplyDate !== null && reapplyDate > new Date()
 
-  useEffect(() => {
-    api.get<MarketerHome>('/account/marketer').then(setHome).catch(() => setHome({ status: 'none' }))
-  }, [isMarketer])
-  useEffect(() => {
-    if (!isMarketer) return
-    api.get<Referral[]>('/account/marketer/referrals').then(setRefs).catch(() => {})
-  }, [isMarketer])
-
-  const copy = (text: string) => {
-    void navigator.clipboard?.writeText(text).then(() => setMsg('کپی شد'))
-  }
   const apply = async () => {
     if (!terms) {
       setTermsErr(true)
@@ -42,8 +499,7 @@ export default function MarketingPage() {
     try {
       await api.post('/account/marketer/apply', { note, channel, terms })
       setMsg('درخواست شما ثبت شد؛ پس از تأیید مدیریت فعال می‌شود.')
-      await refresh()
-      api.get<MarketerHome>('/account/marketer').then(setHome).catch(() => {})
+      await onApplied()
     } catch (e) {
       setMsg(e instanceof Error ? e.message : 'خطا')
     } finally {
@@ -51,133 +507,76 @@ export default function MarketingPage() {
     }
   }
 
-  if (!home) return <div className="acc__page"><p className="acc__muted">در حال بارگذاری…</p></div>
-
-  if (!isMarketer) {
-    const reapplyDate = home.reapply_at ? new Date(home.reapply_at) : null
-    const mustWait = reapplyDate !== null && reapplyDate > new Date()
-    return (
-      <div className="acc__page">
-        <h1 className="acc__title">بازاریابی</h1>
-        <div className="acc__card">
-          <h2><Share2 size={17} /> درخواست بازاریاب شدن</h2>
-
-          {home.status === 'pending' ? (
-            <div className="acc__state acc__state--pending">
-              <Clock3 size={20} aria-hidden="true" />
-              <div>
-                <p>درخواست شما در حال بررسی است.</p>
-                {home.applied_at && (
-                  <p className="acc__muted">ثبت‌شده در {faDate(home.applied_at)} — نتیجه از طریق اعلان اطلاع‌رسانی می‌شود.</p>
-                )}
-              </div>
-            </div>
-          ) : (
-            <>
-              {home.status === 'rejected' && (
-                <div className="acc__state acc__state--rejected">
-                  <XCircle size={20} aria-hidden="true" />
-                  <div>
-                    <p>درخواست قبلی شما تأیید نشد.</p>
-                    {home.reject_reason && <p className="acc__muted">دلیل: {home.reject_reason}</p>}
-                    {mustWait && reapplyDate && (
-                      <p className="acc__muted">امکان ثبت مجدد از {faDate(reapplyDate.toISOString())}</p>
-                    )}
-                  </div>
-                </div>
-              )}
-              {mustWait ? null : (
-                <>
-                  <p className="acc__muted">
-                    با دریافت کد ارجاع اختصاصی، کاربرانی که با لینک شما درخواست مشاوره ثبت کنند به حساب شما منسوب می‌شوند.
-                  </p>
-                  <div className="acc__apply">
-                    <label className="acc__field">
-                      <span>کانال اصلی معرفی</span>
-                      <select value={channel} onChange={(e) => setChannel(e.target.value)}>
-                        {CHANNELS.map((c) => <option key={c} value={c}>{c}</option>)}
-                      </select>
-                    </label>
-                    <label className="acc__field">
-                      <span>توضیح کوتاه <em>(اختیاری)</em></span>
-                      <textarea
-                        rows={3}
-                        placeholder="چطور می‌خواهید دادنوین را معرفی کنید؟"
-                        value={note}
-                        onChange={(e) => setNote(e.target.value)}
-                      />
-                    </label>
-                    <label className="authp__check">
-                      <input
-                        type="checkbox"
-                        checked={terms}
-                        onChange={(e) => { setTerms(e.target.checked); setTermsErr(false) }}
-                      />
-                      <span>قوانین بازاریابی و حفظ محرمانگی موکل را می‌پذیرم</span>
-                    </label>
-                    {termsErr && <em className="acc__hint authp__hint--err">پذیرش قوانین الزامی است.</em>}
-                    <button className="btn btn--primary" disabled={busy} onClick={apply}>
-                      {busy ? 'در حال ارسال…' : 'ارسال درخواست'}
-                    </button>
-                  </div>
-                </>
-              )}
-            </>
-          )}
-          {msg && <p className="acc__notice">{msg}</p>}
-        </div>
-      </div>
-    )
-  }
-
-  const link = `${window.location.origin}${home.ref_link ?? ''}`
-
   return (
     <div className="acc__page">
       <h1 className="acc__title">بازاریابی</h1>
-
       <div className="acc__card">
-        <h2>کد و لینک ارجاع شما</h2>
-        <div className="acc__refbox">
-          <code dir="ltr">{home.ref_code}</code>
-          <button className="btn btn--ghost" onClick={() => copy(home.ref_code ?? '')}>
-            <Copy size={14} /> کپی کد
-          </button>
-          <button className="btn btn--ghost" onClick={() => copy(link)}>
-            <Copy size={14} /> کپی لینک
-          </button>
-        </div>
-        {home.is_active === false && <p className="acc__err">کد شما توسط مدیریت غیرفعال شده است.</p>}
+        <h2><Share2 size={17} /> درخواست بازاریاب شدن</h2>
+
+        {home.status === 'pending' ? (
+          <div className="acc__state acc__state--pending">
+            <Clock3 size={20} aria-hidden="true" />
+            <div>
+              <p>درخواست شما در حال بررسی است.</p>
+              {home.applied_at && (
+                <p className="acc__muted">ثبت‌شده در {faDate(home.applied_at)} — نتیجه از طریق اعلان اطلاع‌رسانی می‌شود.</p>
+              )}
+            </div>
+          </div>
+        ) : (
+          <>
+            {home.status === 'rejected' && (
+              <div className="acc__state acc__state--rejected">
+                <XCircle size={20} aria-hidden="true" />
+                <div>
+                  <p>درخواست قبلی شما تأیید نشد.</p>
+                  {home.reject_reason && <p className="acc__muted">دلیل: {home.reject_reason}</p>}
+                  {mustWait && reapplyDate && (
+                    <p className="acc__muted">امکان ثبت مجدد از {faDate(reapplyDate.toISOString())}</p>
+                  )}
+                </div>
+              </div>
+            )}
+            {mustWait ? null : (
+              <>
+                <p className="acc__muted">
+                  با دریافت کد ارجاع اختصاصی، کاربرانی که با لینک شما درخواست مشاوره ثبت کنند به حساب شما منسوب می‌شوند.
+                </p>
+                <div className="acc__apply">
+                  <label className="acc__field">
+                    <span>کانال اصلی معرفی</span>
+                    <select value={channel} onChange={(e) => setChannel(e.target.value)}>
+                      {CHANNELS.map((c) => <option key={c} value={c}>{c}</option>)}
+                    </select>
+                  </label>
+                  <label className="acc__field">
+                    <span>توضیح کوتاه <em>(اختیاری)</em></span>
+                    <textarea
+                      rows={3}
+                      placeholder="چطور می‌خواهید دادنوین را معرفی کنید؟"
+                      value={note}
+                      onChange={(e) => setNote(e.target.value)}
+                    />
+                  </label>
+                  <label className="authp__check">
+                    <input
+                      type="checkbox"
+                      checked={terms}
+                      onChange={(e) => { setTerms(e.target.checked); setTermsErr(false) }}
+                    />
+                    <span>قوانین بازاریابی و حفظ محرمانگی موکل را می‌پذیرم</span>
+                  </label>
+                  {termsErr && <em className="acc__hint authp__hint--err">پذیرش قوانین الزامی است.</em>}
+                  <button className="btn btn--primary" disabled={busy} onClick={apply}>
+                    {busy ? 'در حال ارسال…' : 'ارسال درخواست'}
+                  </button>
+                </div>
+              </>
+            )}
+          </>
+        )}
         {msg && <p className="acc__notice">{msg}</p>}
       </div>
-
-      <div className="acc__stats">
-        <div className="acc__card acc__stat"><p className="acc__stat-num">{(home.stats?.clicks ?? 0).toLocaleString('fa-IR')}</p><p className="acc__muted">کلیک</p></div>
-        <div className="acc__card acc__stat"><p className="acc__stat-num">{(home.stats?.requests ?? 0).toLocaleString('fa-IR')}</p><p className="acc__muted">درخواست منسوب</p></div>
-        <div className="acc__card acc__stat"><p className="acc__stat-num">{(home.stats?.accepted ?? 0).toLocaleString('fa-IR')}</p><p className="acc__muted">پذیرفته‌شده</p></div>
-        <div className="acc__card acc__stat"><p className="acc__stat-num">{(home.stats?.conversion ?? 0).toLocaleString('fa-IR')}٪</p><p className="acc__muted">نرخ تبدیل</p></div>
-      </div>
-
-      <div className="acc__card">
-        <h2>ارجاع‌های اخیر</h2>
-        {refs.length === 0 ? <p className="acc__muted">هنوز ارجاعی ثبت نشده است.</p> : (
-          <div className="acc__list">
-            {refs.map((r, i) => (
-              <div key={i} className="acc__row">
-                <span className="acc__row-topic">{r.masked_name}</span>
-                <span className="acc__badge">{STATUS_FA[r.status] ?? r.status}</span>
-                <span className="acc__muted">{faDate(r.created_at)}</span>
-              </div>
-            ))}
-          </div>
-        )}
-      </div>
-
-      {!home.commission_enabled ? (
-        <p className="acc__muted">سیستم کمیسیون فعلاً غیرفعال است؛ آمار ارجاع همچنان ثبت می‌شود.</p>
-      ) : (
-        <p className="acc__muted">موجودی و برداشت در <Link to="/panel/wallet">کیف پول</Link>.</p>
-      )}
     </div>
   )
 }

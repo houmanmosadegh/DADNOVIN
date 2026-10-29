@@ -2,24 +2,15 @@
 
 import { useQuery } from "@tanstack/react-query";
 import {
-  Bot,
   ChevronDown,
   FileText,
   Inbox as InboxIcon,
   LayoutDashboard,
-  LifeBuoy,
   LogOut,
-  MapPin,
   Menu,
-  MessageSquareText,
-  Newspaper,
-  Phone,
-  ScrollText,
   Search,
   Settings,
   Share2,
-  Shield,
-  Tag,
   Users,
   X,
 } from "lucide-react";
@@ -41,78 +32,33 @@ interface NavItem {
 const CONTENT_ROLES = ["super_admin", "admin", "editor"];
 const REQUEST_ROLES = ["super_admin", "admin", "support"];
 
-const NAV: { group: string; collapsible?: boolean; items: NavItem[] }[] = [
-  { group: "", items: [{ to: "/", label: "داشبورد", icon: <LayoutDashboard size={17} /> }] },
+/* سایدبار ۶‌آیتمی (spec §2) — همهٔ صفحات داخل تب‌های هر هاب هستند. */
+const NAV: { group: string; items: NavItem[] }[] = [
   {
-    group: "مدیریت درخواست‌ها",
-    collapsible: true,
+    group: "",
     items: [
-      { to: "/inbox", label: "صندوق ورودی", icon: <InboxIcon size={17} />, roles: REQUEST_ROLES, badge: "new" },
-      { to: "/requests/consultations", label: "درخواست‌های مشاوره", icon: <FileText size={17} />, roles: REQUEST_ROLES },
-      { to: "/requests/contacts", label: "تماس‌ها", icon: <Phone size={17} />, roles: REQUEST_ROLES },
-      { to: "/requests/tickets", label: "تیکت‌ها", icon: <LifeBuoy size={17} />, roles: REQUEST_ROLES },
-      { to: "/labels", label: "برچسب‌ها", icon: <Tag size={17} />, roles: REQUEST_ROLES },
-      { to: "/ai/conversations", label: "مکالمات مشاور", icon: <MessageSquareText size={17} />, roles: ["super_admin", "admin"] },
-      { to: "/marketers", label: "بازاریابی", icon: <Share2 size={17} />, roles: ["super_admin"] },
-    ],
-  },
-  {
-    group: "مدیریت محتوای سایت",
-    collapsible: true,
-    items: [
-      { to: "/content/pages", label: "صفحات سایت", icon: <Newspaper size={17} />, roles: CONTENT_ROLES },
-      { to: "/content/articles", label: "مقالات", icon: <ScrollText size={17} />, roles: CONTENT_ROLES },
-      { to: "/content/lawyers", label: "وکلا و رزومه‌ها", icon: <Users size={17} />, roles: CONTENT_ROLES },
-      { to: "/content/media", label: "تصاویر و رسانه‌ها", icon: <FileText size={17} />, roles: CONTENT_ROLES },
-    ],
-  },
-  {
-    group: "تنظیمات سایت",
-    collapsible: true,
-    items: [
-      { to: "/settings/contact", label: "اطلاعات تماس", icon: <Phone size={17} />, roles: CONTENT_ROLES },
-      { to: "/settings/address", label: "آدرس و محل فعالیت", icon: <MapPin size={17} />, roles: CONTENT_ROLES },
-      { to: "/settings/social", label: "ایمیل و شبکه‌ها", icon: <Share2 size={17} />, roles: CONTENT_ROLES },
-      { to: "/settings/general", label: "تنظیمات عمومی", icon: <Settings size={17} />, roles: CONTENT_ROLES },
-      { to: "/ai", label: "مشاور هوشمند", icon: <Bot size={17} />, roles: ["super_admin", "admin"] },
-    ],
-  },
-  {
-    group: "مدیریت سیستم",
-    collapsible: true,
-    items: [
-      { to: "/users", label: "کاربران و دسترسی‌ها", icon: <Shield size={17} />, roles: ["super_admin"] },
-      { to: "/audit", label: "گزارش فعالیت‌ها", icon: <ScrollText size={17} />, roles: ["super_admin", "admin"] },
+      { to: "/", label: "داشبورد", icon: <LayoutDashboard size={17} /> },
+      { to: "/requests", label: "درخواست‌ها", icon: <InboxIcon size={17} />, roles: REQUEST_ROLES, badge: "new" },
+      { to: "/users", label: "کاربران", icon: <Users size={17} />, roles: ["super_admin"] },
+      { to: "/marketing", label: "بازاریابی", icon: <Share2 size={17} />, roles: ["super_admin"] },
+      { to: "/content", label: "محتوای سایت", icon: <FileText size={17} />, roles: CONTENT_ROLES },
+      { to: "/system", label: "مدیریت سیستم", icon: <Settings size={17} />, roles: ["super_admin", "admin"] },
     ],
   },
 ];
 
 const CRUMBS: Record<string, string> = {
   "/": "داشبورد",
-  "/inbox": "صندوق ورودی",
   "/requests": "درخواست‌ها",
   "/requests/consultation": "مشاوره",
   "/requests/contact": "تماس",
   "/requests/ticket": "تیکت",
-  "/requests/consultations": "درخواست‌های مشاوره",
-  "/requests/contacts": "تماس‌ها",
-  "/requests/tickets": "تیکت‌ها",
-  "/labels": "برچسب‌ها",
-  "/content": "محتوا",
-  "/content/pages": "صفحات سایت",
-  "/content/articles": "مقالات",
-  "/content/media": "تصاویر و رسانه‌ها",
-  "/content/lawyers": "وکلا و رزومه‌ها",
-  "/settings": "تنظیمات سایت",
-  "/settings/contact": "اطلاعات تماس",
-  "/settings/address": "آدرس و محل فعالیت",
-  "/settings/social": "ایمیل و شبکه‌ها",
-  "/settings/general": "تنظیمات عمومی",
-  "/ai": "مشاور هوشمند",
-  "/ai/conversations": "مکالمات مشاور",
-  "/users": "کاربران و دسترسی‌ها",
-  "/audit": "گزارش فعالیت‌ها",
-  "/marketers": "بازاریابی",
+  "/users": "کاربران",
+  "/marketing": "بازاریابی",
+  "/content": "محتوای سایت",
+  "/content/pages": "ویرایش صفحه",
+  "/content/lawyers": "ویرایش وکیل",
+  "/system": "مدیریت سیستم",
 };
 
 function crumbsFor(path: string): { label: string; to: string }[] {
@@ -140,7 +86,6 @@ export default function AppLayout() {
   const [sidebarOpen, setSidebarOpen] = useState(false);
   const [userMenu, setUserMenu] = useState(false);
   const [notifOpen, setNotifOpen] = useState(false);
-  const [collapsed, setCollapsed] = useState<Record<string, boolean>>({});
   const [query, setQuery] = useState("");
   const location = useLocation();
   const navigate = useNavigate();
@@ -179,24 +124,10 @@ export default function AppLayout() {
       </div>
       <nav className="flex-1 overflow-y-auto px-3 py-4">
         {visibleNav.map((g) => {
-          const isCollapsed = g.collapsible && collapsed[g.group];
           return (
             <div key={g.group || "root"} className="mb-4">
-              {g.group ? (
-                <button
-                  className="nav-group-label w-full"
-                  onClick={() => setCollapsed((c) => ({ ...c, [g.group]: !c[g.group] }))}
-                  aria-expanded={!isCollapsed}
-                >
-                  {g.group}
-                  <ChevronDown
-                    size={13}
-                    className={`transition ${isCollapsed ? "-rotate-90" : ""}`}
-                  />
-                </button>
-              ) : null}
-              {!isCollapsed &&
-                g.items.map((item) => {
+              {g.group ? <p className="nav-group-label">{g.group}</p> : null}
+              {g.items.map((item) => {
                   const to = item.to.split("?")[0];
                   return (
                     <NavLink
@@ -268,7 +199,7 @@ export default function AppLayout() {
             className="relative mx-2 hidden max-w-xs flex-1 md:block"
             onSubmit={(e) => {
               e.preventDefault();
-              if (query.trim()) navigate(`/inbox?q=${encodeURIComponent(query.trim())}`);
+              if (query.trim()) navigate(`/requests?q=${encodeURIComponent(query.trim())}`);
             }}
           >
             <Search size={15} className="pointer-events-none absolute right-3 top-1/2 -translate-y-1/2 text-ink-3" />

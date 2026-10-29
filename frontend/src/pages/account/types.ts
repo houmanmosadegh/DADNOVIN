@@ -33,11 +33,28 @@ export interface MarketerHome {
   is_active?: boolean
   commission_enabled?: boolean
   cookie_days?: number
-  stats?: { clicks: number; requests: number; accepted: number; conversion: number }
+  stats?: {
+    clicks: number
+    unique_clicks: number
+    suspicious_clicks: number
+    requests: number
+    accepted: number
+    conversion: number
+  }
+  links?: MarketerLink[]
+  rules?: { kind: string; value: number; tier_min: number; own: boolean }[]
   iban_masked?: string
   reject_reason?: string
   reapply_at?: string
   applied_at?: string
+}
+
+export interface MarketerLink {
+  id: string
+  label: string
+  clicks: number
+  unique_clicks: number
+  url: string
 }
 
 export interface WalletView {

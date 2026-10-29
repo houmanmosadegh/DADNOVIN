@@ -1,5 +1,6 @@
 """Public account, marketer, wallet and payout schemas."""
 
+import re
 import uuid
 from datetime import datetime
 
@@ -10,9 +11,34 @@ from ..utils.phone import is_valid_iranian_phone, normalize_phone
 
 class RegisterIn(BaseModel):
     full_name: str = Field(min_length=3, max_length=120)
+    username: str = Field(min_length=3, max_length=24)
     phone: str
     password: str = Field(min_length=8, max_length=128)
     ref_code: str = Field(default="", max_length=24)
+    otp: str = Field(default="", max_length=8)
+
+    @field_validator("username")
+    @classmethod
+    def _username(cls, v: str) -> str:
+        v = v.strip().lower()
+        if not re.fullmatch(r"[a-z0-9_]{3,24}", v):
+            raise ValueError(
+                "نام کاربری باید ۳ تا ۲۴ کاراکتر — حروف لاتین، عدد یا _ باشد."
+            )
+        return v
+
+    @field_validator("phone")
+    @classmethod
+    def _phone(cls, v: str) -> str:
+        v = normalize_phone(v)
+        if not is_valid_iranian_phone(v):
+            raise ValueError("شماره موبایل معتبر نیست.")
+        return v
+
+
+class OtpRequestIn(BaseModel):
+    phone: str
+    purpose: str = Field(default="register", pattern="^(register|login|reset)$")
 
     @field_validator("phone")
     @classmethod

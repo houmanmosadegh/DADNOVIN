@@ -32,9 +32,11 @@ interface AuthState {
   login: (identifier: string, password: string) => Promise<AccountMe>
   register: (input: {
     full_name: string
+    username: string
     phone: string
     password: string
     ref_code: string
+    otp?: string
   }) => Promise<AccountMe>
   logout: () => Promise<void>
 }
@@ -77,7 +79,14 @@ export function AuthProvider({ children }: { children: ReactNode }) {
   }, [])
 
   const register = useCallback(
-    async (input: { full_name: string; phone: string; password: string; ref_code: string }) => {
+    async (input: {
+      full_name: string
+      username: string
+      phone: string
+      password: string
+      ref_code: string
+      otp?: string
+    }) => {
       const out = await api.post<AccountMe>('/account-auth/register', input)
       setMe(out)
       return out

@@ -66,16 +66,40 @@ class MarketerProfile(Base):
     updated_at: Mapped[datetime] = updated_at_col()
 
 
+class ReferralLink(Base):
+    """A marketer's labeled referral link — same ref_code, per-source stats."""
+
+    __tablename__ = "referral_links"
+
+    id: Mapped[uuid.UUID] = uuid_pk()
+    marketer_id: Mapped[uuid.UUID] = mapped_column(
+        Uuid, ForeignKey("marketer_profiles.id", ondelete="CASCADE"), index=True
+    )
+    # source label embedded in the URL as ?src= (e.g. instagram, telegram)
+    label: Mapped[str] = mapped_column(String(80))
+    created_at: Mapped[datetime] = created_at_col()
+
+    __table_args__ = (
+        UniqueConstraint("marketer_id", "label", name="uq_ref_link_label"),
+    )
+
+
 class ReferralClick(Base):
-    """Landing via /?ref=CODE — raw signal for marketer stats."""
+    """Landing via /r/CODE or /?ref=CODE — raw signal for marketer stats."""
 
     __tablename__ = "referral_clicks"
 
     id: Mapped[uuid.UUID] = uuid_pk()
     ref_code: Mapped[str] = mapped_column(String(24), index=True)
+    link_label: Mapped[str] = mapped_column(String(80), default="", index=True)
     ip: Mapped[str] = mapped_column(String(45), default="")
     user_agent: Mapped[str] = mapped_column(String(300), default="")
+    # sha256(ip+ua) — lets us count unique visitors without storing raw identity
+    visitor_hash: Mapped[str] = mapped_column(String(64), default="", index=True)
     landing_path: Mapped[str] = mapped_column(String(200), default="/")
+    # anti-fraud: suspicious clicks are recorded but excluded from conversion stats
+    suspicious: Mapped[bool] = mapped_column(Boolean, default=False, index=True)
+    suspicious_reason: Mapped[str] = mapped_column(String(200), default="")
     created_at: Mapped[datetime] = created_at_col()
 
 
@@ -116,6 +140,16 @@ class CommissionRule(Base):
     marketer_id: Mapped[uuid.UUID | None] = mapped_column(
         Uuid, nullable=True, index=True
     )  # per-marketer override; NULL = global
+    # clamps: 0 = unbounded; result is clamped to [min_amount, max_amount]
+    min_amount: Mapped[int] = mapped_column(BigInteger, default=0)
+    max_amount: Mapped[int] = mapped_column(BigInteger, default=0)
+    # validity window — NULL bounds mean open-ended; applies to new commissions only
+    starts_at: Mapped[datetime | None] = mapped_column(
+        DateTime(timezone=True), nullable=True
+    )
+    ends_at: Mapped[datetime | None] = mapped_column(
+        DateTime(timezone=True), nullable=True
+    )
     is_active: Mapped[bool] = mapped_column(Boolean, default=True, index=True)
     created_at: Mapped[datetime] = created_at_col()
 
@@ -137,6 +171,9 @@ class Commission(Base):
     hold_until: Mapped[datetime | None] = mapped_column(
         DateTime(timezone=True), nullable=True
     )
+    # JSON snapshot of the rule applied at creation — later rule edits never
+    # rewrite history
+    rule_snapshot: Mapped[str] = mapped_column(Text, default="")
     created_at: Mapped[datetime] = created_at_col()
     updated_at: Mapped[datetime] = updated_at_col()
 
@@ -200,6 +237,23 @@ class InboxNotification(Base):
     kind: Mapped[str] = mapped_column(String(30), default="info")
     link: Mapped[str] = mapped_column(String(200), default="")
     read_at: Mapped[datetime | None] = mapped_column(
+        DateTime(timezone=True), nullable=True
+    )
+    created_at: Mapped[datetime] = created_at_col()
+
+
+class OtpToken(Base):
+    """Phone-verification code — OTP-ready; provider-agnostic (mock/log for now)."""
+
+    __tablename__ = "otp_tokens"
+
+    id: Mapped[uuid.UUID] = uuid_pk()
+    phone: Mapped[str] = mapped_column(String(20), index=True)
+    code_hash: Mapped[str] = mapped_column(String(64))
+    purpose: Mapped[str] = mapped_column(String(20), default="register")
+    attempts: Mapped[int] = mapped_column(Integer, default=0)
+    expires_at: Mapped[datetime] = mapped_column(DateTime(timezone=True))
+    used_at: Mapped[datetime | None] = mapped_column(
         DateTime(timezone=True), nullable=True
     )
     created_at: Mapped[datetime] = created_at_col()

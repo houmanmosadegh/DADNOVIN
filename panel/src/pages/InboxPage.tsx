@@ -36,13 +36,19 @@ export default function InboxPage({
   fixedType,
   title = "صندوق ورودی",
   subtitle = "همهٔ درخواست‌ها — مشاوره، تماس و تیکت — در یک نما",
+  embedded = false,
 }: {
   fixedType?: "consultation" | "ticket" | "contact";
   title?: string;
   subtitle?: string;
+  embedded?: boolean; // inside the requests hub — skip own PageHeader
 }) {
   const [params, setParams] = useSearchParams();
-  const [tab, setTab] = useState<string>(params.get("tab") ?? "all");
+  // `?tab=` is owned by the hub when embedded — only read known values
+  const initTab = params.get("tab") ?? "all";
+  const [tab, setTab] = useState<string>(
+    TABS.some((t) => t.key === initTab) ? initTab : "all",
+  );
   const [status, setStatus] = useState(params.get("status") ?? "");
   const [type, setType] = useState(params.get("type") ?? "");
   const [page, setPage] = useState(1);
@@ -160,15 +166,24 @@ export default function InboxPage({
 
   return (
     <div>
-      <PageHeader
-        title={title}
-        subtitle={subtitle}
-        actions={
+      {!embedded && (
+        <PageHeader
+          title={title}
+          subtitle={subtitle}
+          actions={
+            <button className="btn-ghost btn-sm" onClick={exportCsv}>
+              <Download size={14} /> خروجی CSV
+            </button>
+          }
+        />
+      )}
+      {embedded && (
+        <div className="mb-4 flex justify-end">
           <button className="btn-ghost btn-sm" onClick={exportCsv}>
             <Download size={14} /> خروجی CSV
           </button>
-        }
-      />
+        </div>
+      )}
 
       {/* quick tabs */}
       <div className="mb-4 flex flex-wrap gap-2">

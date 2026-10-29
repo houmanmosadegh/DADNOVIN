@@ -27,6 +27,9 @@ class Settings(BaseSettings):
     # comma-separated list of origins allowed to call the API
     cors_origins: str = "http://localhost:5173,http://localhost:5174,http://localhost:8080"
 
+    # absolute site origin — referral links / QR codes embed this
+    public_base_url: str = "http://localhost:8080"
+
     # media
     storage_dir: str = "storage"
     media_max_bytes: int = 6 * 1024 * 1024  # 6 MB

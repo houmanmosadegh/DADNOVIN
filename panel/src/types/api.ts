@@ -11,6 +11,7 @@ export interface UserOut {
   username: string;
   email: string;
   full_name: string;
+  phone: string;
   is_active: boolean;
   roles: RoleOut[];
   created_at: string;

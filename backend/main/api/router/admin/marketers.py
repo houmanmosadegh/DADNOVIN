@@ -1,11 +1,15 @@
 """Admin — marketer applications, profiles, referrals, payouts, commissions."""
 
+import csv
+import io
+import json
 import uuid
+from datetime import datetime
 from typing import Annotated
 
-from fastapi import APIRouter, Depends, HTTPException, Request
+from fastapi import APIRouter, Depends, HTTPException, Request, Response
 from pydantic import BaseModel, Field
-from sqlalchemy import select
+from sqlalchemy import func, select
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from ....db.session import get_db
@@ -16,6 +20,7 @@ from ....models.account import (
     MarketerProfile,
     PayoutRequest,
     ReferralAttribution,
+    ReferralClick,
 )
 from ....models.consultation import ConsultationRequest
 from ....models.user import User
@@ -171,7 +176,7 @@ async def profile_referrals(db: DbDep, profile_id: uuid.UUID) -> list[dict]:
     out = []
     for a in attrs:
         item = {"id": str(a.id), "created_at": a.created_at.isoformat(),
-                "ip": a.ip, "ua": a.ua[:80]}
+                "ip": a.ip, "ua": a.user_agent[:80]}
         if a.request_type == "consultation":
             row = await db.get(ConsultationRequest, a.request_id)
             if row:
@@ -271,6 +276,19 @@ commissions_router = APIRouter(
 # ─── rules (admin-configured per spec §6) ────────────────────────────
 
 
+def _rule_out(r: CommissionRule) -> dict:
+    return {
+        "id": str(r.id), "kind": r.kind, "value": r.value,
+        "tier_min": r.tier_min,
+        "marketer_id": str(r.marketer_id) if r.marketer_id else None,
+        "min_amount": r.min_amount,
+        "max_amount": r.max_amount,
+        "starts_at": r.starts_at.isoformat() if r.starts_at else None,
+        "ends_at": r.ends_at.isoformat() if r.ends_at else None,
+        "is_active": r.is_active, "created_at": r.created_at.isoformat(),
+    }
+
+
 @commissions_router.get("/rules")
 async def rules_list(db: DbDep) -> list[dict]:
     rows = (
@@ -278,15 +296,7 @@ async def rules_list(db: DbDep) -> list[dict]:
             select(CommissionRule).order_by(CommissionRule.tier_min.desc())
         )
     ).scalars().all()
-    return [
-        {
-            "id": str(r.id), "kind": r.kind, "value": r.value,
-            "tier_min": r.tier_min,
-            "marketer_id": str(r.marketer_id) if r.marketer_id else None,
-            "is_active": r.is_active, "created_at": r.created_at.isoformat(),
-        }
-        for r in rows
-    ]
+    return [_rule_out(r) for r in rows]
 
 
 class RuleIn(BaseModel):
@@ -294,6 +304,10 @@ class RuleIn(BaseModel):
     value: int = Field(ge=0)
     tier_min: int = Field(default=0, ge=0)
     marketer_id: uuid.UUID | None = None  # per-marketer override
+    min_amount: int = Field(default=0, ge=0)  # clamp floor — 0 = none
+    max_amount: int = Field(default=0, ge=0)  # clamp ceiling — 0 = none
+    starts_at: datetime | None = None
+    ends_at: datetime | None = None
 
 
 @commissions_router.post("/rules", status_code=201)
@@ -303,6 +317,8 @@ async def rule_create(
     rule = CommissionRule(
         kind=payload.kind, value=payload.value,
         tier_min=payload.tier_min, marketer_id=payload.marketer_id,
+        min_amount=payload.min_amount, max_amount=payload.max_amount,
+        starts_at=payload.starts_at, ends_at=payload.ends_at,
     )
     db.add(rule)
     await db.flush()
@@ -349,6 +365,7 @@ async def commission_list(db: DbDep) -> list[dict]:
             "status": c.status,
             "basis_kind": c.basis_kind,
             "basis_amount": c.basis_amount,
+            "rule_snapshot": json.loads(c.rule_snapshot) if c.rule_snapshot else None,
             "hold_until": c.hold_until.isoformat() if c.hold_until else None,
             "created_at": c.created_at.isoformat(),
         }
@@ -390,4 +407,123 @@ async def commission_cancel(
                 entity_id=comm.id, after={"reason": payload.reason}, request=request)
     await db.commit()
     return {"status": "cancelled"}
+
+
+class PreviewIn(BaseModel):
+    marketer_id: uuid.UUID | None = None
+    basis_amount: int = Field(default=0, ge=0)
+    accepted_count: int | None = Field(default=None, ge=0)
+
+
+@commissions_router.post("/preview")
+async def commission_preview(db: DbDep, payload: PreviewIn) -> dict:
+    """What-if — same engine the real flow uses; nothing is written."""
+    return await comm_svc.preview_commission(
+        db, payload.marketer_id, payload.basis_amount, payload.accepted_count
+    )
+
+
+# ─── performance report + suspicious ────────────────────────────────
+
+
+@router.get("/report")
+async def marketer_report(db: DbDep) -> dict:
+    """Leaderboard + funnel + top sources + suspicious items for the admin."""
+    rows = (
+        await db.execute(
+            select(MarketerProfile, User)
+            .join(User, User.id == MarketerProfile.user_id)
+        )
+    ).all()
+    board = []
+    for p, u in rows:
+        stats = await ref_svc.stats_for(db, p.id)
+        earned = (
+            await db.execute(
+                select(func.coalesce(func.sum(Commission.amount), 0)).where(
+                    Commission.marketer_id == p.id,
+                    Commission.status.in_(["pending", "approved", "paid"]),
+                )
+            )
+        ).scalar_one()
+        board.append(
+            {
+                "id": str(p.id),
+                "full_name": u.full_name,
+                "ref_code": p.ref_code,
+                "is_active": p.is_active,
+                "fraud_flag": p.fraud_flag,
+                "earned": earned,
+                **stats,
+            }
+        )
+    board.sort(key=lambda b: (b["accepted"], b["requests"], b["clicks"]), reverse=True)
+
+    funnel = {
+        "clicks": sum(b["clicks"] for b in board),
+        "unique_clicks": sum(b["unique_clicks"] for b in board),
+        "requests": sum(b["requests"] for b in board),
+        "accepted": sum(b["accepted"] for b in board),
+    }
+    sources = (
+        await db.execute(
+            select(
+                ReferralClick.link_label,
+                func.count(ReferralClick.id),
+                func.count(func.distinct(ReferralClick.visitor_hash)),
+            )
+            .where(ReferralClick.suspicious.is_(False))
+            .group_by(ReferralClick.link_label)
+            .order_by(func.count(ReferralClick.id).desc())
+            .limit(20)
+        )
+    ).all()
+    suspicious = (
+        await db.execute(
+            select(ReferralClick)
+            .where(ReferralClick.suspicious.is_(True))
+            .order_by(ReferralClick.created_at.desc())
+            .limit(50)
+        )
+    ).scalars().all()
+    return {
+        "leaderboard": board,
+        "funnel": funnel,
+        "sources": [
+            {"label": s or "مستقیم", "clicks": c, "unique": u} for s, c, u in sources
+        ],
+        "suspicious": [
+            {
+                "id": str(c.id),
+                "ref_code": c.ref_code,
+                "reason": c.suspicious_reason,
+                "ip": c.ip,
+                "created_at": c.created_at.isoformat(),
+            }
+            for c in suspicious
+        ],
+    }
+
+
+@router.get("/report.csv")
+async def marketer_report_csv(db: DbDep) -> Response:
+    """Excel-friendly export of the leaderboard."""
+    report = await marketer_report(db)
+    buf = io.StringIO()
+    w = csv.writer(buf)
+    w.writerow(
+        ["marketer", "ref_code", "active", "clicks", "unique_clicks",
+         "requests", "accepted", "conversion", "earned_rials", "fraud_flag"]
+    )
+    for b in report["leaderboard"]:
+        w.writerow(
+            [b["full_name"], b["ref_code"], b["is_active"], b["clicks"],
+             b["unique_clicks"], b["requests"], b["accepted"],
+             b["conversion"], b["earned"], b["fraud_flag"]]
+        )
+    return Response(
+        "﻿" + buf.getvalue(),  # BOM so Excel opens it as UTF-8
+        media_type="text/csv; charset=utf-8",
+        headers={"Content-Disposition": 'attachment; filename="marketers.csv"'},
+    )
 
