@@ -147,7 +147,7 @@ export function Header() {
           {/* ورود/پنل — نسخهٔ کشویی برای موبایل */}
           <div className="site-nav__auth">
             {loading ? null : (
-              <Link to="/account" className="site-nav__auth-link" onClick={() => setOpen(false)}>
+              <Link to="/panel" className="site-nav__auth-link" onClick={() => setOpen(false)}>
                 <UserRound size={16} aria-hidden="true" /> {me ? 'پنل من' : 'پنل کاربری'}
               </Link>
             )}
@@ -169,7 +169,7 @@ export function Header() {
 
         <div className="site-header__actions">
           {loading ? null : (
-            <Link to="/account" className="header-auth" aria-label="پنل کاربری">
+            <Link to="/panel" className="header-auth" aria-label="پنل کاربری">
               <UserRound size={17} aria-hidden="true" />
               <span>{me ? 'پنل من' : 'پنل کاربری'}</span>
             </Link>

@@ -28,7 +28,7 @@ export default function RequestsPage() {
       ) : (
         <div className="acc__card acc__list">
           {rows.map((r) => (
-            <Link key={r.id} to={`/account/requests/${r.id}`} className="acc__row">
+            <Link key={r.id} to={`/panel/requests/${r.id}`} className="acc__row">
               <span dir="ltr" className="acc__code">{r.tracking_code}</span>
               <span className="acc__row-topic">{r.topic || '—'}</span>
               <span className={`acc__badge acc__badge--${r.status}`}>{STATUS_FA[r.status] ?? r.status}</span>

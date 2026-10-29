@@ -3,7 +3,7 @@ import tailwindcss from "@tailwindcss/vite";
 import { defineConfig } from "vite";
 
 export default defineConfig({
-  base: "/panel/",
+  base: "/admin/",
   plugins: [react(), tailwindcss()],
   server: {
     port: 5174,

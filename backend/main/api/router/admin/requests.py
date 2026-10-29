@@ -236,7 +236,7 @@ async def add_message(
             db, getattr(row, "user_id", None),
             title=f"پاسخ جدید برای درخواست {row.tracking_code}",
             body=payload.body[:300], kind="reply",
-            link="/account/requests",
+            link="/panel/requests",
         )
         await thread_svc.add_event(
             db, rtype, request_id, "reply_sent", actor=user,
@@ -290,7 +290,7 @@ async def change_status(
         db, getattr(row, "user_id", None),
         title=f"وضعیت درخواست {row.tracking_code} تغییر کرد",
         body=f"وضعیت جدید: {STATUS_FA.get(payload.status, payload.status)}",
-        kind="status", link="/account/requests",
+        kind="status", link="/panel/requests",
     )
     await audit(
         db, actor=user, action="request.status", entity=rtype,

@@ -13,6 +13,6 @@ RUN npm run build
 
 FROM nginxinc/nginx-unprivileged:1.27-alpine AS runtime
 COPY infrastructure/nginx/panel.conf /etc/nginx/conf.d/default.conf
-# vite base=/panel/ → serve the bundle under /panel so paths resolve as-is
-COPY --from=build /app/dist /usr/share/nginx/html/panel
+# vite base=/admin/ → serve the bundle under /admin so paths resolve as-is
+COPY --from=build /app/dist /usr/share/nginx/html/admin
 EXPOSE 8080

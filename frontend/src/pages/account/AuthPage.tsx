@@ -1,8 +1,8 @@
-/** صفحهٔ ورود/ثبت‌نام پنل کاربر — جایگزین مودال؛ گیتِ /account. */
+/** صفحهٔ ورود/ثبت‌نام پنل کاربر — جایگزین مودال؛ گیتِ /panel. */
 
 import { useState } from 'react'
 import { useNavigate } from 'react-router-dom'
-import { AlertCircle, ArrowLeft, CheckCircle2, Lock, Phone, Scale, Ticket, UserRound } from 'lucide-react'
+import { AlertCircle, ArrowLeft, CheckCircle2, Lock, Phone, Ticket, UserRound } from 'lucide-react'
 import { api } from '../../services/api'
 import { useAuth } from '../../services/auth'
 import { readRefCookie } from '../../services/referral'
@@ -35,7 +35,7 @@ export default function AuthPage() {
   }
 
   const done = (me: { roles: string[] }) => {
-    navigate(me.roles.some((r) => STAFF.includes(r)) ? '/panel/' : '/account')
+    navigate(me.roles.some((r) => STAFF.includes(r)) ? '/admin/' : '/panel')
   }
 
   const submit = async (e: React.FormEvent) => {
@@ -84,9 +84,11 @@ export default function AuthPage() {
         <aside className="authp__brand">
           <a className="authp__back" href="/"><ArrowLeft size={14} /> بازگشت به سایت</a>
           <div className="authp__mark">
-            <Scale size={30} aria-hidden="true" />
+            <img src="/images/logo-mark.png" alt="" width={44} height={34} decoding="async" />
           </div>
-          <h1 className="authp__name">دادنوین</h1>
+          <p className="authp__kicker">گروه حقوقی دادنوین</p>
+          <h1 className="authp__name">پنل کاربری</h1>
+          <span className="authp__rule" aria-hidden="true" />
           <p className="authp__motto">«عدالت، حق همه است…»</p>
           <ul className="authp__points" role="list">
             <li>پیگیری آنلاین درخواست مشاوره</li>

@@ -8,12 +8,12 @@ export default function LoginPage() {
 
   useEffect(() => {
     if (!user) {
-      window.location.assign("/account");
+      window.location.assign("/panel");
     }
   }, [user]);
 
   if (user) {
-    window.location.assign("/panel/");
+    window.location.assign("/admin/");
     return null;
   }
   return null;

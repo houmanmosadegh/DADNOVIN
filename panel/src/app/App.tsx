@@ -60,7 +60,7 @@ export default function App() {
     <QueryClientProvider client={qc}>
       <AuthProvider>
         <ToastProvider>
-          <BrowserRouter basename="/panel">
+          <BrowserRouter basename="/admin">
             <Routes>
               <Route path="/login" element={<LoginPage />} />
               <Route

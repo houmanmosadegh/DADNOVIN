@@ -43,14 +43,14 @@ export default function AccountApp() {
 
   const isStaff = me.roles.some((r) => STAFF_ROLES.includes(r))
   const items = [
-    { to: '/account', label: 'داشبورد', icon: <LayoutDashboard size={17} />, end: true },
-    { to: '/account/requests', label: 'درخواست‌های من', icon: <FileText size={17} /> },
-    { to: '/account/notifications', label: 'اعلان‌ها', icon: <Bell size={17} /> },
-    { to: '/account/marketing', label: 'بازاریابی', icon: <Share2 size={17} /> },
+    { to: '/panel', label: 'داشبورد', icon: <LayoutDashboard size={17} />, end: true },
+    { to: '/panel/requests', label: 'درخواست‌های من', icon: <FileText size={17} /> },
+    { to: '/panel/notifications', label: 'اعلان‌ها', icon: <Bell size={17} /> },
+    { to: '/panel/marketing', label: 'بازاریابی', icon: <Share2 size={17} /> },
     ...(me.is_marketer
-      ? [{ to: '/account/wallet', label: 'کیف پول', icon: <Wallet size={17} /> }]
+      ? [{ to: '/panel/wallet', label: 'کیف پول', icon: <Wallet size={17} /> }]
       : []),
-    { to: '/account/profile', label: 'پروفایل', icon: <UserRound size={17} /> },
+    { to: '/panel/profile', label: 'پروفایل', icon: <UserRound size={17} /> },
   ]
 
   return (
@@ -78,7 +78,7 @@ export default function AccountApp() {
         <div className="acc__user">
           <p className="acc__username">{me.full_name}</p>
           <p className="acc__muted" dir="ltr">{me.phone}</p>
-          {isStaff && <a className="acc__stafflink" href="/panel/">ورود به پنل مدیریت ←</a>}
+          {isStaff && <a className="acc__stafflink" href="/admin/">ورود به پنل مدیریت ←</a>}
           <div className="acc__user-actions">
             <a href="/" className="acc__sitelink">مشاهدهٔ سایت</a>
             <button
@@ -100,7 +100,7 @@ export default function AccountApp() {
           <Route path="marketing" element={<MarketingPage />} />
           <Route path="wallet" element={<WalletPage />} />
           <Route path="profile" element={<ProfilePage />} />
-          <Route path="*" element={<Navigate to="/account" replace />} />
+          <Route path="*" element={<Navigate to="/panel" replace />} />
         </Routes>
       </main>
     </div>

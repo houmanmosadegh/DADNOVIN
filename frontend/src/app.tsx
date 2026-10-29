@@ -45,7 +45,7 @@ export function AppRoutes() {
   useContext(ContentVersion) // re-render shell once remote CMS content lands
   const { pathname } = useLocation()
   // پنل کاربر اپ مستقلی است — بدون Header/Footer و انیمیشن‌های سایت
-  if (pathname.startsWith('/account')) {
+  if (pathname.startsWith('/panel')) {
     return (
       <Suspense fallback={null}>
         <AccountApp />

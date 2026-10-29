@@ -37,7 +37,7 @@ export default function RequestDetailPage() {
 
   return (
     <div className="acc__page">
-      <Link to="/account/requests" className="acc__back">→ بازگشت به لیست</Link>
+      <Link to="/panel/requests" className="acc__back">→ بازگشت به لیست</Link>
       {!detail && !err && <p className="acc__muted">در حال بارگذاری…</p>}
       {err && <p className="acc__err">{err}</p>}
       {detail && (

@@ -22,7 +22,7 @@ export default function DashboardPage() {
       <h1 className="acc__title">داشبورد</h1>
 
       <div className="acc__stats">
-        <Link to="/account/requests" className="acc__card acc__stat">
+        <Link to="/panel/requests" className="acc__card acc__stat">
           <p className="acc__stat-num">{(rows?.length ?? 0).toLocaleString('fa-IR')}</p>
           <p className="acc__muted">کل درخواست‌ها</p>
         </Link>
@@ -30,7 +30,7 @@ export default function DashboardPage() {
           <p className="acc__stat-num">{open.length.toLocaleString('fa-IR')}</p>
           <p className="acc__muted">در جریان</p>
         </div>
-        <Link to="/account/notifications" className="acc__card acc__stat">
+        <Link to="/panel/notifications" className="acc__card acc__stat">
           <p className="acc__stat-num">{unread.length.toLocaleString('fa-IR')}</p>
           <p className="acc__muted">اعلان خوانده‌نشده</p>
         </Link>
@@ -48,7 +48,7 @@ export default function DashboardPage() {
         ) : (
           <div className="acc__list">
             {recent.map((r) => (
-              <Link key={r.id} to={`/account/requests/${r.id}`} className="acc__row">
+              <Link key={r.id} to={`/panel/requests/${r.id}`} className="acc__row">
                 <span dir="ltr" className="acc__code">{r.tracking_code}</span>
                 <span className="acc__row-topic">{r.topic || '—'}</span>
                 <span className={`acc__badge acc__badge--${r.status}`}>{STATUS_FA[r.status] ?? r.status}</span>

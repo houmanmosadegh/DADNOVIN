@@ -116,7 +116,7 @@ export default function MarketingPage() {
       {!home.commission_enabled ? (
         <p className="acc__muted">سیستم کمیسیون فعلاً غیرفعال است؛ آمار ارجاع همچنان ثبت می‌شود.</p>
       ) : (
-        <p className="acc__muted">موجودی و برداشت در <Link to="/account/wallet">کیف پول</Link>.</p>
+        <p className="acc__muted">موجودی و برداشت در <Link to="/panel/wallet">کیف پول</Link>.</p>
       )}
     </div>
   )
