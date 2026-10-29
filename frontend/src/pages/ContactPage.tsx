@@ -1,6 +1,7 @@
 import { Mail, MapPin, Phone } from 'lucide-react'
 import { ContactForm } from '../components/ContactForm'
 import { Reveal } from '../components/Reveal'
+import { SectionWave } from '../components/SectionWave'
 import { brand, contact, contactPage, lawyers } from '../content/lawyers.fa.js'
 import { useSeo } from '../utils/seo'
 import './pages.css'
@@ -11,17 +12,25 @@ export function ContactPage() {
   const address = contact.address ?? `ایران، استان خراسان رضوی، ${contact.city}`
   return (
     <div className="page">
-      <div className="container">
-        <Reveal>
-          <header className="page__head">
-            <h1 className="page__title">{contactPage.title}</h1>
-            <p className="page__lead">{contactPage.lead}</p>
-          </header>
-        </Reveal>
+      {/* هدر صفحه — سفید */}
+      <div className="page-band band band--white">
+        <div className="container">
+          <Reveal>
+            <header className="page__head">
+              <h1 className="page__title">{contactPage.title}</h1>
+              <p className="page__lead">{contactPage.lead}</p>
+            </header>
+          </Reveal>
+        </div>
+      </div>
+      <SectionWave from="white" to="navy" />
 
-        {people.length || contact.email ? (
-          <Reveal delay={120}>
-            <div className="consult-layout contact-layout">
+      {/* ریل کانال‌ها + فرم — سورمه‌ای */}
+      <div className="page-band band band--navy">
+        <div className="container">
+          {people.length || contact.email ? (
+            <Reveal delay={120}>
+              <div className="consult-layout contact-layout">
               {/* channel rail — phones, email, city, writing tips */}
               <aside className="consult-aside" aria-label={contactPage.locationLabel}>
                 <p className="consult-aside__brand">
@@ -83,19 +92,21 @@ export function ContactPage() {
                 <p className="consult-aside__privacy">{contactPage.form.privacy}</p>
               </aside>
 
-              <div className="consult-form-wrap contact-panel">
-                <h2 className="consult-form-wrap__title">{contactPage.form.title}</h2>
-                <p className="consult-form-wrap__lead">{contactPage.form.lead}</p>
-                <ContactForm />
+                <div className="consult-form-wrap contact-panel">
+                  <h2 className="consult-form-wrap__title">{contactPage.form.title}</h2>
+                  <p className="consult-form-wrap__lead">{contactPage.form.lead}</p>
+                  <ContactForm />
+                </div>
               </div>
-            </div>
-          </Reveal>
-        ) : (
-          <p className="page__note">
-            شماره‌های تماس گروه حقوقی دادنوین به‌زودی در همین صفحه اعلام می‌شود.
-          </p>
-        )}
+            </Reveal>
+          ) : (
+            <p className="page__note">
+              شماره‌های تماس گروه حقوقی دادنوین به‌زودی در همین صفحه اعلام می‌شود.
+            </p>
+          )}
+        </div>
       </div>
+      <SectionWave from="navy" to="goldwhite" />
     </div>
   )
 }

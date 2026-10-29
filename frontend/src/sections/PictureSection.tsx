@@ -1,14 +1,17 @@
 import { Link } from 'react-router-dom'
 import { ArrowLeft } from 'lucide-react'
 import { Reveal } from '../components/Reveal'
-import { SectionHeading } from '../components/SectionHeading'
 import { home } from '../content/lawyers.fa.js'
 
 const { picture } = home
 
 export function PictureSection() {
   return (
-    <section className="section picture" id="approach" aria-labelledby="picture-title">
+    <section
+      className="section picture band band--navy"
+      id="approach"
+      aria-labelledby="picture-title"
+    >
       <div className="container picture__grid">
         {/* media column — در دسکتاپ سمت راست، از سمت راست وارد می‌شود */}
         <Reveal variant="x-start" className="picture__media">
@@ -36,13 +39,16 @@ export function PictureSection() {
         {/* text column — از سمت چپ (مقابل تصویر) وارد می‌شود */}
         <Reveal variant="x-end" className="picture__text">
           <div className="picture__copy">
-            <SectionHeading
-              index={2}
-              eyebrow={picture.eyebrow}
-              title={picture.title}
-              id="picture-title"
-              lead={picture.text}
-            />
+            <span className="chapter-head__eyebrow">
+              <span className="chapter-head__no" aria-hidden="true">
+                ۰۲
+              </span>
+              {picture.eyebrow}
+            </span>
+            <h2 id="picture-title" className="picture__title">
+              {picture.title}
+            </h2>
+            <p className="picture__lead">{picture.text}</p>
             <Link to={picture.link.to} className="picture__link">
               {picture.link.label}
               <ArrowLeft size={17} aria-hidden="true" />

@@ -11,30 +11,37 @@
 .site-header__bg {
   position: absolute;
   inset: 0;
-  background-color: rgb(var(--ink-rgb) / 0.82);
-  -webkit-backdrop-filter: blur(12px) saturate(1.3);
-  backdrop-filter: blur(12px) saturate(1.3);
+  /* charcoal glass — sits on every band without tinting */
+  background-color: rgb(18 19 21 / 0.82);
+  -webkit-backdrop-filter: blur(10px);
+  backdrop-filter: blur(10px);
+  /* top inner catch-light — makes the glass read as glass */
+  box-shadow: inset 0 1px 0 rgb(255 255 255 / 0.04);
   transition:
     background-color 0.35s ease,
+    box-shadow 0.35s ease,
     -webkit-backdrop-filter 0.35s ease,
     backdrop-filter 0.35s ease;
 }
 
 .site-header.is-scrolled .site-header__bg,
 .site-header.is-open .site-header__bg {
-  background-color: rgb(var(--ink-0-rgb) / 0.96);
-  -webkit-backdrop-filter: blur(16px) saturate(1.35);
-  backdrop-filter: blur(16px) saturate(1.35);
+  background-color: rgb(18 19 21 / 0.94);
+  -webkit-backdrop-filter: blur(12px);
+  backdrop-filter: blur(12px);
+  box-shadow:
+    inset 0 1px 0 rgb(255 255 255 / 0.04),
+    0 12px 32px -14px rgb(0 0 0 / 0.65);
 }
 
-/* thin gold baseline */
+/* thin gold baseline — 1px at 20% */
 .site-header::after {
   content: '';
   position: absolute;
   inset-inline: 0;
   bottom: 0;
   height: 1px;
-  background: var(--line-gold);
+  background: rgb(var(--gold-rgb) / 0.2);
 }
 
 /* scroll progress — draws over the baseline */
@@ -48,12 +55,6 @@
   transform: scaleX(0);
   transform-origin: right center; /* RTL: grows from the reading edge */
   will-change: transform;
-  transition: opacity var(--dur-fast) var(--ease-out);
-}
-/* the open drawer lives inside .site-header__inner (z-2) — the progress
-   line must not slice across it */
-.site-header.is-open .site-header__progress {
-  opacity: 0;
 }
 
 .site-header__inner {
@@ -64,6 +65,11 @@
   align-items: center;
   gap: 1.25rem;
   min-height: var(--header-h);
+  transition: min-height 0.35s var(--ease-out);
+}
+/* slightly compressed once the page is scrolled */
+.site-header.is-scrolled .site-header__inner {
+  min-height: calc(var(--header-h) - 0.9rem);
 }
 
 /* ---------- Brand ---------- */
@@ -92,7 +98,7 @@
   line-height: 1.3;
 }
 .brand__name {
-  font-weight: 700;
+  font-weight: 400;
   font-size: 1.15rem;
   color: var(--color-text);
 }
@@ -126,14 +132,18 @@
   display: inline-block;
   padding: 0.55rem 0.95rem;
   border-radius: var(--radius-s);
-  color: var(--color-text);
+  /* light cream at rest — brightens into gold on hover/active */
+  color: rgb(233 228 214 / 0.8);
   font-size: 0.95rem;
   font-weight: 500;
   white-space: nowrap;
-  transition: color var(--dur-fast) var(--ease-out);
+  transition:
+    color var(--dur-fast) var(--ease-out),
+    background-color var(--dur-fast) var(--ease-out);
 }
 .site-nav__link:hover {
   color: var(--color-gold-hi);
+  background: rgb(var(--gold-rgb) / 0.09);
 }
 /* underline opens from the center on hover */
 .site-nav__link::after {
@@ -211,13 +221,6 @@
 
   .nav-toggle {
     display: grid;
-  }
-
-  /* keep the ✕ button above the open drawer (drawer is z-3 inside the
-     header-inner stacking context) */
-  .site-header__actions {
-    position: relative;
-    z-index: 4;
   }
 
   .nav-backdrop {

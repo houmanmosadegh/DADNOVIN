@@ -21,55 +21,38 @@ const routes = [
   ['/track', 'track'],
 ]
 
-// meta values land inside HTML/attributes — escape so a stray & < > " in
-// the copy can't corrupt the markup
-const esc = (s) =>
-  s
-    .replace(/&/g, '&amp;')
-    .replace(/</g, '&lt;')
-    .replace(/>/g, '&gt;')
-    .replace(/"/g, '&quot;')
+const escapeRegExp = (s) => s.replace(/[.*+?^${}()|[\]\\]/g, '\\$&')
 
 function applyMeta(html, meta, url) {
-  const title = esc(meta.title)
-  const desc = esc(meta.description)
-  const link = esc(url)
   return html
-    .replace(/<title>[\s\S]*?<\/title>/, `<title>${title}</title>`)
+    .replace(/<title>[\s\S]*?<\/title>/, `<title>${meta.title}</title>`)
     .replace(
       /(<meta\s+name="description"\s+content=")[\s\S]*?(")/,
-      `$1${desc}$2`,
+      `$1${meta.description}$2`,
     )
     .replace(
       /(<link\s+rel="canonical"\s+href=")[^"]*(")/,
-      `$1${link}$2`,
+      `$1${url}$2`,
     )
-    .replace(/(property="og:title"\s+content=")[^"]*(")/g, `$1${title}$2`)
+    .replace(/(property="og:title"\s+content=")[^"]*(")/g, `$1${meta.title}$2`)
     .replace(
       /(property="og:description"\s+content=")[^"]*(")/g,
-      `$1${desc}$2`,
+      `$1${meta.description}$2`,
     )
-    .replace(/(property="og:url"\s+content=")[^"]*(")/, `$1${link}$2`)
-    .replace(/(name="twitter:title"\s+content=")[^"]*(")/, `$1${title}$2`)
+    .replace(/(property="og:url"\s+content=")[^"]*(")/, `$1${url}$2`)
+    .replace(/(name="twitter:title"\s+content=")[^"]*(")/, `$1${meta.title}$2`)
     .replace(
       /(name="twitter:description"\s+content=")[^"]*(")/,
-      `$1${desc}$2`,
+      `$1${meta.description}$2`,
     )
-}
-
-const ROOT_MARKER = '<div id="root">'
-if (!template.includes(ROOT_MARKER)) {
-  throw new Error('dist/index.html is missing <div id="root"> — prerender target changed?')
 }
 
 for (const [path, key] of routes) {
-  const meta = seo[key]
-  if (!meta) throw new Error(`seo map has no entry for "${key}"`)
   const url = `${siteUrl}${path === '/' ? '/' : path}`
   const appHtml = render(path)
   const html = applyMeta(
-    template.replace(ROOT_MARKER, `${ROOT_MARKER}${appHtml}`),
-    meta,
+    template.replace('<div id="root">', `<div id="root">${appHtml}`),
+    seo[key],
     url,
   )
 

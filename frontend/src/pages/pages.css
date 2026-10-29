@@ -1,6 +1,10 @@
 .page {
-  padding-block: clamp(3.5rem, 7vw, 5.5rem) clamp(4rem, 8vw, 6.5rem);
   min-height: 55vh;
+}
+/* banded sub-page sections — padding lives on the band so waves
+   can seam the full-width colour edges */
+.page-band {
+  padding-block: clamp(3.5rem, 7vw, 5.5rem) clamp(3rem, 6vw, 5rem);
 }
 
 .page__head {
@@ -10,7 +14,7 @@
 }
 .page__title {
   font-size: clamp(1.7rem, 1.2rem + 2.4vw, 2.6rem);
-  font-weight: 700;
+  font-weight: 400;
   text-wrap: balance;
 }
 .page__title::after {
@@ -43,14 +47,13 @@
 }
 .page__subtitle {
   font-size: 1.15rem;
-  font-weight: 700;
+  font-weight: 400;
   text-align: center;
 }
 /* ---------- Services page — «چطور کار می‌کنیم» steps strip ---------- */
 .how-strip__heading {
-  margin-top: clamp(3rem, 6vw, 4.5rem);
   font-size: 1.25rem;
-  font-weight: 700;
+  font-weight: 400;
   text-align: center;
 }
 .how-strip {
@@ -119,7 +122,7 @@
   display: grid;
   gap: 1.6rem;
   max-width: 64rem;
-  margin: clamp(3.5rem, 6vw, 5rem) auto 0;
+  margin: 0 auto;
 }
 .svc {
   padding: clamp(1.6rem, 3vw, 2.4rem);
@@ -146,7 +149,7 @@
 .svc__title {
   margin-top: 0.5rem;
   font-size: clamp(1.25rem, 1rem + 1.4vw, 1.65rem);
-  font-weight: 700;
+  font-weight: 400;
 }
 .svc__details {
   margin-top: 0.85rem;
@@ -267,7 +270,7 @@
 }
 .consult-point__title {
   font-size: 1.25rem;
-  font-weight: 700;
+  font-weight: 400;
   color: var(--color-gold);
 }
 .consult-point__list {
@@ -299,7 +302,7 @@
 /* ---------- Consultation FAQ — always visible, no accordion ---------- */
 .faq {
   max-width: 44rem;
-  margin: 3.75rem auto 0;
+  margin: 0 auto;
 }
 .faq__title {
   font-size: 1.25rem;
@@ -360,7 +363,7 @@
   grid-template-columns: repeat(3, 1fr);
   gap: 2rem;
   max-width: 58rem;
-  margin: 3.5rem auto 0;
+  margin: 0 auto;
   padding: 0;
   list-style: none;
 }
@@ -392,8 +395,8 @@
   margin-inline: auto;
   border-radius: 50%;
   border: 1px solid var(--color-border-gold);
-  background: var(--color-bg);
-  box-shadow: 0 0 0 0.45rem var(--color-bg);
+  background: var(--band-self, var(--color-bg));
+  box-shadow: 0 0 0 0.45rem var(--band-self, var(--color-bg));
   color: var(--color-gold-hi);
   font-size: 1.15rem;
   font-weight: 700;
@@ -404,7 +407,7 @@
 .timeline__item:hover .timeline__node {
   background: rgb(var(--gold-rgb) / 0.14);
   box-shadow:
-    0 0 0 0.45rem var(--color-bg),
+    0 0 0 0.45rem var(--band-self, var(--color-bg)),
     0 0 18px rgb(var(--gold-rgb) / 0.3);
 }
 .timeline__body {
@@ -441,7 +444,6 @@
   grid-template-columns: minmax(17rem, 22rem) 1fr;
   gap: clamp(1.5rem, 4vw, 3rem);
   align-items: start;
-  margin-top: 3.5rem;
 }
 .consult-aside {
   padding: 1.6rem 1.5rem 1.4rem;
@@ -577,7 +579,6 @@
 @media (max-width: 62rem) {
   .consult-layout {
     grid-template-columns: 1fr;
-    margin-top: 2.75rem;
   }
   .consult-aside__list {
     grid-template-columns: 1fr 1fr;
@@ -697,7 +698,7 @@
 
 /* ---------- Contact — channel rail inside the aside + form panel ---------- */
 .contact-layout {
-  margin-top: 3rem;
+  margin-top: 0;
 }
 .consult-aside__row--static {
   cursor: default;

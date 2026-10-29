@@ -80,7 +80,7 @@ describe('HomePage', () => {
     expect(
       screen.getByRole('heading', {
         level: 1,
-        name: 'قانون، پشتوانهٔ تصمیم‌های بزرگ شما',
+        name: 'دفاعی تمام‌قد در کنار شما',
       }),
     ).toBeTruthy()
     for (const s of services) {
@@ -122,23 +122,38 @@ describe('HomePage', () => {
     expect(container.querySelector('.about__stats')!.textContent).toContain('مشهد')
   })
 
-  it('renders the hero artwork with fixed dimensions', () => {
+  it('hero is a flat dark gradient — no photo backdrop', () => {
     const { container } = withRouter(<HomePage />)
-    const img = container.querySelector<HTMLImageElement>('.hero__bg img')
-    expect(img).not.toBeNull()
-    expect(img!.getAttribute('width')).toBe('1672')
-    expect(img!.getAttribute('height')).toBe('941')
+    expect(container.querySelector('.hero')).not.toBeNull()
+    expect(container.querySelector('.hero__bg')).toBeNull()
+    expect(container.querySelector('.hero__bg img')).toBeNull()
   })
 
-  it('renders consistent column marks on every divider — never the logo', () => {
+  it('seams every section band with a wave — never a hard divider line', () => {
     const { container } = withRouter(<HomePage />)
-    const marks = Array.from(
-      container.querySelectorAll<HTMLImageElement>('.section-divider__mark'),
-    ).map((img) => img.getAttribute('src'))
-    expect(marks.length).toBeGreaterThanOrEqual(5)
-    for (const src of marks) {
-      expect(src).toBe('/images/symbol-column-384.webp')
-      expect(src).not.toContain('logo')
+    // hero→about is seamed by the hero's own masked wave edge (no
+    // element — an overlay there would sit on the panel's arc)
+    const waves = container.querySelectorAll('.section-wave')
+    expect(waves.length).toBe(5)
+    for (const wave of waves) {
+      // two staggered ridges form each wave seam
+      expect(wave.querySelectorAll('svg path').length).toBe(2)
+      expect(wave.querySelector('img')).toBeNull()
+    }
+    expect(container.querySelector('.section-divider')).toBeNull()
+  })
+
+  it('bands each home section — مشکی، استخونی، سورمه‌ای، فیلی', () => {
+    const { container } = withRouter(<HomePage />)
+    const expected: [string, string][] = [
+      ['#about', 'band--white'],
+      ['#approach', 'band--navy'],
+      ['#services', 'band--gray'],
+      ['#team', 'band--navy'],
+      ['#consult', 'band--white'],
+    ]
+    for (const [id, cls] of expected) {
+      expect(container.querySelector(`${id}.${cls}`)).not.toBeNull()
     }
   })
 
@@ -275,7 +290,7 @@ describe('App', () => {
     expect(
       screen.getByRole('heading', {
         level: 1,
-        name: 'قانون، پشتوانهٔ تصمیم‌های بزرگ شما',
+        name: 'دفاعی تمام‌قد در کنار شما',
       }),
     ).toBeTruthy()
   })

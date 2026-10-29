@@ -9,7 +9,7 @@ const jalaliYear = new Intl.DateTimeFormat('fa-IR', { year: 'numeric' }).format(
 
 export function Footer() {
   return (
-    <footer className="site-footer">
+    <footer className="site-footer band band--goldwhite">
       <div className="container site-footer__grid">
         <div className="site-footer__brand">
           <Link to="/" className="brand" aria-label={brand.legalName}>
@@ -75,6 +75,12 @@ export function Footer() {
                 <a href={`mailto:${contact.email}`} className="site-footer__link">
                   {contact.email}
                 </a>
+              </li>
+            ) : null}
+            {contact.address ? (
+              <li>
+                <MapPin size={16} aria-hidden="true" />
+                <span className="site-footer__link">{contact.address}</span>
               </li>
             ) : null}
             <li>

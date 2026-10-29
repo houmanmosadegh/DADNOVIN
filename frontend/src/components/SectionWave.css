@@ -1,0 +1,31 @@
+.section-wave {
+  display: block;
+  line-height: 0;
+  background: var(--sw-under);
+  /* 1px pull-up so no hairline seam can appear against the band above */
+  margin-top: -1px;
+}
+
+.section-wave svg {
+  display: block;
+  width: 100%;
+  height: clamp(3.25rem, 8vw, 6.5rem);
+}
+
+.section-wave__back {
+  fill: var(--sw-over);
+  opacity: 0.38;
+}
+.section-wave__front {
+  fill: var(--sw-over);
+}
+
+.section-wave--flip svg {
+  transform: scaleX(-1);
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .section-wave svg {
+    height: 3.25rem;
+  }
+}

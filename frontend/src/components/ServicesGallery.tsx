@@ -3,7 +3,6 @@ import { Link } from 'react-router-dom'
 import { ArrowLeft } from 'lucide-react'
 import { Button } from './Button'
 import { Reveal } from './Reveal'
-import { SectionHeading } from './SectionHeading'
 import { StatueParticles } from './StatueParticles'
 import { trackGlow } from '../utils/pointerGlow'
 import { cta, home, services, servicesPage } from '../content/lawyers.fa.js'
@@ -43,6 +42,7 @@ function resetCard(e: React.PointerEvent<HTMLElement>) {
 export function ServicesGallery({ variant = 'home' }: { variant?: 'home' | 'page' }) {
   const isPage = variant === 'page'
   const [statueEl, setStatueEl] = useState<HTMLImageElement | null>(null)
+  const Title = isPage ? 'h1' : 'h2'
   const CardTitle = isPage ? 'h2' : 'h3'
   const head = {
     eyebrow: home.services.eyebrow,
@@ -69,62 +69,66 @@ export function ServicesGallery({ variant = 'home' }: { variant?: 'home' | 'page
 
   return (
     <section
-      className={`sg${isPage ? ' sg--page' : ' section'}`}
+      className={`sg${isPage ? ' sg--page' : ' section band band--gray'}`}
       id={isPage ? undefined : 'services'}
       aria-labelledby={isPage ? 'services-page-title' : 'services-title'}
     >
       <div className="container">
-        {/* header: statue standing on the bronze hairline, title centred */}
-        <header className="sg__head" onPointerMove={onHeadPointer}>
-          <Reveal variant="fade" className="sg__stage">
-            <div className="sg__decor" aria-hidden="true">
-              {statueEl ? <StatueParticles target={statueEl} /> : null}
-              <img
-                ref={setStatueEl}
-                className="sg__statue"
-                src="/images/man-legal.webp"
-                width="561"
-                height="755"
-                alt=""
-                draggable={false}
-                loading={isPage ? 'eager' : 'lazy'}
-                decoding="async"
-              />
-              <img
-                className="sg__reflection"
-                src="/images/man-legal.webp"
-                width="561"
-                height="755"
-                alt=""
-                draggable={false}
-                loading="lazy"
-                decoding="async"
-              />
-              <span className="sg__shadow" />
-            </div>
-            <span className="sg__line" aria-hidden="true">
-              <i className="sg__line-diamond" />
-            </span>
-          </Reveal>
+        {/* header: statue standing on the bronze hairline, title centred —
+            the statue+particles live here only on /services; on the homepage
+            they stand in the hero instead */}
+        <header
+          className={`sg__head${isPage ? '' : ' sg__head--plain'}`}
+          onPointerMove={isPage ? onHeadPointer : undefined}
+        >
+          {isPage ? (
+            <Reveal variant="fade" className="sg__stage">
+              <div className="sg__decor" aria-hidden="true">
+                {statueEl ? <StatueParticles target={statueEl} /> : null}
+                <img
+                  ref={setStatueEl}
+                  className="sg__statue"
+                  src="/images/man-legal.webp"
+                  width="561"
+                  height="755"
+                  alt=""
+                  draggable={false}
+                  loading="eager"
+                  decoding="async"
+                />
+                <img
+                  className="sg__reflection"
+                  src="/images/man-legal.webp"
+                  width="561"
+                  height="755"
+                  alt=""
+                  draggable={false}
+                  loading="lazy"
+                  decoding="async"
+                />
+                <span className="sg__shadow" />
+              </div>
+              <span className="sg__line" aria-hidden="true">
+                <i className="sg__line-diamond" />
+              </span>
+            </Reveal>
+          ) : null}
           <Reveal className="sg__text">
-            <SectionHeading
-              index={isPage ? undefined : 3}
-              eyebrow={head.eyebrow}
-              title={head.title}
-              id={isPage ? 'services-page-title' : 'services-title'}
-              lead={head.lead}
-              align="center"
-              level={isPage ? 1 : 2}
-            />
+            <span className="sg__eyebrow">
+              {isPage ? null : <b aria-hidden="true">۰۳</b>}
+              {head.eyebrow}
+            </span>
+            <Title className="sg__title" id={isPage ? 'services-page-title' : 'services-title'}>
+              {head.title}
+            </Title>
+            <p className="sg__lead">{head.lead}</p>
           </Reveal>
         </header>
 
         {/* six black-marble emblem cards — two per row */}
         <div className="sg__grid" role="list">
           {services.map((service, i) => {
-            // a symbol missing from the table degrades to a square box —
-            // better than crashing the whole gallery on a data typo
-            const dim = SYMBOL_DIMS[service.symbol] ?? { w: 384, h: 384 }
+            const dim = SYMBOL_DIMS[service.symbol]
             return (
               <Reveal key={service.slug} delay={delayFor(i)} className="sg__cell">
                 <Link

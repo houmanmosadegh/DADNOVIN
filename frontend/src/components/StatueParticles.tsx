@@ -14,9 +14,10 @@ import { useEffect, useRef } from 'react'
  * Pauses when scrolled out of view.
  */
 
-const BLOB_COUNT = 5 // [0] = cursor reveal, [1..4] = ambient patches
-// manual silhouette fit — tune after visual check
-const FIT = { scale: 1.0, ox: 0, oy: 0 }
+const BLOB_COUNT = 10 // [0] = cursor reveal, [1..3] = arrival wave, [4..9] = ambient patches
+// manual silhouette fit — 0.96 keeps the whole cloud safely inside the
+// photo's alpha, so dust never pokes out from behind the figure
+const FIT = { scale: 0.96, ox: 0, oy: 0 }
 
 /** a point-cloud model + its normalised bounds (measured from the .bin) */
 type ModelData = {
@@ -56,18 +57,30 @@ void main() {
   vec2 disp = vec2(0.0);
   for (int i = 0; i < ${BLOB_COUNT}; i++) {
     vec4 b = uBlobs[i];
-    float d = distance(px, b.xy);
+    float fi = float(i);
+    // irregular smudge — per-blob elliptical squash + angular noise on the
+    // radius, so reveals read as rough patches of dust, never clean circles
+    vec2 rel = px - b.xy;
+    rel *= vec2(0.85 + 0.35 * sin(fi * 1.31 + 0.4),
+                0.85 + 0.35 * cos(fi * 1.73 - 0.7));
+    float ang = atan(rel.y, rel.x);
+    float d = length(rel);
+    d *= 1.0 + 0.34 * sin(ang * 3.0 + fi * 2.1) + 0.2 * cos(ang * 5.0 - fi * 1.4);
     // b.z == 0 → smoothstep with equal edges is undefined/NaN — guard it
-    float w = (1.0 - smoothstep(b.z * 0.4, max(b.z, 0.001), d)) * b.w;
+    float w = (1.0 - smoothstep(b.z * 0.3, max(b.z, 0.001), d)) * b.w;
     // revealed particles rise UP through the surface — the canvas is
     // clipped to the statue's alpha, so they always stay inside the figure
     vec2 dir = normalize(px - b.xy + vec2(0.001));
     vec2 jitter = vec2(sin(aRand * 39.7 + uTime * 1.9), cos(aRand * 57.3 + uTime * 1.4));
-    vec2 lift = vec2(dir.x * 0.08 + jitter.x * 0.32, -(0.72 + 0.28 * aRand));
-    disp += lift * w * (16.0 + 22.0 * aRand);
+    // revealed points scatter into the air — strong upward drift plus
+    // turbulent sideways spread so the cloud reads volumetric, not flat
+    vec2 lift = vec2(dir.x * 0.1 + jitter.x * 0.44, -(0.82 + 0.3 * aRand));
+    disp += lift * w * (22.0 + 34.0 * aRand);
     infl += w;
   }
   px += disp;
+  // revealed dust keeps floating upward slowly — continuous air drift
+  px.y -= infl * (3.0 + 4.0 * aRand) * (0.5 + 0.5 * sin(uTime * 0.9 + aRand * 43.0));
   // breathing shimmer — sub-pixel drift keeps the cloud alive
   px += vec2(sin(uTime * (0.7 + aRand * 0.7) + aRand * 6.28),
              cos(uTime * (0.6 + aRand * 0.6) + aRand * 9.1)) * 0.5;
@@ -93,12 +106,18 @@ void main() {
   float d = length(gl_PointCoord - 0.5);
   float a = smoothstep(0.5, 0.16, d) * vAlpha;
   if (a < 0.015) discard;
-  // synced with the site background: mostly deep navy/graphite dust,
-  // a minority of champagne-gold sparks
-  vec3 inkTone = vec3(0.2, 0.24, 0.34);
-  vec3 goldTone = vec3(0.9, 0.76, 0.45);
-  vec3 tint = mix(inkTone, goldTone, smoothstep(0.55, 0.9, vRand));
-  vec3 lit = mix(vColor, tint, 0.78 + vDepth * 0.08) * 1.18;
+  // ~88% near-black dust, a rare ~12% bright champagne gold — the sparkle
+  // reads as treasure, not noise
+  vec3 tint;
+  if (vRand < 0.88) {
+    float m = smoothstep(0.0, 0.88, vRand);
+    tint = mix(vec3(0.045, 0.045, 0.055), vec3(0.15, 0.155, 0.185), m);
+  } else {
+    float g = (vRand - 0.88) * 8.3;
+    tint = vec3(0.9, 0.74, 0.44) * (0.95 + 0.3 * g);
+  }
+  vec3 lit = mix(vColor, tint, 0.92);
+  if (vRand >= 0.88) lit *= 1.3; // only the rare gold sparks glow
   gl_FragColor = vec4(lit, a);
 }
 `
@@ -249,17 +268,17 @@ export function StatueParticles({
       window.addEventListener('pointermove', onMove, { passive: true })
       head.addEventListener('pointerleave', onLeave)
 
-      // ambient: four slow lissajous patches — always gliding over the
-      // statue, staggered cycles so at least a couple are alive at once
-      const ambient = [1, 2, 3, 4].map((i) => ({
+      // ambient: six slow lissajous patches — always gliding over the
+      // statue, staggered cycles so several are alive at once
+      const ambient = [1, 2, 3, 4, 5, 6].map((i) => ({
         f1: 0.14 + i * 0.045,
         f2: 0.12 + i * 0.05,
         f3: 0.13 + i * 0.05,
         p1: i * 2.1,
         p2: i * 4.2,
-        period: 9 + i * 3.5,
-        duty: 0.68,
-        phase: i * 4.7,
+        period: 6.5 + i * 2.6,
+        duty: 0.72,
+        phase: i * 3.6,
       }))
       // arrival moment — the first time the section scrolls in, a reveal
       // wave travels down the statue so visitors notice the hidden cloud
@@ -305,11 +324,11 @@ export function StatueParticles({
           for (const a of ambient) {
             const ct = (t + a.phase) % a.period
             const on = ct / a.period < a.duty
-            const env = on ? Math.min(1, ct / 1.6, (a.period * a.duty - ct) / 1.6) : 0
-            const x = W * (0.5 + 0.34 * Math.sin(t * a.f1 * Math.PI * 2 + a.p1))
-            const y = H * (0.46 + 0.32 * Math.sin(t * a.f2 * Math.PI * 2 + a.p2))
-            const rr = W * 0.14 * (0.7 + 0.3 * Math.sin(t * a.f3 * Math.PI * 2))
-            blobs.push([x, y, rr, Math.max(0, env) * dampAmb])
+            const env = on ? Math.min(1, ct / 1.4, (a.period * a.duty - ct) / 1.4) : 0
+            const x = W * (0.5 + 0.4 * Math.sin(t * a.f1 * Math.PI * 2 + a.p1))
+            const y = H * (0.46 + 0.38 * Math.sin(t * a.f2 * Math.PI * 2 + a.p2))
+            const rr = W * 0.2 * (0.72 + 0.28 * Math.sin(t * a.f3 * Math.PI * 2))
+            blobs.push([x, y, rr, Math.max(0, env) * 0.85 * dampAmb])
           }
         }
 

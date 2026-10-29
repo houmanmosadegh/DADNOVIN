@@ -1,7 +1,8 @@
-/* floating AI-consultant — dark-glass pill anchored bottom-right (RTL start) */
+/* floating AI-consultant — dark-glass pill anchored bottom-left
+   (RTL end) so it never covers the hero panel's copy */
 .ai-fab {
   position: fixed;
-  inset-inline-start: clamp(0.9rem, 2.5vw, 1.6rem);
+  inset-inline-end: clamp(0.9rem, 2.5vw, 1.6rem);
   bottom: clamp(0.9rem, 2.5vw, 1.6rem);
   z-index: 55; /* under the header (60), above content */
   display: inline-flex;
@@ -51,7 +52,7 @@
 /* ---------------- chat panel ---------------- */
 .ai-chat {
   position: fixed;
-  inset-inline-start: clamp(0.9rem, 2.5vw, 1.6rem);
+  inset-inline-end: clamp(0.9rem, 2.5vw, 1.6rem);
   bottom: calc(clamp(0.9rem, 2.5vw, 1.6rem) + 4.1rem);
   z-index: 55;
   display: flex;
@@ -113,8 +114,8 @@
   width: 6px;
   height: 6px;
   border-radius: 50%;
-  background: #6fd98c;
-  box-shadow: 0 0 6px #6fd98c;
+  background: rgb(var(--online-rgb));
+  box-shadow: 0 0 6px rgb(var(--online-rgb));
 }
 .ai-chat__close {
   display: grid;

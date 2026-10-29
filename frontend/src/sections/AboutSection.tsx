@@ -1,5 +1,5 @@
 import { BookOpen, Search, ShieldCheck, type LucideIcon } from 'lucide-react'
-import { SectionHeading } from '../components/SectionHeading'
+import { ChapterHead } from '../components/ChapterHead'
 import { CountUp } from '../components/CountUp'
 import { Reveal } from '../components/Reveal'
 import { brand, home, lawyers, services } from '../content/lawyers.fa.js'
@@ -15,13 +15,13 @@ const faNum = new Intl.NumberFormat('fa-IR', { minimumIntegerDigits: 2 })
 export function AboutSection() {
   const { about } = home
   return (
-    <section className="section about" id="about" aria-labelledby="about-title">
+    <section className="section about band band--white" id="about" aria-labelledby="about-title">
       <div className="container about__grid">
         <div className="about__side">
           <Reveal>
-            <SectionHeading
-              index={1}
-              eyebrow={brand.legalName}
+            <ChapterHead
+              index="۰۱"
+              eyebrow="گروه حقوقی دادنوین"
               title={about.title}
               id="about-title"
             />
@@ -47,7 +47,7 @@ export function AboutSection() {
               </div>
               <div className="stat">
                 <dd className="stat__num stat__num--city">{brand.city}</dd>
-                <dt className="stat__label">{home.stats.cityLabel}</dt>
+                <dt className="stat__label">محل دفتر</dt>
               </div>
             </dl>
           </Reveal>

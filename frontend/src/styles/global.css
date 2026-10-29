@@ -1,5 +1,30 @@
 @import './tokens.css';
 
+/* ---------- Fonts — self-hosted WOFF2, OFL-licensed ----------
+   Lalezar (display) + Estedad variable (body/UI) — Persian native. */
+@font-face {
+  font-family: 'Lalezar';
+  src: url('/fonts/lalezar-arabic-400.woff2') format('woff2');
+  font-weight: 400;
+  font-style: normal;
+  font-display: swap;
+}
+@font-face {
+  font-family: 'Estedad';
+  src: url('/fonts/estedad-arabic-var.woff2') format('woff2');
+  font-weight: 100 900;
+  font-style: normal;
+  font-display: swap;
+}
+@font-face {
+  font-family: 'Estedad';
+  src: url('/fonts/estedad-latin-var.woff2') format('woff2');
+  font-weight: 100 900;
+  font-style: normal;
+  font-display: swap;
+  unicode-range: U+0000-00FF, U+0131, U+0152-0153, U+02BB-02BC, U+2000-206F, U+20A0-20BF;
+}
+
 *,
 *::before,
 *::after {
@@ -22,8 +47,9 @@ html {
 
 body {
   font-family: var(--font-fa);
-  font-size: 1rem;
-  line-height: 1.85;
+  font-size: var(--text-body);
+  font-weight: var(--weight-body);
+  line-height: var(--lh-body);
   color: var(--color-text);
   background-color: var(--color-bg);
   -webkit-font-smoothing: antialiased;
@@ -65,14 +91,38 @@ a {
   text-decoration: none;
 }
 
-/* display face for headings — Markazi's naskh carries the formal legal
-   personality; Vazirmatn stays for body/UI text */
-h1,
+/* display face — Lalezar's massive poster forms for h1/h2/brand only;
+   subtle emboss text-shadow (controlled depth, never gimmicky).
+   h3 stays in Estedad Bold — small headings must read cleanly. */
+h1 {
+  font-family: var(--font-display);
+  font-weight: var(--weight-display);
+  font-size: var(--text-h1);
+  line-height: var(--lh-display);
+}
 h2,
-h3,
 .brand__name {
   font-family: var(--font-display);
+  font-weight: var(--weight-heading);
+  font-size: var(--text-h2);
+  line-height: var(--lh-display);
+}
+.brand__name {
+  font-size: var(--text-h3);
+}
+h3 {
+  font-family: var(--font-fa);
   font-weight: 700;
+  font-size: var(--text-h3);
+  line-height: var(--lh-display);
+}
+/* restrained emboss — a warm top-edge catch + soft cast shadow,
+   only on dark fields where it reads as depth */
+:is(.band--ink, .band--navy, .band--goldblack, .band--goldwhite) h1,
+:is(.band--ink, .band--navy, .band--goldblack, .band--goldwhite) h2 {
+  text-shadow:
+    0 1px 0 rgb(var(--gold-rgb) / 0.22),
+    0 6px 22px rgb(0 0 0 / 0.5);
 }
 
 ul[role='list'],
@@ -127,6 +177,91 @@ img {
   margin-inline: auto;
 }
 
+/* ---------- Section bands — مشکی / سفید / فیلی / کرمی ----------
+   Sections carry a flat band colour; SectionWave seams between them.
+   Light bands rescope the text/gold tokens so every descendant
+   (chapter heads, ledgers, buttons) re-themes without new rules.
+   --band-self lets children (e.g. timeline nodes) pick the band bg. */
+.band--ink {
+  background: var(--band-ink);
+  --band-self: var(--band-ink);
+}
+.band--navy {
+  /* سورمه‌ای — a dark band; keeps the default ivory/gold theme */
+  background: var(--band-navy);
+  --band-self: var(--band-navy);
+}
+.band--white {
+  background: var(--band-white);
+  --band-self: var(--band-white);
+}
+.band--gray {
+  background: var(--band-gray);
+  --band-self: var(--band-gray);
+}
+.band--cream {
+  background: var(--band-cream);
+  --band-self: var(--band-cream);
+}
+/* مشکی طلایی — a dark band; keeps the default ivory/gold theme */
+.band--goldblack {
+  background:
+    radial-gradient(120% 150% at 50% -20%, rgb(var(--gold-rgb) / 0.12), transparent 60%),
+    var(--band-goldblack);
+  --band-self: var(--band-goldblack);
+}
+/* طلایی سفید — light champagne; gets the light-band rescope below */
+.band--goldwhite {
+  background: var(--band-goldwhite);
+  --band-self: var(--band-goldwhite);
+}
+/* LIGHT theme rescope — every semantic pair flips together
+   (color-palette rule: never change a background without its pair).
+   --lt-accent #7a4a05 keeps ≥5:1 on every light band incl. gray. */
+.band--white,
+.band--gray,
+.band--cream {
+  --color-text: var(--lt-text);
+  --color-text-2: var(--lt-text-muted);
+  --color-border: var(--lt-border-strong);
+  --color-border-gold: rgb(125 95 26 / 0.4);
+  --gold-rgb: 125 95 26;   /* --lt-accent */
+  --gold-hi-rgb: 142 108 31; /* --lt-accent-hi */
+  --gold-soft-rgb: 158 126 62;
+  --gold-deep-rgb: 95 74 18; /* --lt-accent-deep */
+  color: var(--color-text);
+}
+/* dark panels inside a light band keep the dark-panel palette.
+   `color` must be set too — descendants that only INHERIT it
+   (no explicit var) would otherwise pick up the band's dark text. */
+:is(.band--white, .band--gray, .band--cream) :is(
+  .sg-card, .svc, .rcard, .trust__item, .how-strip__item,
+  .consult-point, .consult-aside, .contact-panel, .cform, .cform__result
+) {
+  --color-text: var(--text);
+  --color-text-2: var(--text-muted);
+  --gold-rgb: 202 148 46;
+  --gold-hi-rgb: 245 198 110;
+  --gold-soft-rgb: 224 180 110;
+  --gold-deep-rgb: 161 98 7;
+  color: var(--color-text);
+}
+:is(.band--white, .band--gray, .band--cream) .picture__frame img {
+  filter: drop-shadow(0 2rem 2.2rem rgb(41 35 26 / 0.4));
+}
+/* translucent ink panels blend into muddy gray over light bands —
+   force them solid so they read as true dark cards */
+:is(.band--white, .band--gray, .band--cream) :is(
+  .trust__item, .consult-point, .how-strip__item
+) {
+  background: linear-gradient(180deg, rgb(var(--ink-3-rgb)), rgb(var(--ink-2-rgb)));
+}
+:is(.band--white, .band--gray, .band--cream) .svc {
+  background:
+    radial-gradient(90% 60% at 85% 0%, rgb(var(--gold-rgb) / 0.09), transparent 55%),
+    linear-gradient(180deg, rgb(var(--ink-3-rgb)), rgb(var(--ink-2-rgb)));
+}
+
 .skip-link {
   position: absolute;
   inset-inline-start: 1rem;
@@ -143,17 +278,23 @@ img {
   top: 0.75rem;
 }
 
-/* ---------- Section headings (numbered editorial chapters) ---------- */
-.sec-head {
-  display: grid;
-  grid-template-columns: auto 1fr;
-  grid-template-rows: auto auto auto;
-  column-gap: clamp(1.1rem, 2.6vw, 1.9rem);
+/* ---------- Chapter headers (numbered editorial sections) ---------- */
+.chapter-head {
+  display: flex;
+  align-items: flex-start;
+  gap: clamp(1rem, 2.4vw, 1.6rem);
   max-width: 56rem;
 }
-.sec-head__eyebrow {
-  grid-row: 1;
-  grid-column: 2;
+.chapter-head__no {
+  flex: none;
+  margin-top: 0.45rem;
+  font-size: clamp(2.3rem, 1.6rem + 2.2vw, 3.4rem);
+  font-weight: 700;
+  line-height: 1;
+  color: transparent;
+  -webkit-text-stroke: 1px rgb(var(--gold-rgb) / 0.5);
+}
+.chapter-head__eyebrow {
   display: inline-flex;
   align-items: center;
   gap: 0.65rem;
@@ -162,44 +303,29 @@ img {
   letter-spacing: 0.03em;
   color: var(--color-gold);
 }
-/* small Latin numeral + thin gold rule, centred on the title line */
-.sec-head__mark {
-  grid-row: 2;
-  grid-column: 1;
-  align-self: center;
-  display: flex;
-  flex-direction: column;
-  align-items: center;
-  gap: 0.4rem;
-  user-select: none;
-}
-.sec-head__no {
-  font-family: var(--font-en);
-  font-size: 1.05rem;
-  font-weight: 500;
-  letter-spacing: 0.12em;
-  color: var(--color-gold);
-  font-variant-numeric: tabular-nums;
-  font-feature-settings: 'tnum';
-}
-.sec-head__mark::after {
+.chapter-head__eyebrow::before {
   content: '';
-  width: clamp(1.4rem, 2.2vw, 1.9rem);
+  width: 1.6rem;
   height: 1px;
   background: var(--color-gold);
   opacity: 0.7;
 }
-.sec-head__title {
-  grid-row: 2;
-  grid-column: 2;
+/* inline chapter number used inside standalone eyebrows (picture / cta-band) */
+.chapter-head__eyebrow .chapter-head__no {
+  margin-top: 0;
+  font-size: 1rem;
+  -webkit-text-stroke: 0;
+  color: var(--color-gold);
+}
+.chapter-head__title {
   margin-top: 0.6rem;
   font-size: clamp(1.8rem, 1.25rem + 2.4vw, 2.75rem);
-  font-weight: 700;
+  font-weight: 400;
   line-height: 1.5;
   text-wrap: balance;
 }
 /* gold underline drawn under the title on section entrance */
-.sec-head__title::after {
+.chapter-head__title::after {
   content: '';
   display: block;
   width: 3.4rem;
@@ -211,12 +337,10 @@ img {
   transform-origin: right center;
   transition: transform 0.6s var(--ease-out) 0.3s;
 }
-.reveal.is-visible .sec-head__title::after {
+.reveal.is-visible .chapter-head__title::after {
   transform: scaleX(1);
 }
-.sec-head__lead {
-  grid-row: 3;
-  grid-column: 2;
+.chapter-head__lead {
   margin-top: 0.9rem;
   max-width: 38rem;
   color: var(--color-text-2);
@@ -224,102 +348,143 @@ img {
   line-height: 1.9;
 }
 
-/* centred variant — services gallery */
-.sec-head--center {
-  display: flex;
-  flex-direction: column;
-  align-items: center;
-  text-align: center;
-}
-.sec-head--center .sec-head__mark {
-  order: -1;
-  margin-bottom: 0.85rem;
-}
-.sec-head--center .sec-head__eyebrow::before,
-.sec-head--center .sec-head__eyebrow::after {
-  content: '';
-  width: clamp(1.6rem, 3vw, 2.6rem);
-  height: 1px;
-  background: var(--color-gold);
-  opacity: 0.7;
-}
-.sec-head--center .sec-head__title::after {
-  margin-inline: auto;
-  transform-origin: center;
-}
-
-/* mark drifts up as the section reveals itself */
-.reveal .sec-head__mark {
-  opacity: 0;
-  transform: translateY(0.5rem);
-  transition:
-    opacity 0.7s var(--ease-out) 0.15s,
-    transform 0.7s var(--ease-out) 0.15s;
-}
-.reveal.is-visible .sec-head__mark {
-  opacity: 1;
-  transform: none;
-}
-@media (prefers-reduced-motion: reduce) {
-  .reveal .sec-head__mark {
-    opacity: 1;
-    transform: none;
-    transition: none;
-  }
-}
-
 /* ---------- Buttons ---------- */
+/* ===================== 3-D CTA system =====================
+   One shared base (.btn) + skin variants. On light surfaces the
+   primary is a charcoal-navy plate with gold-cream text; molten gold
+   is reserved for dark bands only. Only transform/filter animate. */
 .btn {
+  position: relative;
   display: inline-flex;
   align-items: center;
   justify-content: center;
   gap: 0.55rem;
-  min-height: 2.875rem;
-  padding: 0.7rem 1.6rem;
-  border: 1px solid transparent;
-  border-radius: var(--radius-s);
+  min-height: 48px;
+  padding: 0.9rem 2rem;
+  border: 0;
+  border-radius: 12px;
   font-family: inherit;
   font-size: 0.95rem;
-  font-weight: 700;
+  font-weight: 800;
   line-height: 1.4;
   cursor: pointer;
+  overflow: hidden;
   transition:
-    transform var(--dur-fast) var(--ease-out),
-    box-shadow var(--dur-fast) var(--ease-out),
-    background-color var(--dur-fast) var(--ease-out),
-    border-color var(--dur-fast) var(--ease-out),
-    color var(--dur-fast) var(--ease-out);
+    transform 0.18s ease,
+    box-shadow 0.18s ease,
+    filter 0.18s ease;
 }
-.btn--primary {
-  /* flat champagne fill — no gradient, no glow; the hover lifts and
-     lightens slightly. Dark ink text keeps AA contrast */
-  background: rgb(var(--gold-rgb));
-  border-color: rgb(var(--gold-rgb) / 0.45);
-  color: rgb(var(--gold-ink-rgb));
+/* shine sweep — travels right→left, matching the RTL reading direction */
+.btn::after {
+  content: '';
+  position: absolute;
+  inset: 0;
+  background: linear-gradient(
+    115deg,
+    transparent 35%,
+    rgb(255 255 255 / 0.35) 50%,
+    transparent 65%
+  );
+  transform: translateX(120%);
+  transition: transform 0.6s ease;
+  pointer-events: none;
 }
-.btn--primary:hover {
-  transform: translateY(-1px);
-  background: rgb(var(--gold-soft-rgb));
-  border-color: rgb(var(--gold-rgb) / 0.7);
+.btn:hover::after {
+  transform: translateX(-120%);
 }
-.btn--ghost {
-  background: rgb(var(--gold-rgb) / 0.04);
-  border-color: rgb(var(--gold-rgb) / 0.3);
-  color: var(--color-gold-hi);
-}
-.btn--ghost:hover {
-  background: rgb(var(--gold-rgb) / 0.12);
-  border-color: rgb(var(--gold-rgb) / 0.55);
+.btn:hover {
+  transform: translateY(-2px);
 }
 .btn:active {
-  transform: translateY(0) scale(0.98); /* instant press feedback */
+  transform: translateY(4px);
+  filter: brightness(0.95);
+}
+.btn:focus-visible {
+  outline: 3px solid #d4a84b;
+  outline-offset: 3px;
 }
 .btn:disabled,
 .btn[aria-disabled='true'] {
-  opacity: 0.55;
+  box-shadow: none;
+  filter: saturate(0.4);
   cursor: not-allowed;
   transform: none;
-  box-shadow: none;
+}
+
+/* navy plate — the primary on light surfaces (hero panel, light bands) */
+.btn--primary,
+.btn-navy {
+  color: #f1e7c8;
+  background: linear-gradient(180deg, #2a3a63 0%, #1a2547 55%, #0f1731 100%);
+  box-shadow:
+    inset 0 1px 0 rgb(255 255 255 / 0.18),
+    inset 0 -2px 0 rgb(0 0 0 / 0.3),
+    0 6px 0 #070b1a,
+    0 14px 24px rgb(10 14 30 / 0.35);
+}
+.btn--primary:hover,
+.btn-navy:hover {
+  box-shadow:
+    inset 0 1px 0 rgb(255 255 255 / 0.18),
+    0 8px 0 #070b1a,
+    0 18px 30px rgb(10 14 30 / 0.4);
+}
+.btn--primary:active,
+.btn-navy:active {
+  box-shadow:
+    inset 0 2px 4px rgb(0 0 0 / 0.35),
+    0 2px 0 #070b1a;
+}
+
+/* molten gold — only inside dark bands / dark cards, never on bone
+   (:not(.hero-panel *) — the hero's bone panel is a light island
+   inside the band--ink hero; its buttons stay navy/ghost) */
+:is(.band--ink, .band--navy, .band--goldblack, .band--goldwhite) .btn--primary:not(.btn-navy):not(.hero-panel *),
+:is(.dark-panel, .contact-card, .svc, .sg-card, .rcard) .btn--primary:not(.btn-navy) {
+  color: #1a1408;
+  background: linear-gradient(180deg, #f6e3a1 0%, #d4a84b 50%, #b88a32 100%);
+  text-shadow: 0 1px 0 rgb(255 255 255 / 0.3);
+  box-shadow:
+    inset 0 1px 0 rgb(255 255 255 / 0.5),
+    inset 0 -2px 0 rgb(0 0 0 / 0.15),
+    0 6px 0 #7a5a1c,
+    0 14px 24px rgb(0 0 0 / 0.35),
+    0 0 24px rgb(212 168 75 / 0.25);
+}
+:is(.band--ink, .band--navy, .band--goldblack, .band--goldwhite) .btn--primary:not(.btn-navy):not(.hero-panel *):hover,
+:is(.dark-panel, .contact-card, .svc, .sg-card, .rcard) .btn--primary:not(.btn-navy):hover {
+  box-shadow:
+    inset 0 1px 0 rgb(255 255 255 / 0.5),
+    0 8px 0 #7a5a1c,
+    0 18px 30px rgb(0 0 0 / 0.4),
+    0 0 32px rgb(212 168 75 / 0.4);
+}
+:is(.band--ink, .band--navy, .band--goldblack, .band--goldwhite) .btn--primary:not(.btn-navy):not(.hero-panel *):active,
+:is(.dark-panel, .contact-card, .svc, .sg-card, .rcard) .btn--primary:not(.btn-navy):active {
+  box-shadow:
+    inset 0 2px 4px rgb(0 0 0 / 0.25),
+    0 2px 0 #7a5a1c;
+}
+
+/* ghost — dark hairline on light surfaces, light hairline on dark */
+.btn--ghost {
+  background: transparent;
+  color: #14161a;
+  border: 1.5px solid rgb(20 22 26 / 0.45);
+  box-shadow: 0 3px 0 rgb(20 22 26 / 0.12);
+}
+.btn--ghost:hover {
+  border-color: rgb(20 22 26 / 0.7);
+}
+:is(.band--ink, .band--navy, .band--goldblack, .band--goldwhite) .btn--ghost:not(.hero-panel *),
+:is(.dark-panel, .contact-card, .svc, .sg-card, .rcard) .btn--ghost {
+  color: #e9e4d6;
+  border-color: rgb(233 228 214 / 0.45);
+  box-shadow: 0 3px 0 rgb(0 0 0 / 0.35);
+}
+:is(.band--ink, .band--navy, .band--goldblack, .band--goldwhite) .btn--ghost:not(.hero-panel *):hover,
+:is(.dark-panel, .contact-card, .svc, .sg-card, .rcard) .btn--ghost:hover {
+  border-color: rgb(233 228 214 / 0.75);
 }
 
 /* ---------- Section reveal ---------- */

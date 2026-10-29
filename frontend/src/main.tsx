@@ -1,5 +1,4 @@
 import '@fontsource-variable/vazirmatn'
-import '@fontsource/markazi-text/arabic-700.css'
 import '@fontsource/cormorant-garamond/600.css'
 import { StrictMode } from 'react'
 import { createRoot, hydrateRoot } from 'react-dom/client'

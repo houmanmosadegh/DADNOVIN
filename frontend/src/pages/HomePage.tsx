@@ -1,4 +1,4 @@
-import { SectionDivider } from '../components/SectionDivider'
+import { SectionWave } from '../components/SectionWave'
 import { HeroSection } from '../sections/HeroSection'
 import { AboutSection } from '../sections/AboutSection'
 import { PictureSection } from '../sections/PictureSection'
@@ -13,16 +13,17 @@ export function HomePage() {
   return (
     <>
       <HeroSection />
-      <SectionDivider />
+      {/* hero↔about seam: the hero's own masked wave edge — no element */}
       <AboutSection />
-      <SectionDivider />
+      <SectionWave from="white" to="navy" flip />
       <PictureSection />
-      <SectionDivider />
+      <SectionWave from="navy" to="gray" />
       <ServicesSection />
-      <SectionDivider />
+      <SectionWave from="gray" to="navy" flip />
       <LawyersSection />
-      <SectionDivider />
+      <SectionWave from="navy" to="white" />
       <CtaBand />
+      <SectionWave from="white" to="goldwhite" flip />
     </>
   )
 }

@@ -99,8 +99,10 @@ function applyPages(pages: PublicPage[]) {
   if (home.has('about')) mergeObj(h.about as Dict, home.get('about')!)
   if (home.has('services_head')) mergeObj(h.services as Dict, home.get('services_head')!)
   if (home.has('picture')) mergeObj(h.picture as Dict, home.get('picture')!)
-  if (home.has('lawyers_head')) mergeObj(h.lawyers as Dict, home.get('lawyers_head')!)
-  if (home.has('cta_band')) mergeObj(h.ctaBand as Dict, home.get('cta_band')!)
+  if (home.has('lawyers_head') && h.lawyers)
+    mergeObj(h.lawyers as Dict, home.get('lawyers_head')!)
+  if (home.has('cta_band') && h.ctaBand)
+    mergeObj(h.ctaBand as Dict, home.get('cta_band')!)
 
   const about = sectionMap(bySlug.get('about'))
   const ap = c.aboutPage as unknown as Dict
