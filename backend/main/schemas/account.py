@@ -24,13 +24,15 @@ class RegisterIn(BaseModel):
 
 
 class LoginPhoneIn(BaseModel):
-    phone: str
+    """Unified login — `identifier` is a mobile number or a staff username."""
+
+    identifier: str = Field(min_length=3, max_length=64)
     password: str = Field(min_length=1, max_length=128)
 
-    @field_validator("phone")
+    @field_validator("identifier")
     @classmethod
-    def _phone(cls, v: str) -> str:
-        return normalize_phone(v)
+    def _identifier(cls, v: str) -> str:
+        return normalize_phone(v) if is_valid_iranian_phone(normalize_phone(v)) else v.strip()
 
 
 class ForgotIn(BaseModel):

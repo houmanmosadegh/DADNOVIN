@@ -7,7 +7,7 @@ from main.models.account import Commission, CommissionRule
 from main.models.consultation import ConsultationRequest
 from main.models.content import SiteSetting
 
-from .conftest import ADMIN_USER, login_as
+from .conftest import ADMIN_PASS, ADMIN_USER, login_as
 
 pytestmark = pytest.mark.asyncio
 
@@ -27,7 +27,7 @@ async def _register(client, phone, name="کاربر تست", password=USER_PASS,
 async def _login_user(client, phone, password=USER_PASS):
     r = await client.post(
         "/api/v1/account-auth/login",
-        json={"phone": phone, "password": password},
+        json={"identifier": phone, "password": password},
     )
     assert r.status_code == 200, r.text
 
@@ -106,9 +106,19 @@ class TestRegisterLogin:
         await _register(client, PHONE_A)
         r = await client.post(
             "/api/v1/account-auth/login",
-            json={"phone": PHONE_A, "password": "wrong-password"},
+            json={"identifier": PHONE_A, "password": "wrong-password"},
         )
         assert r.status_code == 401
+
+    async def test_staff_login_by_username(self, client):
+        """Unified endpoint also accepts a staff username."""
+        r = await client.post(
+            "/api/v1/account-auth/login",
+            json={"identifier": ADMIN_USER, "password": ADMIN_PASS},
+        )
+        assert r.status_code == 200, r.text
+        me = r.json()
+        assert any(r_ in ("super_admin", "admin") for r_ in me["roles"])
 
     async def test_forgot_never_leaks(self, client):
         r = await client.post(

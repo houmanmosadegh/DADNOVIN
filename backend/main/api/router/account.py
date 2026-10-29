@@ -138,10 +138,14 @@ async def login_phone(
     settings = get_settings()
     limiter.check("login", client_key(request), settings.rate_limit_login_per_minute)
     user = (
-        await db.execute(select(User).where(User.phone == payload.phone))
+        await db.execute(
+            select(User).where(
+                (User.phone == payload.identifier) | (User.username == payload.identifier)
+            )
+        )
     ).scalar_one_or_none()
     generic = HTTPException(
-        401, {"code": "bad_credentials", "message": "شماره موبایل یا رمز عبور نادرست است."}
+        401, {"code": "bad_credentials", "message": "شناسه یا رمز عبور نادرست است."}
     )
     if user is None or not user.is_active or not verify_password(
         payload.password, user.password_hash

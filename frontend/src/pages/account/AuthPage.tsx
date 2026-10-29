@@ -136,10 +136,11 @@ export default function AuthPage() {
             )}
             {mode !== 'reset' && (
               <label className="authp__field">
-                <span><Phone size={13} /> شماره موبایل</span>
+                <span><Phone size={13} /> {mode === 'login' ? 'شماره موبایل یا نام کاربری' : 'شماره موبایل'}</span>
                 <input
-                  dir="ltr" inputMode="tel" autoComplete="tel"
-                  placeholder="0912 000 0000"
+                  dir="ltr" inputMode={mode === 'login' ? 'text' : 'tel'}
+                  autoComplete={mode === 'login' ? 'username' : 'tel'}
+                  placeholder={mode === 'login' ? '0912… یا نام کاربری' : '0912 000 0000'}
                   value={f.phone} onChange={set('phone')} required
                 />
               </label>
