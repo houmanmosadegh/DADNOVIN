@@ -77,6 +77,16 @@ const NAV: { group: string; collapsible?: boolean; items: NavItem[] }[] = [
     ],
   },
   {
+    group: "بازاریابی",
+    collapsible: true,
+    items: [
+      { to: "/marketers", label: "بازاریاب‌ها", icon: <Share2 size={17} />, roles: ["super_admin"] },
+      { to: "/commissions", label: "کمیسیون‌ها", icon: <Tag size={17} />, roles: ["super_admin"] },
+      { to: "/payouts", label: "برداشت‌ها", icon: <Phone size={17} />, roles: ["super_admin"] },
+      { to: "/settings/commission", label: "تنظیمات کمیسیون", icon: <Settings size={17} />, roles: ["super_admin"] },
+    ],
+  },
+  {
     group: "مدیریت سیستم",
     collapsible: true,
     items: [
@@ -111,6 +121,10 @@ const CRUMBS: Record<string, string> = {
   "/ai/conversations": "مکالمات مشاور",
   "/users": "کاربران و دسترسی‌ها",
   "/audit": "گزارش فعالیت‌ها",
+  "/marketers": "بازاریاب‌ها",
+  "/commissions": "کمیسیون‌ها",
+  "/payouts": "برداشت‌ها",
+  "/settings/commission": "تنظیمات کمیسیون",
 };
 
 function crumbsFor(path: string): { label: string; to: string }[] {

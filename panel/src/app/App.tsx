@@ -16,9 +16,12 @@ import LabelsPage from "../pages/LabelsPage";
 import LawyerEditPage from "../pages/LawyerEditPage";
 import LawyersPage from "../pages/LawyersPage";
 import LoginPage from "../pages/LoginPage";
+import MarketersPage from "../pages/MarketersPage";
+import CommissionsPage from "../pages/CommissionsPage";
 import MediaPage from "../pages/MediaPage";
 import PageEditPage from "../pages/PageEditPage";
 import PagesPage from "../pages/PagesPage";
+import PayoutsPage from "../pages/PayoutsPage";
 import RequestDetailPage from "../pages/RequestDetailPage";
 import SettingsPage from "../pages/SettingsPage";
 import UsersPage from "../pages/UsersPage";
@@ -90,6 +93,11 @@ export default function App() {
                 {/* settings */}
                 <Route path="settings" element={<RoleGate roles={["super_admin", "admin", "editor"]}><SettingsPage /></RoleGate>} />
                 <Route path="settings/:tab" element={<RoleGate roles={["super_admin", "admin", "editor"]}><SettingsTabRoute /></RoleGate>} />
+
+                {/* referral/marketing */}
+                <Route path="marketers" element={<RoleGate roles={["super_admin"]}><MarketersPage /></RoleGate>} />
+                <Route path="commissions" element={<RoleGate roles={["super_admin"]}><CommissionsPage /></RoleGate>} />
+                <Route path="payouts" element={<RoleGate roles={["super_admin"]}><PayoutsPage /></RoleGate>} />
 
                 {/* system */}
                 <Route path="labels" element={<RoleGate roles={REQUEST_ROLES}><LabelsPage /></RoleGate>} />

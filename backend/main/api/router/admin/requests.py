@@ -24,6 +24,9 @@ from ....models.ticket import Ticket
 from ....models.user import User
 from ....notify import dispatch_reply, retry_delivery
 from ....schemas.common import Page
+from ....services import commissions as commissions_svc
+from ....services import inbox as inbox_svc
+from ....services import notify_user as notify_svc
 from ....schemas.requests import (
     DeliveryOut,
     EventOut,
@@ -34,7 +37,6 @@ from ....schemas.requests import (
     StaffMessageIn,
     StatusIn,
 )
-from ....services import inbox as inbox_svc
 from ....services import thread as thread_svc
 from ....services.audit import audit
 from ...dependencies.auth import SupportDep
@@ -230,6 +232,12 @@ async def add_message(
     deliveries = []
     if not payload.is_note:
         deliveries = await dispatch_reply(db, msg, row, channels=payload.channels)
+        await notify_svc.notify(
+            db, getattr(row, "user_id", None),
+            title=f"پاسخ جدید برای درخواست {row.tracking_code}",
+            body=payload.body[:300], kind="reply",
+            link="/account/requests",
+        )
         await thread_svc.add_event(
             db, rtype, request_id, "reply_sent", actor=user,
             payload={
@@ -260,8 +268,29 @@ async def change_status(
 ) -> dict:
     row = await thread_svc.load_request(db, rtype, request_id)
     before = row.status
+    if payload.fee_amount is not None and rtype == "consultation":
+        row.fee_amount = payload.fee_amount
     await thread_svc.set_status(
         db, rtype, row, payload.status, actor=user, reason=payload.reason
+    )
+    if payload.status == "accepted" and rtype == "consultation":
+        comm = await commissions_svc.on_request_accepted(db, rtype, request_id, row)
+        if comm is not None:
+            await thread_svc.add_event(
+                db, rtype, request_id, "commission_created",
+                actor=user, payload={"commission_id": str(comm.id), "amount": comm.amount},
+            )
+    STATUS_FA = {
+        "new": "جدید", "reviewing": "در حال بررسی", "awaiting_call": "در انتظار تماس",
+        "followed_up": "پیگیری شد", "consulted": "مشاوره انجام شد",
+        "accepted": "پرونده پذیرفته شد", "rejected": "رد شد",
+        "completed": "تکمیل شد", "cancelled": "لغو شد",
+    }
+    await notify_svc.notify(
+        db, getattr(row, "user_id", None),
+        title=f"وضعیت درخواست {row.tracking_code} تغییر کرد",
+        body=f"وضعیت جدید: {STATUS_FA.get(payload.status, payload.status)}",
+        kind="status", link="/account/requests",
     )
     await audit(
         db, actor=user, action="request.status", entity=rtype,

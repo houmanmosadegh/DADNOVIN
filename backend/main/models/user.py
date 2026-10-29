@@ -7,6 +7,7 @@ from sqlalchemy import (
     Column,
     DateTime,
     ForeignKey,
+    Index,
     Integer,
     String,
     Table,
@@ -53,6 +54,11 @@ class User(Base):
     id: Mapped[uuid.UUID] = uuid_pk()
     username: Mapped[str] = mapped_column(String(80), unique=True, index=True)
     email: Mapped[str] = mapped_column(String(255), default="")
+    # public accounts log in with this; staff rows keep it empty.
+    # Uniqueness is enforced only for non-empty values — staff share "".
+    phone: Mapped[str] = mapped_column(String(20), index=True, default="")
+    # referral code captured at registration (empty for staff/direct)
+    referred_code: Mapped[str] = mapped_column(String(24), default="")
     password_hash: Mapped[str] = mapped_column(Text)
     full_name: Mapped[str] = mapped_column(String(120), default="")
     is_active: Mapped[bool] = mapped_column(default=True)
@@ -64,6 +70,16 @@ class User(Base):
     )
     sessions: Mapped[list["Session"]] = relationship(
         back_populates="user", cascade="all, delete-orphan"
+    )
+
+    __table_args__ = (
+        Index(
+            "uq_users_phone_nonempty",
+            "phone",
+            unique=True,
+            postgresql_where=Column("phone") != "",
+            sqlite_where=Column("phone") != "",
+        ),
     )
 
     @property

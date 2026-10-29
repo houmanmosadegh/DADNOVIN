@@ -1,13 +1,17 @@
 import { useEffect, useRef, useState } from 'react'
 import { Link, NavLink, useLocation } from 'react-router-dom'
-import { Menu, Phone, X } from 'lucide-react'
+import { Menu, Phone, UserRound, X } from 'lucide-react'
 import { brand, contact, nav } from '../content/lawyers.fa.js'
 import { useScrolled } from '../utils/useScrolled'
+import { useAuth } from '../services/auth'
+import { AuthModal } from './AuthModal'
 import './Header.css'
 
 export function Header() {
   const scrolled = useScrolled(20)
   const [open, setOpen] = useState(false)
+  const [authOpen, setAuthOpen] = useState(false)
+  const { me, loading } = useAuth()
   const { pathname } = useLocation()
   const progressRef = useRef<HTMLSpanElement>(null)
   const listRef = useRef<HTMLUListElement>(null)
@@ -142,6 +146,23 @@ export function Header() {
             <li className="site-nav__marker" ref={markerRef} aria-hidden="true" />
           </ul>
 
+          {/* ورود/پنل — نسخهٔ کشویی برای موبایل */}
+          <div className="site-nav__auth">
+            {loading ? null : me ? (
+              <Link to="/account" className="site-nav__auth-link">
+                <UserRound size={16} aria-hidden="true" /> پنل من
+              </Link>
+            ) : (
+              <button
+                type="button"
+                className="site-nav__auth-link"
+                onClick={() => { setOpen(false); setAuthOpen(true) }}
+              >
+                <UserRound size={16} aria-hidden="true" /> ورود / ثبت‌نام
+              </button>
+            )}
+          </div>
+
           {contact.phones.length > 0 ? (
             <ul className="site-nav__phones" role="list">
               {contact.phones.map((phone: string) => (
@@ -157,6 +178,21 @@ export function Header() {
         </nav>
 
         <div className="site-header__actions">
+          {loading ? null : me ? (
+            <Link to="/account" className="header-auth" aria-label="پنل کاربری">
+              <UserRound size={17} aria-hidden="true" />
+              <span>پنل من</span>
+            </Link>
+          ) : (
+            <button
+              type="button"
+              className="header-auth"
+              onClick={() => setAuthOpen(true)}
+            >
+              <UserRound size={17} aria-hidden="true" />
+              <span>ورود</span>
+            </button>
+          )}
           <button
             type="button"
             className="nav-toggle"
@@ -181,6 +217,8 @@ export function Header() {
 
       {/* خط پیشرفت اسکرول */}
       <span className="site-header__progress" ref={progressRef} aria-hidden="true" />
+
+      <AuthModal open={authOpen} onClose={() => setAuthOpen(false)} />
     </header>
   )
 }

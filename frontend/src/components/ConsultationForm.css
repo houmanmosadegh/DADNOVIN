@@ -50,6 +50,11 @@
   font-weight: 600;
   color: var(--color-text);
 }
+.cform__opt {
+  font-weight: 400;
+  font-size: 0.78rem;
+  color: var(--color-text-2);
+}
 /* gold asterisk on required fields — pseudo-element keeps label text intact */
 .cform__field--req label::after {
   content: ' *';

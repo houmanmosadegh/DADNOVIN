@@ -19,7 +19,10 @@ from ...dependencies.auth import EditorDep
 router = APIRouter(prefix="/settings", tags=["admin-settings"])
 DbDep = Annotated[AsyncSession, Depends(get_db)]
 
-ALLOWED_KEYS = {"brand", "contact", "seo", "footer", "socials", "ai"}
+ALLOWED_KEYS = {
+    "brand", "contact", "seo", "footer", "socials", "ai",
+    "referral", "commission",
+}
 
 
 @router.get("")

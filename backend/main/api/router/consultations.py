@@ -14,6 +14,7 @@ from ...models.consultation import ConsultationRequest
 from ...models.content import SiteSetting
 from ...schemas.consultation import ConsultationCreatedOut, ConsultationIn
 from ...security.passwords import hash_password
+from ...services import referrals as ref_svc
 from ...services import thread as thread_svc
 from ...utils.ids import access_code
 
@@ -47,10 +48,13 @@ async def submit_consultation(
         topic=payload.topic.strip(),
         message=payload.message.strip(),
         source_page=payload.source_page.strip(),
+        client_ip=client_key(request),
+        client_ua=request.headers.get("user-agent", "")[:300],
     )
     db.add(row)
     await db.flush()
     await thread_svc.stamp_sla(db, "consultation", row)
+    await _maybe_attribute(db, row, payload, request)
     await thread_svc.add_event(
         db, "consultation", row.id, "created", payload={"source": row.source_page}
     )
@@ -62,6 +66,46 @@ async def submit_consultation(
 
 
 AI_HEADER = "دستیار هوشمند دادنوین — پاسخ اولیهٔ اطلاعاتی:"
+
+REF_COOKIE = "dn_ref"
+
+
+async def _maybe_attribute(
+    db: AsyncSession, row: ConsultationRequest, payload, request: Request
+) -> None:
+    """Attribute the request to a marketer when a valid code exists.
+
+    Form field wins over the referral cookie (user can edit/clear it).
+    Anti-fraud inside `attribution_block_reason` silently skips
+    self-referrals and non-new clients — submission never fails on it.
+    """
+    code = (payload.ref_code or request.cookies.get(REF_COOKIE, "")).strip().upper()
+    if not code:
+        return
+    prof = await ref_svc.resolve_code(db, code)
+    if prof is None:
+        return
+    reason = await ref_svc.attribution_block_reason(
+        db, prof, phone=row.phone, user=None, exclude_request_id=row.id
+    )
+    if reason:
+        await thread_svc.add_event(
+            db, "consultation", row.id, "referral_blocked", payload={"reason": reason}
+        )
+        return
+    await ref_svc.attribute(
+        db,
+        prof,
+        request_type="consultation",
+        request_id=row.id,
+        ip=row.client_ip,
+        ua=row.client_ua,
+    )
+    row.ref_code = code
+    row.referrer_id = prof.id
+    await thread_svc.add_event(
+        db, "consultation", row.id, "referred", payload={"ref_code": code}
+    )
 
 
 async def _ai_auto_reply_enabled(db: AsyncSession) -> bool:

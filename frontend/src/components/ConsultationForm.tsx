@@ -3,6 +3,7 @@ import { Link, useSearchParams } from 'react-router-dom'
 import { Check, ClipboardCopy } from 'lucide-react'
 import { consultationPage, services } from '../content/lawyers.fa.js'
 import { api } from '../services/api'
+import { readRefCookie } from '../services/referral'
 import { isValidPhone } from '../utils/phone'
 import './ConsultationForm.css'
 
@@ -29,6 +30,8 @@ export function ConsultationForm() {
     services.some((s) => s.slug === preselect) ? preselect : '',
   )
   const [message, setMessage] = useState('')
+  // referral code — prefilled from the dn_ref cookie when present
+  const [refCode, setRefCode] = useState(() => readRefCookie())
   const [honey, setHoney] = useState('')
   const [errors, setErrors] = useState<Errors>({})
   const [summary, setSummary] = useState<string | null>(null)
@@ -90,6 +93,7 @@ export function ConsultationForm() {
           topic: service === 'other' ? F.fields.serviceOther : serviceTitle,
           message: message.trim(),
           source_page: '/consultation',
+          ref_code: refCode.trim().toUpperCase(),
           website: honey,
         },
       )
@@ -245,6 +249,18 @@ export function ConsultationForm() {
               {errors.service}
             </p>
           ) : null}
+        </div>
+
+        <div className="cform__field">
+          <label htmlFor="cf-ref">کد معرف <span className="cform__opt">(اختیاری)</span></label>
+          <input
+            id="cf-ref"
+            type="text"
+            dir="ltr"
+            placeholder="DN-XXXXXX"
+            value={refCode}
+            onChange={(e) => setRefCode(e.target.value)}
+          />
         </div>
 
         <div className="cform__field cform__field--wide">

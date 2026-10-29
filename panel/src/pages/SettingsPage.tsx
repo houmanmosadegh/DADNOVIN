@@ -13,6 +13,7 @@ const TABS = [
   { key: "seo", label: "تنظیمات سئو" },
   { key: "footer", label: "فوتر" },
   { key: "ai", label: "مشاور هوشمند" },
+  { key: "commission", label: "بازاریابی و کمیسیون" },
 ] as const;
 
 function useSetting(key: string) {
@@ -30,6 +31,7 @@ const TAB_ALIAS: Record<string, (typeof TABS)[number]["key"]> = {
   seo: "seo",
   footer: "footer",
   ai: "ai",
+  commission: "commission",
 };
 
 export default function SettingsPage({ tab: initialTab }: { tab?: string }) {
@@ -60,6 +62,7 @@ export default function SettingsPage({ tab: initialTab }: { tab?: string }) {
       {tab === "seo" && <SeoForm />}
       {tab === "footer" && <FooterForm />}
       {tab === "ai" && <AiForm />}
+      {tab === "commission" && <CommissionForm />}
     </div>
   );
 }
@@ -257,6 +260,66 @@ function AiForm() {
       <Field label="پیام خوش‌آمد"><input value={v.welcome} onChange={(e) => setV({ ...v, welcome: e.target.value })} /></Field>
       <Field label="متن راهنمای ورودی"><input value={v.placeholder} onChange={(e) => setV({ ...v, placeholder: e.target.value })} /></Field>
       <SaveBar saving={save.isPending} onSave={() => save.mutate(v)} />
+    </div>
+  );
+}
+
+function CommissionForm() {
+  const { data, isLoading } = useSetting("commission");
+  const save = useSave("commission");
+  const [v, setV] = useState({
+    commission_enabled: false,
+    cookie_days: "30",
+    min_payout: "1000000",
+    hold_days: "14",
+  });
+  useEffect(() => {
+    if (data)
+      setV({
+        commission_enabled: data.value.commission_enabled === true,
+        cookie_days: String(data.value.cookie_days ?? 30),
+        min_payout: String(data.value.min_payout ?? 1_000_000),
+        hold_days: String(data.value.hold_days ?? 14),
+      });
+  }, [data]);
+  if (isLoading) return <PageSkeleton />;
+  const num = (s: string) => parseInt(s.replace(/,/g, ""), 10) || 0;
+  return (
+    <div className="card max-w-2xl space-y-4 p-5">
+      <div className="rounded-xl border border-amber-500/30 bg-amber-500/5 p-3.5 text-[12.5px] leading-6 text-amber-200/90">
+        پرداخت پورسانت بابت جذب موکل ممکن است با مقررات کانون وکلا و اخلاق حرفه‌ای تعارض داشته باشد — قبل از فعال‌سازی با مراجع مربوط هماهنگ شود. کمیسیون بر مبنای پروندهٔ پذیرفته‌شده یا حق‌الوکالهٔ ثبت‌شده است، نه درصدی از نتیجهٔ دعوا.
+      </div>
+      <label className="flex items-center gap-2 text-sm">
+        <input
+          type="checkbox"
+          className="!w-4"
+          checked={v.commission_enabled}
+          onChange={(e) => setV({ ...v, commission_enabled: e.target.checked })}
+        />
+        فعال‌سازی ثبت کمیسیون (پیش‌فرض خاموش)
+      </label>
+      <div className="grid gap-4 sm:grid-cols-3">
+        <Field label="اعتبار کوکی ارجاع (روز)">
+          <input dir="ltr" inputMode="numeric" value={v.cookie_days} onChange={(e) => setV({ ...v, cookie_days: e.target.value })} />
+        </Field>
+        <Field label="حداقل مبلغ برداشت (ریال)">
+          <input dir="ltr" inputMode="numeric" value={v.min_payout} onChange={(e) => setV({ ...v, min_payout: e.target.value })} />
+        </Field>
+        <Field label="دورهٔ نگهداری کمیسیون (روز)">
+          <input dir="ltr" inputMode="numeric" value={v.hold_days} onChange={(e) => setV({ ...v, hold_days: e.target.value })} />
+        </Field>
+      </div>
+      <SaveBar
+        saving={save.isPending}
+        onSave={() =>
+          save.mutate({
+            commission_enabled: v.commission_enabled,
+            cookie_days: num(v.cookie_days),
+            min_payout: num(v.min_payout),
+            hold_days: num(v.hold_days),
+          })
+        }
+      />
     </div>
   );
 }

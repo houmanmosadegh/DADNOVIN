@@ -1,5 +1,16 @@
 """ORM models — kept one module per aggregate."""
 
+from .account import (
+    Commission,
+    InboxNotification,
+    MarketerApplication,
+    MarketerProfile,
+    PasswordResetToken,
+    PayoutRequest,
+    ReferralAttribution,
+    ReferralClick,
+    WalletEntry,
+)
 from .ai import AIConversation, AIKnowledgeSource, AIMessage
 from .audit import AuditLog
 from .consultation import ConsultationNote, ConsultationRequest
@@ -25,16 +36,24 @@ __all__ = [
     "AIMessage",
     "Article",
     "AuditLog",
+    "Commission",
     "ConsultationNote",
     "ConsultationRequest",
     "ContactRequest",
     "ContentRevision",
+    "InboxNotification",
     "Label",
     "Lawyer",
+    "MarketerApplication",
+    "MarketerProfile",
     "MediaAsset",
     "OutboundDelivery",
     "Page",
     "PageSection",
+    "PasswordResetToken",
+    "PayoutRequest",
+    "ReferralAttribution",
+    "ReferralClick",
     "RequestEvent",
     "RequestLabel",
     "RequestMessage",
@@ -45,5 +64,6 @@ __all__ = [
     "TicketMessage",
     "TrackingCounter",
     "User",
+    "WalletEntry",
     "user_roles",
 ]

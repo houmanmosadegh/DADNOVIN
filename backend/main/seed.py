@@ -27,6 +27,8 @@ ROLES = [
     ("admin", "مدیر — همهٔ بخش‌ها به‌جز مدیریت کاربران"),
     ("editor", "ویرایشگر محتوا — صفحات، تنظیمات، وکلا، رسانه"),
     ("support", "پشتیبان — درخواست‌های مشاوره و تیکت‌ها"),
+    ("user", "کاربر عمومی — پنل کاربری، ثبت و پیگیری درخواست"),
+    ("marketer", "بازاریاب تأییدشده — کد ارجاع، آمار و کیف پول"),
 ]
 
 
@@ -53,6 +55,16 @@ async def _seed_setting(
     db.add(SiteSetting(key=key, value=value, is_public=is_public))
     await db.flush()
     return True
+
+
+REFERRAL_DEFAULTS = {
+    "cookie_days": 30,
+    "min_payout": 1_000_000,
+    "hold_days": 14,
+    "basis": "fixed",
+    "commission_enabled": False,
+    "monthly_cap": 0,
+}
 
 
 async def _seed_settings(db: AsyncSession, c: dict) -> int:
@@ -88,6 +100,13 @@ async def _seed_settings(db: AsyncSession, c: dict) -> int:
             "placeholder": c["aiConsultant"]["chat"]["placeholder"],
         },
         True,
+    )
+    # referral/commission defaults — commission OFF until compliance review
+    n += await _seed_setting(
+        db,
+        "commission",
+        dict(REFERRAL_DEFAULTS),
+        False,  # admin-only
     )
     return n
 

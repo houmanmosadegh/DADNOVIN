@@ -19,6 +19,7 @@ class ConsultationIn(BaseModel):
     topic: str = Field(default="", max_length=200)
     message: str = Field(default="", max_length=5000)
     source_page: str = Field(default="", max_length=120)
+    ref_code: str = Field(default="", max_length=24)  # optional referrer code
     website: str = Field(default="", max_length=200)  # honeypot
 
     @field_validator("phone")

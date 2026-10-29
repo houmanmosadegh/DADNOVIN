@@ -101,6 +101,8 @@ class StaffMessageIn(BaseModel):
 class StatusIn(BaseModel):
     status: str = Field(min_length=2, max_length=30)
     reason: str = Field(default="", max_length=300)
+    # registered fee — basis for percent commissions when accepting a case
+    fee_amount: int | None = Field(default=None, ge=0)
 
 
 class RequestPatchIn(BaseModel):

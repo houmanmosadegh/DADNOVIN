@@ -1,4 +1,4 @@
-import { createContext, useContext, useEffect, useState, type ReactNode } from 'react'
+import { createContext, lazy, Suspense, useContext, useEffect, useState, type ReactNode } from 'react'
 import { BrowserRouter, Route, Routes } from 'react-router-dom'
 import { AiFab } from './components/AiFab'
 import { Footer } from './components/Footer'
@@ -13,6 +13,11 @@ import { NotFoundPage } from './pages/NotFoundPage'
 import { ServicesPage } from './pages/ServicesPage'
 import { TrackPage } from './pages/TrackPage'
 import { loadRemoteContent } from './content/remote'
+import { AuthProvider } from './services/auth'
+import { captureReferral } from './services/referral'
+
+/** پنل کاربر — صفحهٔ خصوصی؛ code-split تا لندینگ سنگین نشود */
+const AccountPage = lazy(() => import('./pages/account/AccountPage'))
 
 /**
  * Bumps whenever CMS content was applied so subscribed subtrees
@@ -54,6 +59,14 @@ export function AppRoutes() {
           <Route path="/consultation" element={<ConsultationPage />} />
           <Route path="/contact" element={<ContactPage />} />
           <Route path="/track" element={<TrackPage />} />
+          <Route
+            path="/account/*"
+            element={
+              <Suspense fallback={null}>
+                <AccountPage />
+              </Suspense>
+            }
+          />
           <Route path="*" element={<NotFoundPage />} />
         </Routes>
       </main>
@@ -64,11 +77,14 @@ export function AppRoutes() {
 }
 
 export default function App() {
+  useEffect(captureReferral, [])
   return (
     <BrowserRouter>
-      <RemoteSync>
-        <AppRoutes />
-      </RemoteSync>
+      <AuthProvider>
+        <RemoteSync>
+          <AppRoutes />
+        </RemoteSync>
+      </AuthProvider>
     </BrowserRouter>
   )
 }

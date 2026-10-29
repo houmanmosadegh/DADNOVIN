@@ -1,0 +1,265 @@
+"""Commission rules, creation on case acceptance, settlement and payouts."""
+
+import uuid
+from datetime import UTC, datetime, timedelta
+
+from fastapi import HTTPException
+from sqlalchemy import func, select
+from sqlalchemy.ext.asyncio import AsyncSession
+
+from ..models.account import (
+    Commission,
+    CommissionRule,
+    MarketerProfile,
+    PayoutRequest,
+    ReferralAttribution,
+)
+from ..models.content import SiteSetting
+from ..models.consultation import ConsultationRequest
+from ..models.user import User
+from . import wallet
+
+REFERRAL_DEFAULTS = {
+    "cookie_days": 30,
+    "min_payout": 1_000_000,
+    "hold_days": 14,
+    "basis": "fixed",  # fixed | percent — admin decides
+    "commission_enabled": False,  # OFF by default — see README compliance note
+    "monthly_cap": 0,
+}
+
+
+async def referral_settings(db: AsyncSession) -> dict:
+    row = await db.get(SiteSetting, "commission")
+    cfg = dict(REFERRAL_DEFAULTS)
+    if row and isinstance(row.value, dict):
+        cfg.update(row.value)
+    return cfg
+
+
+async def pick_rule(
+    db: AsyncSession, marketer_id: uuid.UUID, accepted_count: int
+) -> CommissionRule | None:
+    """Per-marketer override first, then the highest global tier reached."""
+    rows = (
+        await db.execute(
+            select(CommissionRule)
+            .where(CommissionRule.is_active.is_(True))
+            .order_by(CommissionRule.tier_min.desc())
+        )
+    ).scalars().all()
+    for r in rows:
+        if r.marketer_id == marketer_id:
+            return r
+    for r in rows:
+        if r.marketer_id is None and accepted_count >= r.tier_min:
+            return r
+    return None
+
+
+async def accepted_count(db: AsyncSession, marketer_id: uuid.UUID) -> int:
+    """Cases this marketer referred that reached `accepted`."""
+    subq = select(ReferralAttribution.request_id).where(
+        ReferralAttribution.marketer_id == marketer_id,
+        ReferralAttribution.request_type == "consultation",
+    )
+    return (
+        await db.execute(
+            select(func.count(ConsultationRequest.id)).where(
+                ConsultationRequest.id.in_(subq),
+                ConsultationRequest.status == "accepted",
+            )
+        )
+    ).scalar_one()
+
+
+async def on_request_accepted(
+    db: AsyncSession, request_type: str, request_id: uuid.UUID, row
+) -> Commission | None:
+    """Hook called when a request reaches `accepted` — creates the commission.
+
+    Idempotent by the unique (request_type, request_id) constraint; a no-op
+    when commissions are disabled or the request was not referred.
+    """
+    cfg = await referral_settings(db)
+    if not cfg.get("commission_enabled"):
+        return None
+    attr = (
+        await db.execute(
+            select(ReferralAttribution).where(
+                ReferralAttribution.request_type == request_type,
+                ReferralAttribution.request_id == request_id,
+            )
+        )
+    ).scalar_one_or_none()
+    if attr is None:
+        return None
+    exists = (
+        await db.execute(
+            select(Commission.id).where(
+                Commission.request_type == request_type,
+                Commission.request_id == request_id,
+            )
+        )
+    ).scalar_one_or_none()
+    if exists is not None:
+        return None
+    count = await accepted_count(db, attr.marketer_id)
+    rule = await pick_rule(db, attr.marketer_id, count)
+    if rule is None:
+        return None
+    fee = getattr(row, "fee_amount", 0) or 0
+    if rule.kind == "percent":
+        amount = fee * rule.value // 100
+    else:
+        amount = rule.value
+    if amount <= 0:
+        return None
+    comm = Commission(
+        marketer_id=attr.marketer_id,
+        request_type=request_type,
+        request_id=request_id,
+        basis_kind=rule.kind,
+        basis_amount=fee if rule.kind == "percent" else 0,
+        amount=amount,
+        status="pending",
+        hold_until=datetime.now(UTC) + timedelta(days=int(cfg.get("hold_days", 14))),
+    )
+    db.add(comm)
+    await db.flush()
+    return comm
+
+
+async def settle_due(db: AsyncSession, actor_id: uuid.UUID | None = None) -> int:
+    """Approve pending commissions whose hold elapsed → credit the ledger."""
+    now = datetime.now(UTC)
+    due = (
+        await db.execute(
+            select(Commission).where(
+                Commission.status == "pending",
+                Commission.hold_until.is_not(None),
+                Commission.hold_until <= now,
+            )
+        )
+    ).scalars().all()
+    n = 0
+    for comm in due:
+        await approve_commission(db, comm, actor_id)
+        n += 1
+    return n
+
+
+async def approve_commission(
+    db: AsyncSession, comm: Commission, actor_id: uuid.UUID | None
+) -> None:
+    if comm.status != "pending":
+        return
+    comm.status = "approved"
+    await wallet.append_entry(
+        db,
+        comm.marketer_id,
+        kind="commission_credit",
+        amount=comm.amount,
+        ref_type="commission",
+        ref_id=comm.id,
+        memo=f"کمیسیون پرونده {comm.request_id}",
+        actor_id=actor_id,
+        idem_key=f"comm:{comm.id}",
+    )
+    await db.flush()
+
+
+async def cancel_commission(
+    db: AsyncSession, comm: Commission, actor_id: uuid.UUID | None
+) -> None:
+    if comm.status == "paid":
+        raise HTTPException(409, {"code": "paid", "message": "پرداخت شده است؛ قابل لغو نیست."})
+    if comm.status == "approved":
+        # reverse the credit with a matching adjustment
+        await wallet.append_entry(
+            db,
+            comm.marketer_id,
+            kind="adjustment",
+            amount=-comm.amount,
+            ref_type="commission",
+            ref_id=comm.id,
+            memo="برگشت کمیسیون لغوشده",
+            actor_id=actor_id,
+            idem_key=f"comm_cancel:{comm.id}",
+        )
+    comm.status = "cancelled"
+    await db.flush()
+
+
+async def request_payout(
+    db: AsyncSession, profile: MarketerProfile, amount: int
+) -> PayoutRequest:
+    cfg = await referral_settings(db)
+    minimum = int(cfg.get("min_payout", 0))
+    if minimum and amount < minimum:
+        raise HTTPException(
+            400,
+            {"code": "below_min", "message": f"حداقل مبلغ برداشت {minimum:,} ریال است."},
+        )
+    bal = await wallet.balance(db, profile.id)
+    if amount > bal:
+        raise HTTPException(
+            400, {"code": "insufficient", "message": "مبلغ از موجودی قابل برداشت بیشتر است."}
+        )
+    iban_masked = _mask_iban(profile)
+    payout = PayoutRequest(
+        marketer_id=profile.id, amount=amount, iban_masked=iban_masked
+    )
+    db.add(payout)
+    await db.flush()
+    return payout
+
+
+async def approve_payout(
+    db: AsyncSession, payout: PayoutRequest, admin: User, payment_ref: str = ""
+) -> None:
+    """Approve → ledger debit (idempotent). Re-check balance at approval time."""
+    if payout.status != "pending":
+        raise HTTPException(409, {"code": "already_reviewed", "message": "قبلاً بررسی شده است."})
+    bal = await wallet.balance(db, payout.marketer_id)
+    if payout.amount > bal:
+        raise HTTPException(
+            409, {"code": "insufficient", "message": "موجودی بازاریاب کافی نیست."}
+        )
+    await wallet.append_entry(
+        db,
+        payout.marketer_id,
+        kind="payout_debit",
+        amount=-payout.amount,
+        ref_type="payout",
+        ref_id=payout.id,
+        memo="برداشت کیف پول",
+        actor_id=admin.id,
+        idem_key=f"payout:{payout.id}",
+    )
+    payout.status = "paid"
+    payout.payment_ref = payment_ref.strip()
+    payout.reviewed_by = admin.id
+    payout.reviewed_at = datetime.now(UTC)
+    await db.flush()
+
+
+async def reject_payout(
+    db: AsyncSession, payout: PayoutRequest, admin: User, note: str = ""
+) -> None:
+    if payout.status != "pending":
+        raise HTTPException(409, {"code": "already_reviewed", "message": "قبلاً بررسی شده است."})
+    payout.status = "rejected"
+    payout.reject_reason = note[:300]
+    payout.reviewed_by = admin.id
+    payout.reviewed_at = datetime.now(UTC)
+    await db.flush()
+
+
+def _mask_iban(profile: MarketerProfile) -> str:
+    """Never expose full bank coordinates — keep only the tail."""
+    from ..security.vault import decrypt_field
+
+    raw = decrypt_field(profile.iban_enc) if profile.iban_enc else ""
+    digits = "".join(ch for ch in raw if ch.isdigit())
+    return f"IR••••{digits[-4:]}" if digits else ""

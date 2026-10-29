@@ -38,9 +38,12 @@ PRIORITIES = ("low", "normal", "high", "urgent")
 TRANSITIONS: dict[str, dict[str, frozenset[str]]] = {
     "consultation": {
         "new": frozenset({"reviewing", "cancelled"}),
-        "reviewing": frozenset({"awaiting_call", "completed", "cancelled"}),
-        "awaiting_call": frozenset({"reviewing", "followed_up", "completed", "cancelled"}),
-        "followed_up": frozenset({"awaiting_call", "completed", "cancelled"}),
+        "reviewing": frozenset({"awaiting_call", "consulted", "completed", "cancelled"}),
+        "awaiting_call": frozenset({"reviewing", "followed_up", "consulted", "completed", "cancelled"}),
+        "followed_up": frozenset({"awaiting_call", "consulted", "completed", "cancelled"}),
+        "consulted": frozenset({"accepted", "rejected", "completed", "cancelled"}),
+        "accepted": frozenset(),
+        "rejected": frozenset(),
         "completed": frozenset(),
         "cancelled": frozenset({"new"}),
     },

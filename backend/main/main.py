@@ -9,12 +9,14 @@ from fastapi.middleware.cors import CORSMiddleware
 from fastapi.responses import JSONResponse
 from sqlalchemy import text
 
+from .api.router import account as account_router
 from .api.router import ai as ai_router
 from .api.router import auth as auth_router
 from .api.router import consultations as consult_router
 from .api.router import contacts as contacts_router
 from .api.router import media as media_router
 from .api.router import public as public_router
+from .api.router import referrals as referrals_router
 from .api.router import tickets as tickets_router
 from .api.router.admin import ai as admin_ai
 from .api.router.admin import articles as admin_articles
@@ -23,6 +25,7 @@ from .api.router.admin import consultations as admin_consultations
 from .api.router.admin import contacts as admin_contacts
 from .api.router.admin import dashboard as admin_dashboard
 from .api.router.admin import lawyers as admin_lawyers
+from .api.router.admin import marketers as admin_marketers
 from .api.router.admin import media as admin_media
 from .api.router.admin import labels as admin_labels
 from .api.router.admin import pages as admin_pages
@@ -121,6 +124,9 @@ def create_app() -> FastAPI:
     app.include_router(contacts_router.router, prefix=api)
     app.include_router(media_router.router, prefix=api)
     app.include_router(ai_router.router, prefix=api)
+    app.include_router(account_router.auth_router, prefix=api)
+    app.include_router(account_router.router, prefix=api)
+    app.include_router(referrals_router.router, prefix=api)
 
     admin = f"{api}/admin"
     app.include_router(admin_dashboard.router, prefix=admin)
@@ -137,6 +143,9 @@ def create_app() -> FastAPI:
     app.include_router(admin_users.router, prefix=admin)
     app.include_router(admin_ai.router, prefix=admin)
     app.include_router(admin_audit.router, prefix=admin)
+    app.include_router(admin_marketers.router, prefix=admin)
+    app.include_router(admin_marketers.payouts_router, prefix=admin)
+    app.include_router(admin_marketers.commissions_router, prefix=admin)
 
     return app
 
