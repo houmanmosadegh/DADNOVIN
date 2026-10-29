@@ -315,18 +315,23 @@ async def my_requests(db: DbDep, user: CurrentUser) -> list[dict]:
     rows.sort(key=lambda r: r.created_at, reverse=True)
     # آخرین فرستندهٔ هر درخواست → نشان «پاسخ جدید» وقتی کارشناس جواب داده
     last_sender: dict[uuid.UUID, str] = {}
+    msgs: list[RequestMessage] = []
     if rows:
-        msgs = (
-            await db.execute(
-                select(RequestMessage)
-                .where(
-                    RequestMessage.request_type == "consultation",
-                    RequestMessage.request_id.in_([r.id for r in rows]),
-                    RequestMessage.is_note.is_(False),
+        msgs = list(
+            (
+                await db.execute(
+                    select(RequestMessage)
+                    .where(
+                        RequestMessage.request_type == "consultation",
+                        RequestMessage.request_id.in_([r.id for r in rows]),
+                        RequestMessage.is_note.is_(False),
+                    )
+                    .order_by(RequestMessage.created_at.desc())
                 )
-                .order_by(RequestMessage.created_at.desc())
             )
-        ).scalars().all()
+            .scalars()
+            .all()
+        )
     last_activity: dict[uuid.UUID, datetime] = {}
     for m in msgs:
         last_sender.setdefault(m.request_id, m.sender_type)
