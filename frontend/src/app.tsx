@@ -1,4 +1,4 @@
-import { useEffect, useState, type ReactNode } from 'react'
+import { createContext, useContext, useEffect, useState, type ReactNode } from 'react'
 import { BrowserRouter, Route, Routes } from 'react-router-dom'
 import { AiFab } from './components/AiFab'
 import { Footer } from './components/Footer'
@@ -15,11 +15,14 @@ import { TrackPage } from './pages/TrackPage'
 import { loadRemoteContent } from './content/remote'
 
 /**
- * Pulls CMS content from the backend after mount; when the API is
- * unreachable the static content stays exactly as shipped.
+ * Bumps whenever CMS content was applied so subscribed subtrees
+ * re-render. Returning `children` alone would not work — React
+ * bails out on the identical element reference.
  */
+const ContentVersion = createContext(0)
+
 function RemoteSync({ children }: { children: ReactNode }) {
-  const [, bump] = useState(0)
+  const [version, bump] = useState(0)
   useEffect(() => {
     let alive = true
     void loadRemoteContent().then((changed) => {
@@ -29,11 +32,12 @@ function RemoteSync({ children }: { children: ReactNode }) {
       alive = false
     }
   }, [])
-  return children
+  return <ContentVersion.Provider value={version}>{children}</ContentVersion.Provider>
 }
 
 /** Shell + routes — shared between BrowserRouter (client) and StaticRouter (prerender). */
 export function AppRoutes() {
+  useContext(ContentVersion) // re-render shell once remote CMS content lands
   return (
     <>
       <SmoothScroll />

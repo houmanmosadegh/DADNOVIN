@@ -2,6 +2,7 @@ import { Mail, MapPin, Phone } from 'lucide-react'
 import { ContactForm } from '../components/ContactForm'
 import { Reveal } from '../components/Reveal'
 import { SectionWave } from '../components/SectionWave'
+import { SocialIcon } from '../components/SocialIcon'
 import { brand, contact, contactPage, lawyers } from '../content/lawyers.fa.js'
 import { useSeo } from '../utils/seo'
 import './pages.css'
@@ -81,6 +82,26 @@ export function ContactPage() {
                       </span>
                     </div>
                   </li>
+                  {contact.socials?.map((s: { label: string; url: string }) => (
+                    <li key={s.url}>
+                      <a
+                        className="consult-aside__row"
+                        href={s.url}
+                        target="_blank"
+                        rel="noopener noreferrer"
+                      >
+                        <span className="consult-aside__icon" aria-hidden="true">
+                          <SocialIcon label={s.label} size={18} />
+                        </span>
+                        <span className="consult-aside__meta">
+                          <span className="consult-aside__who">{s.label}</span>
+                          <span className="consult-aside__what" dir="ltr">
+                            {s.url.replace(/^https?:\/\//, '').replace(/\/$/, '')}
+                          </span>
+                        </span>
+                      </a>
+                    </li>
+                  ))}
                 </ul>
 
                 <h3 className="consult-aside__subtitle">{contactPage.guide.title}</h3>

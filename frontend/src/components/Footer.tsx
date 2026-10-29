@@ -1,6 +1,7 @@
 import { Link } from 'react-router-dom'
 import { Mail, MapPin, Phone } from 'lucide-react'
 import { brand, contact, nav, services } from '../content/lawyers.fa.js'
+import { SocialIcon } from './SocialIcon'
 import './Footer.css'
 
 const jalaliYear = new Intl.DateTimeFormat('fa-IR', { year: 'numeric' }).format(
@@ -77,12 +78,6 @@ export function Footer() {
                 </a>
               </li>
             ) : null}
-            {contact.address ? (
-              <li>
-                <MapPin size={16} aria-hidden="true" />
-                <span className="site-footer__link">{contact.address}</span>
-              </li>
-            ) : null}
             <li>
               <span className="site-footer__note">
                 برای هماهنگی مشاوره، از طریق{' '}
@@ -93,6 +88,23 @@ export function Footer() {
               </span>
             </li>
           </ul>
+          {contact.socials?.length ? (
+            <ul className="site-footer__socials" role="list">
+              {contact.socials.map((s: { label: string; url: string }) => (
+                <li key={s.url}>
+                  <a
+                    href={s.url}
+                    target="_blank"
+                    rel="noopener noreferrer"
+                    className="site-footer__social"
+                    aria-label={s.label}
+                  >
+                    <SocialIcon label={s.label} size={17} />
+                  </a>
+                </li>
+              ))}
+            </ul>
+          ) : null}
         </div>
       </div>
 
