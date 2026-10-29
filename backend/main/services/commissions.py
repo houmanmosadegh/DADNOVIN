@@ -26,6 +26,7 @@ REFERRAL_DEFAULTS = {
     "basis": "fixed",  # fixed | percent — admin decides
     "commission_enabled": False,  # OFF by default — see README compliance note
     "monthly_cap": 0,
+    "reapply_days": 14,  # min days before re-applying after a rejection
 }
 
 

@@ -1,16 +1,24 @@
 import { useEffect, useState } from 'react'
 import { Link } from 'react-router-dom'
-import { Copy, Share2 } from 'lucide-react'
+import { Clock3, Copy, Share2, XCircle } from 'lucide-react'
 import { api } from '../../services/api'
 import { useAuth } from '../../services/auth'
 import type { MarketerHome, Referral } from './types'
 import { STATUS_FA, faDate } from './types'
+
+const CHANNELS = [
+  'اینستاگرام', 'تلگرام', 'واتس‌اپ', 'وب‌سایت / وبلاگ', 'معرفی حضوری', 'سایر',
+]
 
 export default function MarketingPage() {
   const { me, refresh } = useAuth()
   const [home, setHome] = useState<MarketerHome | null>(null)
   const [refs, setRefs] = useState<Referral[]>([])
   const [note, setNote] = useState('')
+  const [channel, setChannel] = useState(CHANNELS[0])
+  const [terms, setTerms] = useState(false)
+  const [termsErr, setTermsErr] = useState(false)
+  const [busy, setBusy] = useState(false)
   const [msg, setMsg] = useState('')
   const isMarketer = me?.is_marketer ?? false
 
@@ -26,42 +34,94 @@ export default function MarketingPage() {
     void navigator.clipboard?.writeText(text).then(() => setMsg('کپی شد'))
   }
   const apply = async () => {
+    if (!terms) {
+      setTermsErr(true)
+      return
+    }
+    setBusy(true)
     try {
-      await api.post('/account/marketer/apply', { note })
+      await api.post('/account/marketer/apply', { note, channel, terms })
       setMsg('درخواست شما ثبت شد؛ پس از تأیید مدیریت فعال می‌شود.')
       await refresh()
+      api.get<MarketerHome>('/account/marketer').then(setHome).catch(() => {})
     } catch (e) {
       setMsg(e instanceof Error ? e.message : 'خطا')
+    } finally {
+      setBusy(false)
     }
   }
 
   if (!home) return <div className="acc__page"><p className="acc__muted">در حال بارگذاری…</p></div>
 
   if (!isMarketer) {
+    const reapplyDate = home.reapply_at ? new Date(home.reapply_at) : null
+    const mustWait = reapplyDate !== null && reapplyDate > new Date()
     return (
       <div className="acc__page">
         <h1 className="acc__title">بازاریابی</h1>
         <div className="acc__card">
           <h2><Share2 size={17} /> درخواست بازاریاب شدن</h2>
+
           {home.status === 'pending' ? (
-            <p className="acc__muted">درخواست شما در انتظار بررسی مدیریت است.</p>
+            <div className="acc__state acc__state--pending">
+              <Clock3 size={20} aria-hidden="true" />
+              <div>
+                <p>درخواست شما در حال بررسی است.</p>
+                {home.applied_at && (
+                  <p className="acc__muted">ثبت‌شده در {faDate(home.applied_at)} — نتیجه از طریق اعلان اطلاع‌رسانی می‌شود.</p>
+                )}
+              </div>
+            </div>
           ) : (
             <>
               {home.status === 'rejected' && (
-                <p className="acc__muted">درخواست قبلی شما تأیید نشد — می‌توانید دوباره درخواست دهید.</p>
+                <div className="acc__state acc__state--rejected">
+                  <XCircle size={20} aria-hidden="true" />
+                  <div>
+                    <p>درخواست قبلی شما تأیید نشد.</p>
+                    {home.reject_reason && <p className="acc__muted">دلیل: {home.reject_reason}</p>}
+                    {mustWait && reapplyDate && (
+                      <p className="acc__muted">امکان ثبت مجدد از {faDate(reapplyDate.toISOString())}</p>
+                    )}
+                  </div>
+                </div>
               )}
-              <p className="acc__muted">
-                با دریافت کد ارجاع اختصاصی، کاربرانی که با لینک شما درخواست مشاوره ثبت کنند به حساب شما منسوب می‌شوند.
-              </p>
-              <div className="acc__apply">
-                <textarea
-                  rows={3}
-                  placeholder="چرا می‌خواهید بازاریاب شوید؟ (اختیاری)"
-                  value={note}
-                  onChange={(e) => setNote(e.target.value)}
-                />
-                <button className="btn btn--primary" onClick={apply}>ارسال درخواست</button>
-              </div>
+              {mustWait ? null : (
+                <>
+                  <p className="acc__muted">
+                    با دریافت کد ارجاع اختصاصی، کاربرانی که با لینک شما درخواست مشاوره ثبت کنند به حساب شما منسوب می‌شوند.
+                  </p>
+                  <div className="acc__apply">
+                    <label className="acc__field">
+                      <span>کانال اصلی معرفی</span>
+                      <select value={channel} onChange={(e) => setChannel(e.target.value)}>
+                        {CHANNELS.map((c) => <option key={c} value={c}>{c}</option>)}
+                      </select>
+                    </label>
+                    <label className="acc__field">
+                      <span>توضیح کوتاه <em>(اختیاری)</em></span>
+                      <textarea
+                        rows={3}
+                        placeholder="چطور می‌خواهید دادنوین را معرفی کنید؟"
+                        value={note}
+                        onChange={(e) => setNote(e.target.value)}
+                      />
+                    </label>
+                    <label className="authp__check">
+                      <input
+                        type="checkbox"
+                        checked={terms}
+                        onChange={(e) => { setTerms(e.target.checked); setTermsErr(false) }}
+                      />
+                      <span>قوانین بازاریابی و حفظ محرمانگی موکل را می‌پذیرم</span>
+                    </label>
+                    {termsErr && <em className="acc__hint authp__hint--err">پذیرش قوانین الزامی است.</em>}
+                    <button className="btn btn--primary" disabled={busy} onClick={apply}>
+                      {busy ? 'در حال ارسال…' : 'ارسال درخواست'}
+                    </button>
+                  </div>
+                </>
+              )}
             </>
           )}
           {msg && <p className="acc__notice">{msg}</p>}

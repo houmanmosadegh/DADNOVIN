@@ -43,7 +43,7 @@ export default function DashboardPage() {
         ) : recent.length === 0 ? (
           <div className="acc__empty">
             <p>هنوز درخواستی ثبت نکرده‌اید.</p>
-            <Link to="/consultation" className="btn btn--primary">ثبت درخواست مشاوره</Link>
+            <Link to="/panel/requests/new" className="btn btn--primary">ثبت درخواست مشاوره</Link>
           </div>
         ) : (
           <div className="acc__list">

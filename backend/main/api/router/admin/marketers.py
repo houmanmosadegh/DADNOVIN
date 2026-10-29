@@ -67,6 +67,8 @@ async def applications(db: DbDep) -> list[dict]:
             "phone": u.phone,
             "status": a.status,
             "note": a.note,
+            "channel": a.channel,
+            "review_note": a.review_note,
             "created_at": a.created_at.isoformat(),
         }
         for a, u in rows

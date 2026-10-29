@@ -10,6 +10,10 @@ export function Header() {
   const scrolled = useScrolled(20)
   const [open, setOpen] = useState(false)
   const { me, loading } = useAuth()
+  const panelHome =
+    me && me.roles.some((r) => ['super_admin', 'admin', 'editor', 'support'].includes(r))
+      ? '/admin/'
+      : '/panel'
   const { pathname } = useLocation()
   const progressRef = useRef<HTMLSpanElement>(null)
   const listRef = useRef<HTMLUListElement>(null)
@@ -146,9 +150,13 @@ export function Header() {
 
           {/* ورود/پنل — نسخهٔ کشویی برای موبایل */}
           <div className="site-nav__auth">
-            {loading ? null : (
+            {loading ? null : me ? (
+              <a href={panelHome} className="site-nav__auth-link" onClick={() => setOpen(false)}>
+                <UserRound size={16} aria-hidden="true" /> پنل من
+              </a>
+            ) : (
               <Link to="/panel" className="site-nav__auth-link" onClick={() => setOpen(false)}>
-                <UserRound size={16} aria-hidden="true" /> {me ? 'پنل من' : 'پنل کاربری'}
+                <UserRound size={16} aria-hidden="true" /> ورود / ثبت‌نام
               </Link>
             )}
           </div>
@@ -168,10 +176,15 @@ export function Header() {
         </nav>
 
         <div className="site-header__actions">
-          {loading ? null : (
-            <Link to="/panel" className="header-auth" aria-label="پنل کاربری">
+          {loading ? null : me ? (
+            <a href={panelHome} className="header-auth" aria-label="پنل من">
               <UserRound size={17} aria-hidden="true" />
-              <span>{me ? 'پنل من' : 'پنل کاربری'}</span>
+              <span>پنل من</span>
+            </a>
+          ) : (
+            <Link to="/panel" className="header-auth" aria-label="ورود یا ثبت‌نام">
+              <UserRound size={17} aria-hidden="true" />
+              <span>ورود / ثبت‌نام</span>
             </Link>
           )}
           <button

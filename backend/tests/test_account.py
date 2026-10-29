@@ -74,7 +74,7 @@ async def _make_marketer(client, phone):
     """
     r = await _register(client, phone, "بازاریاب تست")
     assert r.status_code == 201, r.text
-    r = await client.post("/api/v1/account/marketer/apply", json={"note": ""})
+    r = await client.post("/api/v1/account/marketer/apply", json={"note": "", "channel": "", "terms": True})
     assert r.status_code == 201, r.text
     app_id = r.json()["id"]
     await _admin(client)

@@ -2,7 +2,7 @@
 
 import secrets
 import uuid
-from datetime import UTC, datetime
+from datetime import UTC, datetime, timedelta
 
 from fastapi import HTTPException
 from sqlalchemy import func, select
@@ -16,6 +16,7 @@ from ..models.account import (
 )
 from ..models.consultation import ConsultationRequest
 from ..models.user import Role, User
+from ..db.base import aware
 from ..utils.phone import normalize_phone
 
 CODE_ALPHABET = "ABCDEFGHJKMNPQRSTUVWXYZ23456789"  # no 0/O/1/I — read over phone
@@ -25,26 +26,40 @@ def gen_ref_code() -> str:
     return "DN-" + "".join(secrets.choice(CODE_ALPHABET) for _ in range(6))
 
 
-async def apply(db: AsyncSession, user: User, note: str) -> MarketerApplication:
-    """One pending application per user; re-apply allowed after rejection."""
-    pending = (
+async def apply(
+    db: AsyncSession, user: User, note: str, channel: str = "", reapply_days: int = 14
+) -> MarketerApplication:
+    """One pending application per user; re-apply allowed after `reapply_days`."""
+    latest = (
         await db.execute(
-            select(MarketerApplication).where(
-                MarketerApplication.user_id == user.id,
-                MarketerApplication.status == "pending",
-            )
+            select(MarketerApplication)
+            .where(MarketerApplication.user_id == user.id)
+            .order_by(MarketerApplication.created_at.desc())
+            .limit(1)
         )
     ).scalar_one_or_none()
-    if pending is not None:
+    if latest is not None and latest.status == "pending":
         raise HTTPException(
             409, {"code": "already_pending", "message": "درخواست بازاریابی شما در انتظار بررسی است."}
         )
+    if latest is not None and latest.status == "rejected" and latest.reviewed_at:
+        unlock = aware(latest.reviewed_at) + timedelta(days=reapply_days)
+        if unlock > datetime.now(UTC):
+            raise HTTPException(
+                429,
+                {
+                    "code": "reapply_too_soon",
+                    "message": f"امکان ثبت درخواست مجدد از {unlock.date().isoformat()} فعال می‌شود.",
+                },
+            )
     prof = await profile_for_user(db, user.id)
     if prof is not None:
         raise HTTPException(
             409, {"code": "already_marketer", "message": "حساب شما هم‌اکنون بازاریاب است."}
         )
-    app = MarketerApplication(user_id=user.id, note=note.strip())
+    app = MarketerApplication(
+        user_id=user.id, note=note.strip(), channel=channel.strip()[:200], accepted_terms=True
+    )
     db.add(app)
     await db.flush()
     return app

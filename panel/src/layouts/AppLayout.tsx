@@ -53,6 +53,7 @@ const NAV: { group: string; collapsible?: boolean; items: NavItem[] }[] = [
       { to: "/requests/tickets", label: "تیکت‌ها", icon: <LifeBuoy size={17} />, roles: REQUEST_ROLES },
       { to: "/labels", label: "برچسب‌ها", icon: <Tag size={17} />, roles: REQUEST_ROLES },
       { to: "/ai/conversations", label: "مکالمات مشاور", icon: <MessageSquareText size={17} />, roles: ["super_admin", "admin"] },
+      { to: "/marketers", label: "درخواست‌های بازاریابی", icon: <Share2 size={17} />, roles: ["super_admin"] },
     ],
   },
   {
@@ -111,6 +112,7 @@ const CRUMBS: Record<string, string> = {
   "/ai/conversations": "مکالمات مشاور",
   "/users": "کاربران و دسترسی‌ها",
   "/audit": "گزارش فعالیت‌ها",
+  "/marketers": "درخواست‌های بازاریابی",
 };
 
 function crumbsFor(path: string): { label: string; to: string }[] {

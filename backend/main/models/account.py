@@ -33,6 +33,8 @@ class MarketerApplication(Base):
         Uuid, ForeignKey("users.id", ondelete="CASCADE"), index=True
     )
     note: Mapped[str] = mapped_column(Text, default="")
+    channel: Mapped[str] = mapped_column(String(200), default="")
+    accepted_terms: Mapped[bool] = mapped_column(Boolean, default=False)
     status: Mapped[str] = mapped_column(String(20), default="pending", index=True)
     # pending | approved | rejected
     reviewed_by: Mapped[uuid.UUID | None] = mapped_column(Uuid, nullable=True)

@@ -2,7 +2,7 @@ import { useCallback, useEffect, useState } from 'react'
 import { Link, useParams } from 'react-router-dom'
 import { api } from '../../services/api'
 import type { RequestDetail } from './types'
-import { STATUS_FA, faDateTime } from './types'
+import { CLOSED_STATUSES, STATUS_FA, faDateTime } from './types'
 
 const SENDER_FA: Record<string, string> = {
   staff: 'کارشناس', assistant: 'دستیار هوشمند', customer: 'شما', system: 'سیستم',
@@ -79,17 +79,21 @@ export default function RequestDetailPage() {
                 </div>
               ))}
             </div>
-            <div className="acc__reply">
-              <textarea
-                rows={3}
-                placeholder="پاسخ شما…"
-                value={reply}
-                onChange={(e) => setReply(e.target.value)}
-              />
-              <button className="btn btn--primary" disabled={!reply.trim() || sending} onClick={send}>
-                ارسال
-              </button>
-            </div>
+            {CLOSED_STATUSES.includes(detail.status) ? (
+              <p className="acc__muted acc__closed">این درخواست بسته شده است. برای پیگیری مجدد می‌توانید درخواست جدیدی ثبت کنید.</p>
+            ) : (
+              <div className="acc__reply">
+                <textarea
+                  rows={3}
+                  placeholder="پاسخ شما…"
+                  value={reply}
+                  onChange={(e) => setReply(e.target.value)}
+                />
+                <button className="btn btn--primary" disabled={!reply.trim() || sending} onClick={send}>
+                  {sending ? 'در حال ارسال…' : 'ارسال'}
+                </button>
+              </div>
+            )}
           </div>
         </>
       )}

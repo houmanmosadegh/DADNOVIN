@@ -71,6 +71,8 @@ class PasswordChangeIn(BaseModel):
 
 class MarketerApplyIn(BaseModel):
     note: str = Field(default="", max_length=1000)
+    channel: str = Field(default="", max_length=200)
+    terms: bool = False
 
 
 class MarketerReviewIn(BaseModel):

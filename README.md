@@ -4,8 +4,8 @@
 
 ```
 dadnovin/
-├── frontend/        سایت عمومی — Vite + React 19 + TS + three.js (RTL, فارسی)
-├── panel/           پنل مدیریت — Vite + React + TS + Tailwind (SPA جدا، base=/panel)
+├── frontend/        سایت عمومی + پنل کاربر (/panel) — Vite + React 19 + TS + three.js (RTL, فارسی)
+├── panel/           پنل مدیریت — Vite + React + TS + Tailwind (SPA جدا، base=/admin)
 ├── backend/         FastAPI + SQLAlchemy async + Alembic + PostgreSQL
 │   ├── main/        app, api/router, models, schemas, security, ai, services
 │   ├── alembic/     مایگریشن‌ها (0001–0005)
@@ -30,7 +30,8 @@ docker compose up -d --build
 | مسیر | چیست |
 |---|---|
 | `http://localhost:8080/` | وب‌سایت عمومی |
-| `http://localhost:8080/panel/` | پنل مدیریت |
+| `http://localhost:8080/panel` | پنل کاربر — فرم ورود/ثبت‌نام مشترک همه (ادمین هم از همین‌جا وارد می‌شود و به /admin می‌رود) |
+| `http://localhost:8080/admin/` | پنل مدیریت |
 | `http://localhost:8080/api/v1/...` | API |
 | `http://localhost:8080/docs` | OpenAPI (فقط development) |
 
@@ -68,7 +69,7 @@ pip install -e '.[dev]' && alembic upgrade head && python -m main.cli seed
 uvicorn main.main:app --reload
 
 cd frontend && npm i && npm run dev     # سایت روی :5173 (پروکسی /api → :8000)
-cd panel && npm i && npm run dev        # پنل روی :5174/panel/
+cd panel && npm i && npm run dev        # پنل مدیریت روی :5174/admin/
 ```
 
 ## معماری امنیت
@@ -97,14 +98,14 @@ cd panel && npm i && npm run dev        # پنل روی :5174/panel/
 - کد ارجاع در `/?ref=` + فیلد فرم مشاوره/ثبت‌نام؛ کلیک و انتساب در `referral_clicks`/`referral_attributions` (یکتا، تغییرناپذیر)
 - ضد تقلب: خودارجاعی (user_id یا تلفن یکسان) و «مشتری تکراری» رد می‌شود؛ IP/User-Agent ثبت می‌گردد
 - حریم خصوصی: بازاریاب فقط نام ماسک‌شده + وضعیت کلی + مبلغ کمیسیون می‌بیند — هیچ محتوای پرونده‌ای
-- کمیسیون فقط هنگام انتقال وضعیت به `accepted` ساخته می‌شود (idempotent به‌ازای درخواست)؛ قواعد fixed/percent + پله + override در `commission_rules` و از پنل «کمیسیون» مدیریت می‌شود
+- کمیسیون فقط هنگام انتقال وضعیت به `accepted` ساخته می‌شود (idempotent به‌ازای درخواست)؛ قواعد fixed/percent + پله + override در `commission_rules` و از طریق API مدیریت می‌شود. صفحهٔ تأیید/رد درخواست‌های بازاریابی در پنل ادمین → «درخواست‌های بازاریابی» (فقط super_admin)
 - کیف پول: دفتر کل append-only (`wallet_ledger`)، موجودی از `SUM(amount)`، کلید idempotency یکتا؛ برداشت با حداقل قابل تنظیم، شبا/کارت **Fernet-رمزنگاری‌شده** و ماسک‌شده در UI، تأیید ادمین با بررسی مجدد موجودی در یک تراکنش
 
 ### ملاحظات انطباق
 
 > **هشدار:** پرداخت پورسانت بابت جذب موکل ممکن است با مقررات کانون وکلا و اخلاق حرفه‌ای تعارض داشته باشد. به همین دلیل `commission_enabled` **پیش‌فرض خاموش** است و قبل از فعال‌سازی باید با کانون/مشاور حقوقی هماهنگ شود. مبنای «درصد» فقط از مبلغ حق‌الوکالهٔ ثبت‌شدهٔ ادمین است — نه نتیجهٔ دعوا. هیچ متن UI وعدهٔ نتیجهٔ پرونده نمی‌دهد.
 
-تنظیمات از پنل ادمین → «تنظیمات» → تب کمیسیون: `commission_enabled`، `cookie_days` (اعتبار ارجاع)، `hold_days`، `min_payout`، `monthly_cap`، قواعد. seed این کلید را فقط اگر نباشد ایجاد می‌کند.
+تنظیمات ارجاع/کمیسیون از طریق API (`/api/v1/admin/settings`): `commission_enabled` (پیش‌فرض خاموش — ملاحظهٔ انطباق با مقررات کانون وکلا)، `cookie_days`، `hold_days`، `min_payout`، `monthly_cap`، `reapply_days`. وقتی `commission_enabled` خاموش است، کیف پول/برداشت در پنل کاربر نمایش داده نمی‌شود و هیچ کمیسیونی ثبت نمی‌شود؛ آمار ارجاع همچنان ثبت می‌شود.
 
 ## ادیت محتوا از پنل
 

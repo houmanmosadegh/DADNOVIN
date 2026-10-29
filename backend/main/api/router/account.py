@@ -312,6 +312,22 @@ async def my_requests(db: DbDep, user: CurrentUser) -> list[dict]:
         await db.flush()
         await db.commit()
     rows.sort(key=lambda r: r.created_at, reverse=True)
+    # آخرین فرستندهٔ هر درخواست → نشان «پاسخ جدید» وقتی کارشناس جواب داده
+    last_sender: dict[uuid.UUID, str] = {}
+    if rows:
+        msgs = (
+            await db.execute(
+                select(RequestMessage)
+                .where(
+                    RequestMessage.request_type == "consultation",
+                    RequestMessage.request_id.in_([r.id for r in rows]),
+                    RequestMessage.is_note.is_(False),
+                )
+                .order_by(RequestMessage.created_at.desc())
+            )
+        ).scalars().all()
+        for m in msgs:
+            last_sender.setdefault(m.request_id, m.sender_type)
     return [
         {
             "id": str(r.id),
@@ -319,6 +335,7 @@ async def my_requests(db: DbDep, user: CurrentUser) -> list[dict]:
             "topic": r.topic or r.service_slug,
             "status": r.status,
             "created_at": r.created_at.isoformat(),
+            "has_new_reply": last_sender.get(r.id) == "staff",
         }
         for r in rows
     ]
@@ -380,6 +397,10 @@ async def my_request_reply(
     db: DbDep, user: CurrentUser, request_id: uuid.UUID, payload: dict
 ) -> dict:
     row = await _own_request(db, user, request_id)
+    if row.status in ("completed", "cancelled", "rejected"):
+        raise HTTPException(
+            409, {"code": "request_closed", "message": "این درخواست بسته شده و امکان پاسخ نیست."}
+        )
     body = str(payload.get("body", "")).strip()
     if not body or len(body) > 4000:
         raise HTTPException(400, {"code": "bad_body", "message": "متن پاسخ معتبر نیست."})
@@ -437,7 +458,14 @@ async def read_notification(db: DbDep, user: CurrentUser, notif_id: uuid.UUID) -
 async def marketer_apply(
     db: DbDep, user: CurrentUser, payload: MarketerApplyIn, request: Request
 ) -> dict:
-    app = await ref_svc.apply(db, user, payload.note)
+    if not payload.terms:
+        raise HTTPException(
+            422, {"code": "terms_required", "message": "پذیرش قوانین بازاریابی الزامی است."}
+        )
+    cfg = await comm_svc.referral_settings(db)
+    app = await ref_svc.apply(
+        db, user, payload.note, payload.channel, int(cfg.get("reapply_days", 14))
+    )
     await audit(db, actor=user, action="marketer.apply", entity="marketer_application", entity_id=app.id, request=request)
     await db.commit()
     return {"id": str(app.id), "status": app.status}
@@ -456,7 +484,18 @@ async def marketer_home(db: DbDep, user: CurrentUser) -> dict:
                 .limit(1)
             )
         ).scalar_one_or_none()
-        return {"status": app.status if app else "none", "commission_enabled": bool(cfg.get("commission_enabled"))}
+        out: dict = {
+            "status": app.status if app else "none",
+            "commission_enabled": bool(cfg.get("commission_enabled")),
+        }
+        if app is not None and app.status == "rejected":
+            out["reject_reason"] = app.review_note
+            out["reapply_at"] = (
+                aware(app.reviewed_at) + timedelta(days=int(cfg.get("reapply_days", 14)))
+            ).date().isoformat() if app.reviewed_at else ""
+        if app is not None and app.status == "pending":
+            out["applied_at"] = app.created_at.isoformat()
+        return out
     stats = await ref_svc.stats_for(db, prof.id)
     return {
         "status": "approved",

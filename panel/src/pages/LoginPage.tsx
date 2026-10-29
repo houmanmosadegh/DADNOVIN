@@ -1,14 +1,16 @@
 import { useEffect } from "react";
 import { useAuth } from "../stores/auth";
 
-/** Login is unified — everyone signs in on the public account page
- *  (/account), then staff are routed back here by role. */
+/** Login is unified — everyone signs in on the shared user-panel page
+ *  (/panel), then staff are routed back here by role. */
 export default function LoginPage() {
   const { user } = useAuth();
 
   useEffect(() => {
     if (!user) {
-      window.location.assign("/panel");
+      const cur = window.location.pathname + window.location.search;
+      const back = cur && cur !== "/admin/login" ? `?next=${encodeURIComponent(cur)}` : "";
+      window.location.assign(`/panel${back}`);
     }
   }, [user]);
 

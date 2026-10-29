@@ -4,7 +4,11 @@ export interface MyRequest {
   topic: string
   status: string
   created_at: string
+  has_new_reply?: boolean
 }
+
+/** وضعیت‌هایی که درخواست دیگر پاسخ‌پذیر نیست */
+export const CLOSED_STATUSES = ['completed', 'cancelled', 'rejected']
 
 export interface RequestDetail extends MyRequest {
   events: { from: string; to: string; created_at: string }[]
@@ -30,6 +34,9 @@ export interface MarketerHome {
   cookie_days?: number
   stats?: { clicks: number; requests: number; accepted: number; conversion: number }
   iban_masked?: string
+  reject_reason?: string
+  reapply_at?: string
+  applied_at?: string
 }
 
 export interface WalletView {
