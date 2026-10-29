@@ -1,5 +1,5 @@
 import { createContext, lazy, Suspense, useContext, useEffect, useState, type ReactNode } from 'react'
-import { BrowserRouter, Route, Routes } from 'react-router-dom'
+import { BrowserRouter, Route, Routes, useLocation } from 'react-router-dom'
 import { AiFab } from './components/AiFab'
 import { Footer } from './components/Footer'
 import { Header } from './components/Header'
@@ -16,8 +16,8 @@ import { loadRemoteContent } from './content/remote'
 import { AuthProvider } from './services/auth'
 import { captureReferral } from './services/referral'
 
-/** پنل کاربر — صفحهٔ خصوصی؛ code-split تا لندینگ سنگین نشود */
-const AccountPage = lazy(() => import('./pages/account/AccountPage'))
+/** پنل کاربر — اپ مستقل با سایدبار و صفحات جداگانه؛ code-split تا لندینگ سنگین نشود */
+const AccountApp = lazy(() => import('./pages/account/AccountApp'))
 
 /**
  * Bumps whenever CMS content was applied so subscribed subtrees
@@ -43,6 +43,15 @@ function RemoteSync({ children }: { children: ReactNode }) {
 /** Shell + routes — shared between BrowserRouter (client) and StaticRouter (prerender). */
 export function AppRoutes() {
   useContext(ContentVersion) // re-render shell once remote CMS content lands
+  const { pathname } = useLocation()
+  // پنل کاربر اپ مستقلی است — بدون Header/Footer و انیمیشن‌های سایت
+  if (pathname.startsWith('/account')) {
+    return (
+      <Suspense fallback={null}>
+        <AccountApp />
+      </Suspense>
+    )
+  }
   return (
     <>
       <SmoothScroll />
@@ -59,14 +68,6 @@ export function AppRoutes() {
           <Route path="/consultation" element={<ConsultationPage />} />
           <Route path="/contact" element={<ContactPage />} />
           <Route path="/track" element={<TrackPage />} />
-          <Route
-            path="/account/*"
-            element={
-              <Suspense fallback={null}>
-                <AccountPage />
-              </Suspense>
-            }
-          />
           <Route path="*" element={<NotFoundPage />} />
         </Routes>
       </main>

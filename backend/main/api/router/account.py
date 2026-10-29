@@ -22,7 +22,7 @@ from ...models.account import (
     Commission,
 )
 from ...models.consultation import ConsultationRequest
-from ...models.request_ops import RequestMessage
+from ...models.request_ops import RequestEvent, RequestMessage
 from ...db.base import aware, utcnow
 from ...models.user import Role, Session, User
 from ...notify.providers import get_provider
@@ -334,12 +334,31 @@ async def my_request_detail(db: DbDep, user: CurrentUser, request_id: uuid.UUID)
             .order_by(RequestMessage.created_at)
         )
     ).scalars().all()
+    events = (
+        await db.execute(
+            select(RequestEvent)
+            .where(
+                RequestEvent.request_type == "consultation",
+                RequestEvent.request_id == row.id,
+                RequestEvent.event_type == "status_change",
+            )
+            .order_by(RequestEvent.created_at)
+        )
+    ).scalars().all()
     return {
         "id": str(row.id),
         "tracking_code": row.tracking_code,
         "topic": row.topic or row.service_slug,
         "status": row.status,
         "created_at": row.created_at.isoformat(),
+        "events": [
+            {
+                "from": e.payload.get("from", ""),
+                "to": e.payload.get("to", ""),
+                "created_at": e.created_at.isoformat(),
+            }
+            for e in events
+        ],
         "messages": [
             {
                 "id": str(m.id),
