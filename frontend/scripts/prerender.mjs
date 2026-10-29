@@ -12,6 +12,9 @@ const { seo, siteUrl } = await import(join(root, 'src/content/lawyers.fa.js'))
 
 const template = readFileSync(join(root, 'dist/index.html'), 'utf8')
 
+// شل خالی SPA برای مسیرهای غیر-پرِندر (/panel و…) — جلوی hydrate mismatch
+writeFileSync(join(root, 'dist/spa.html'), template)
+
 const routes = [
   ['/', 'home'],
   ['/about', 'about'],
