@@ -36,7 +36,7 @@ export default function AuthPage() {
   const [showRef, setShowRef] = useState(!!readRefCookie())
   const [touched, setTouched] = useState<Record<string, boolean>>({})
   const [f, setF] = useState({
-    name: '', phone: '', password: '', ref: readRefCookie(), token: '', newPassword: '', terms: false,
+    name: '', phone: '', password: '', ref: readRefCookie(), token: '', newPassword: '',
   })
   const firstRef = useRef<HTMLInputElement>(null)
 
@@ -84,18 +84,12 @@ export default function AuthPage() {
       out.name = 'نام کامل را وارد کنید.'
     if (mode === 'register' && touched.password && f.password.length < 8)
       out.password = 'رمز عبور باید حداقل ۸ کاراکتر باشد.'
-    if (mode === 'register' && touched.terms && !f.terms)
-      out.terms = 'پذیرش قوانین الزامی است.'
     return out
   }, [f, mode, touched])
 
   const submit = async (e: React.FormEvent) => {
     e.preventDefault()
     setErr('')
-    if (mode === 'register' && !f.terms) {
-      setTouched((p) => ({ ...p, terms: true }))
-      return
-    }
     setBusy(true)
     const phone = faToEn(f.phone.trim())
     try {
@@ -233,29 +227,20 @@ export default function AuthPage() {
           )}
 
           {mode === 'register' && (
-            <>
-              {showRef ? (
-                <div className="authp__field">
-                  <input
-                    dir="ltr"
-                    placeholder="کد معرف"
-                    value={f.ref}
-                    onChange={set('ref')}
-                  />
-                </div>
-              ) : (
-                <button type="button" className="authp__link authp__link--start" onClick={() => setShowRef(true)}>
-                  کد معرف دارم
-                </button>
-              )}
-              <div className="authp__field authp__field--check">
-                <label className="authp__check">
-                  <input type="checkbox" checked={f.terms} onChange={set('terms')} onBlur={blur('terms')} />
-                  <span>قوانین و حریم خصوصی دادنوین را می‌پذیرم</span>
-                </label>
-                {fieldErr.terms && <em className="authp__hint authp__hint--err">{fieldErr.terms}</em>}
+            showRef ? (
+              <div className="authp__field">
+                <input
+                  dir="ltr"
+                  placeholder="کد معرف"
+                  value={f.ref}
+                  onChange={set('ref')}
+                />
               </div>
-            </>
+            ) : (
+              <button type="button" className="authp__link authp__link--start" onClick={() => setShowRef(true)}>
+                کد معرف دارم
+              </button>
+            )
           )}
 
           {mode === 'reset' && (

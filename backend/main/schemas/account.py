@@ -111,6 +111,7 @@ class AccountMeOut(BaseModel):
     is_marketer: bool
     ref_code: str = ""
     marketer_status: str = ""  # ''|pending|approved|rejected
+    created_at: datetime | None = None
 
     model_config = {"from_attributes": True}
 

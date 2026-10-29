@@ -26,8 +26,23 @@
   position: relative;
   overflow: hidden;
   background:
-    radial-gradient(46rem 30rem at 50% -18%, rgb(var(--gold-rgb) / .08), transparent 62%),
+    radial-gradient(60rem 36rem at 50% -22%, rgb(var(--gold-rgb) / .10), transparent 60%),
+    radial-gradient(40rem 30rem at 88% 108%, rgb(var(--ink-4-rgb) / .5), transparent 60%),
     var(--color-bg);
+}
+/* هالهٔ طلایی خیلی کم‌رنگ پشت کارت */
+.authp::before {
+  content: '';
+  position: absolute;
+  top: 50%;
+  left: 50%;
+  translate: -50% -50%;
+  inline-size: 30rem;
+  block-size: 30rem;
+  border-radius: 50%;
+  background: radial-gradient(circle, rgb(var(--gold-rgb) / .12), transparent 65%);
+  filter: blur(30px);
+  pointer-events: none;
 }
 
 .authp__card {
@@ -35,12 +50,24 @@
   display: grid;
   gap: 1.15rem;
   inline-size: min(24rem, 100%);
-  padding: 2.2rem 2rem 1.7rem;
+  padding: 2.4rem 2.1rem 1.8rem;
   border-radius: 1rem;
   border: 1px solid rgb(var(--ink-4-rgb) / .28);
   background: linear-gradient(170deg, rgb(var(--ink-2-rgb) / .9), rgb(var(--ink-0-rgb) / .95));
-  box-shadow: 0 32px 90px rgb(var(--ink-0-rgb) / .65), inset 0 1px 0 rgb(255 255 255 / .04);
+  box-shadow:
+    0 40px 100px rgb(var(--ink-0-rgb) / .7),
+    0 0 60px rgb(var(--gold-rgb) / .06),
+    inset 0 1px 0 rgb(255 255 255 / .05);
   animation: authp-in .22s ease-out;
+}
+/* خط مؤی طلایی لبهٔ بالای کارت */
+.authp__card::before {
+  content: '';
+  position: absolute;
+  inset-block-start: -1px;
+  inset-inline: 18%;
+  block-size: 1px;
+  background: linear-gradient(90deg, transparent, rgb(var(--gold-rgb) / .8), transparent);
 }
 @keyframes authp-in {
   from { opacity: 0; translate: 0 8px; }
@@ -380,9 +407,37 @@
 .acc__card h2 { display: flex; align-items: center; gap: .5rem; font-size: 1.05rem; margin: 0; color: var(--title-bone); font-weight: 600; }
 .acc__card > h2:first-child { font-weight: 600; }
 
+/* ─ dashboard ─ */
+.acc__hello {
+  display: flex; align-items: center; justify-content: space-between;
+  gap: 1rem; flex-wrap: wrap;
+}
+.acc__hello .acc__title { margin-block-end: .15rem; }
+.acc__hello .btn { display: inline-flex; align-items: center; gap: .45rem; }
+
+.acc__dashgrid {
+  display: grid;
+  grid-template-columns: minmax(0, 1.6fr) minmax(17rem, 1fr);
+  gap: 1.1rem;
+  align-items: start;
+}
+@media (max-width: 52rem) { .acc__dashgrid { grid-template-columns: 1fr; } }
+.acc__dashside { display: grid; gap: 1.1rem; }
+.acc__cardhead { display: flex; align-items: baseline; justify-content: space-between; gap: .5rem; }
+.acc__contact .btn { justify-self: start; }
+
 .acc__stats { display: grid; grid-template-columns: repeat(auto-fit, minmax(9.5rem, 1fr)); gap: .9rem; }
-.acc__stat { text-align: center; text-decoration: none; color: inherit; }
+.acc__stat { text-align: center; text-decoration: none; color: inherit; position: relative; }
 a.acc__stat:hover { border-color: var(--color-border-gold); }
+.acc__stat-ico {
+  display: grid; place-items: center;
+  inline-size: 2.3rem; block-size: 2.3rem;
+  margin: 0 auto .3rem;
+  border-radius: .6rem;
+  color: var(--color-gold);
+  background: rgb(var(--gold-rgb) / .09);
+  border: 1px solid rgb(var(--gold-rgb) / .18);
+}
 .acc__stat-num { font-size: 1.6rem; font-weight: 700; color: var(--color-gold-hi); margin: 0; }
 
 .acc__list { display: grid; gap: .4rem; }
@@ -405,7 +460,39 @@ a.acc__stat:hover { border-color: var(--color-border-gold); }
 .acc__row-topic { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
 .acc__code { font-size: .85rem; color: var(--color-gold); font-family: var(--font-en), monospace; }
 .acc__notif.is-unread { border-color: var(--color-border-gold); background: rgb(var(--gold-rgb) / .05); }
+.acc__notif-dot {
+  inline-size: .55rem; block-size: .55rem;
+  border-radius: 50%; flex: none;
+  margin-block-start: .35rem;
+  background: transparent;
+}
+.acc__notif.is-unread .acc__notif-dot { background: var(--color-gold); }
 .acc__notif-body { display: grid; gap: .15rem; grid-column: 1 / -1; }
+.acc__row-sub { font-style: normal; opacity: .75; font-size: .8em; }
+
+/* ─ کارت هویت پروفایل ─ */
+.acc__idcard {
+  display: flex; align-items: center; gap: 1rem; flex-wrap: wrap;
+  padding: 1.2rem 1.3rem;
+}
+.acc__avatar--lg { inline-size: 3.4rem; block-size: 3.4rem; }
+.acc__idcard-body { flex: 1; min-inline-size: 12rem; }
+.acc__idmeta {
+  display: flex; gap: 1.1rem; flex-wrap: wrap;
+  color: var(--color-text-2); font-size: .82rem;
+  margin-block-start: .3rem;
+}
+.acc__idmeta span { display: inline-flex; align-items: center; gap: .35rem; }
+.acc__idroles { display: flex; gap: .4rem; flex-wrap: wrap; }
+.acc__rolechip {
+  display: inline-flex; align-items: center; gap: .3rem;
+  font-size: .75rem;
+  color: var(--color-gold-hi);
+  border: 1px solid var(--color-border-gold);
+  background: rgb(var(--gold-rgb) / .07);
+  border-radius: 999px;
+  padding: .2rem .6rem;
+}
 
 .acc__badge {
   font-size: .75rem;

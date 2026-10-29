@@ -22,6 +22,7 @@ export interface AccountMe {
   is_marketer: boolean
   ref_code: string
   marketer_status: string
+  created_at?: string
 }
 
 interface AuthState {

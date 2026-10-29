@@ -242,6 +242,7 @@ async def _me_out(db: AsyncSession, user: User) -> AccountMeOut:
         is_marketer=prof is not None,
         ref_code=prof.ref_code if prof else "",
         marketer_status="approved" if prof else (app.status if app else ""),
+        created_at=user.created_at,
     )
 
 
@@ -326,8 +327,10 @@ async def my_requests(db: DbDep, user: CurrentUser) -> list[dict]:
                 .order_by(RequestMessage.created_at.desc())
             )
         ).scalars().all()
-        for m in msgs:
-            last_sender.setdefault(m.request_id, m.sender_type)
+    last_activity: dict[uuid.UUID, datetime] = {}
+    for m in msgs:
+        last_sender.setdefault(m.request_id, m.sender_type)
+        last_activity.setdefault(m.request_id, m.created_at)
     return [
         {
             "id": str(r.id),
@@ -335,6 +338,7 @@ async def my_requests(db: DbDep, user: CurrentUser) -> list[dict]:
             "topic": r.topic or r.service_slug,
             "status": r.status,
             "created_at": r.created_at.isoformat(),
+            "last_activity": last_activity.get(r.id, r.created_at).isoformat(),
             "has_new_reply": last_sender.get(r.id) == "staff",
         }
         for r in rows

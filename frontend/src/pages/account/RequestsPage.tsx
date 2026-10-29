@@ -89,7 +89,12 @@ export default function RequestsPage() {
                 {r.has_new_reply && <span className="acc__newreply">پاسخ جدید</span>}
               </span>
               <span className={`acc__badge acc__badge--${r.status}`}>{STATUS_FA[r.status] ?? r.status}</span>
-              <span className="acc__muted">{faDate(r.created_at)}</span>
+              <span className="acc__muted">
+                {faDate(r.created_at)}
+                {r.last_activity && r.last_activity !== r.created_at && (
+                  <em className="acc__row-sub"> · آخرین فعالیت {faDate(r.last_activity)}</em>
+                )}
+              </span>
             </Link>
           ))}
         </div>

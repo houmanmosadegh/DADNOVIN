@@ -4,6 +4,7 @@ export interface MyRequest {
   topic: string
   status: string
   created_at: string
+  last_activity?: string
   has_new_reply?: boolean
 }
 
