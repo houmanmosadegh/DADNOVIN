@@ -208,11 +208,19 @@ export function TrackPage() {
                         <li
                           key={m.id}
                           className={`track__msg ${
-                            m.sender_type === 'staff' ? 'track__msg--staff' : 'track__msg--customer'
+                            m.sender_type === 'staff'
+                              ? 'track__msg--staff'
+                              : m.sender_type === 'assistant'
+                                ? 'track__msg--staff track__msg--ai'
+                                : 'track__msg--customer'
                           }`}
                         >
                           <p className="track__msg-who">
-                            {m.sender_type === 'staff' ? T.detail.fromOffice : T.detail.fromYou}
+                            {m.sender_type === 'staff'
+                              ? T.detail.fromOffice
+                              : m.sender_type === 'assistant'
+                                ? 'دستیار هوشمند'
+                                : T.detail.fromYou}
                             <time>{fmt(m.created_at)}</time>
                           </p>
                           <p className="track__msg-body">{m.body}</p>

@@ -38,18 +38,13 @@ async def _get_or_create_conversation(
     return conv
 
 
-async def answer(db: AsyncSession, payload: ChatIn) -> ChatOut:
+async def generate_reply(
+    db: AsyncSession, user_text: str, history: list[dict] | None = None
+) -> tuple[str, str, list[str]]:
+    """Retrieve knowledge → call provider (or honest fallback) → (reply, provider, source_titles)."""
     settings = get_settings()
-    conv = await _get_or_create_conversation(db, payload.session_key)
-
-    last_user = next(
-        (m.content for m in reversed(payload.messages) if m.role == "user"), ""
-    )
-    sources = await search_knowledge(db, last_user)
+    sources = await search_knowledge(db, user_text)
     context = knowledge_block([(s.title, s.body) for s in sources])
-    source_titles = [s.title for s in sources]
-
-    db.add(AIMessage(conversation_id=conv.id, role="user", content=last_user))
 
     reply: str
     provider: str
@@ -58,10 +53,11 @@ async def answer(db: AsyncSession, payload: ChatIn) -> ChatOut:
             {"role": "system", "content": SYSTEM_PROMPT},
             {"role": "system", "content": context},
         ]
-        for m in payload.messages[-8:]:
-            content = sanitize_chunk(m.content)
-            if content:
-                messages.append({"role": m.role, "content": content})
+        for m in (history or [])[-8:]:
+            content = sanitize_chunk(m.get("content", ""))
+            role = m.get("role", "user")
+            if content and role in {"user", "assistant"}:
+                messages.append({"role": role, "content": content})
         try:
             reply = await chat_complete(settings, messages)
             provider = "model"
@@ -74,6 +70,41 @@ async def answer(db: AsyncSession, payload: ChatIn) -> ChatOut:
 
     if GROUNDING_NOTE not in reply and provider != "unavailable":
         reply = reply.rstrip() + "\n\n" + GROUNDING_NOTE
+    return reply, provider, [s.title for s in sources]
+
+
+async def consultation_draft(
+    db: AsyncSession, *, topic: str, service_slug: str, message: str
+) -> str | None:
+    """First AI information message attached to a fresh consultation request.
+
+    Returns None when nothing useful can be said — never invents an answer.
+    """
+    prompt = (
+        f"موضوع درخواست مشاوره: {topic}\n"
+        f"حوزهٔ خدمت: {service_slug}\n"
+        f"شرح موکل: {message}\n\n"
+        "بر اساس اطلاعات سایت، یک پاسخ اولیهٔ کلی و کوتاه بده: مسیر کلی قانونی، "
+        "مدارک/اطلاعاتی که بهتر است آماده شود و اینکه کارشناسان به‌زودی تماس می‌گیرند."
+    )
+    reply, provider, _ = await generate_reply(db, prompt)
+    if provider == "unavailable":
+        return None
+    return reply
+
+
+async def answer(db: AsyncSession, payload: ChatIn) -> ChatOut:
+    conv = await _get_or_create_conversation(db, payload.session_key)
+
+    last_user = next(
+        (m.content for m in reversed(payload.messages) if m.role == "user"), ""
+    )
+
+    db.add(AIMessage(conversation_id=conv.id, role="user", content=last_user))
+
+    reply, provider, source_titles = await generate_reply(
+        db, last_user, [m.model_dump() for m in payload.messages]
+    )
 
     db.add(AIMessage(conversation_id=conv.id, role="assistant", content=reply))
     await db.flush()

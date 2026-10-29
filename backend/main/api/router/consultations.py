@@ -1,14 +1,17 @@
 """Public consultation submission."""
 
+import asyncio
 from typing import Annotated
 
 from fastapi import APIRouter, Depends, Request, Response, status
 from sqlalchemy.ext.asyncio import AsyncSession
 
+from ...ai.service import consultation_draft
 from ...core.config import get_settings
 from ...core.rate_limit import client_key, limiter
 from ...db.session import get_db
 from ...models.consultation import ConsultationRequest
+from ...models.content import SiteSetting
 from ...schemas.consultation import ConsultationCreatedOut, ConsultationIn
 from ...security.passwords import hash_password
 from ...services import thread as thread_svc
@@ -51,7 +54,55 @@ async def submit_consultation(
     await thread_svc.add_event(
         db, "consultation", row.id, "created", payload={"source": row.source_page}
     )
+    await _attach_ai_first_reply(db, row)
     await db.commit()
     return ConsultationCreatedOut(
         id=row.id, tracking_code=row.tracking_code, access_code=code_str
+    )
+
+
+AI_HEADER = "دستیار هوشمند دادنوین — پاسخ اولیهٔ اطلاعاتی:"
+
+
+async def _ai_auto_reply_enabled(db: AsyncSession) -> bool:
+    row = await db.get(SiteSetting, "ai")
+    cfg = row.value if row and isinstance(row.value, dict) else {}
+    return cfg.get("enabled", True) and cfg.get("auto_reply", True)
+
+
+async def _attach_ai_first_reply(db: AsyncSession, row: ConsultationRequest) -> None:
+    """Add one assistant message with initial legal information.
+
+    Never blocks or fails submission — any problem just skips the reply.
+    Status stays `new` so a human specialist still answers for real.
+    """
+    settings = get_settings()
+    if not settings.ai_enabled:
+        return
+    try:
+        if not await _ai_auto_reply_enabled(db):
+            return
+        reply = await asyncio.wait_for(
+            consultation_draft(
+                db,
+                topic=row.topic,
+                service_slug=row.service_slug,
+                message=row.message,
+            ),
+            timeout=settings.ai_timeout_seconds,
+        )
+    except Exception:
+        return
+    if not reply:
+        return
+    msg = await thread_svc.add_message(
+        db,
+        "consultation",
+        row.id,
+        sender_type="assistant",
+        sender_id=None,
+        body=f"{AI_HEADER}\n\n{reply}",
+    )
+    await thread_svc.add_event(
+        db, "consultation", row.id, "ai_reply", payload={"message_id": str(msg.id)}
     )

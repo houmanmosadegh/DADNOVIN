@@ -44,6 +44,7 @@ const EVENT_FA: Record<string, string> = {
   customer_reply: "پاسخ مشتری",
   call_logged: "تماس تلفنی",
   labels_updated: "به‌روزرسانی برچسب",
+  ai_reply: "پاسخ خودکار هوش مصنوعی",
 };
 
 const TEMPLATES: { label: string; body: string }[] = [
@@ -194,13 +195,23 @@ export default function RequestDetailPage() {
         node: (
           <TimelineItem
             key={`m-${m.id}`}
-            color={m.is_note ? "bg-amber-300" : m.sender_type === "staff" ? "bg-gold-2" : "bg-sky-400"}
+            color={
+              m.is_note
+                ? "bg-amber-300"
+                : m.sender_type === "staff"
+                  ? "bg-gold-2"
+                  : m.sender_type === "assistant"
+                    ? "bg-violet-400"
+                    : "bg-sky-400"
+            }
             title={
               m.is_note
                 ? "یادداشت داخلی"
                 : m.sender_type === "staff"
                   ? "پاسخ کارشناس"
-                  : "پیام مشتری"
+                  : m.sender_type === "assistant"
+                    ? "پاسخ خودکار هوش مصنوعی"
+                    : "پیام مشتری"
             }
             time={fmtDate(m.created_at)}
           >

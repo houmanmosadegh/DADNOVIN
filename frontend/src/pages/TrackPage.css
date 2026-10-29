@@ -203,6 +203,11 @@
   color: var(--color-gold);
 }
 
+.track__msg--ai {
+  border-style: dashed;
+  background: rgb(var(--gold-rgb) / 0.07);
+}
+
 .track__msg-who time {
   font-size: 0.72rem;
 }

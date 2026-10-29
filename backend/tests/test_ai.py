@@ -66,3 +66,92 @@ async def test_admin_sync_endpoint(admin_client):
     assert resp.status_code == 200
     status = await admin_client.get("/api/v1/admin/ai/status")
     assert status.json()["knowledge_sources"] > 0
+
+
+async def test_consultation_gets_ai_first_reply(client, seeded_session, db_session):
+    """AI drafts an initial info message on the thread; status stays `new`."""
+    from sqlalchemy import select
+
+    import uuid
+
+    from main.ai.knowledge import sync_knowledge
+    from main.models.request_ops import RequestMessage
+
+    await sync_knowledge(seeded_session)
+    await seeded_session.commit()
+
+    resp = await client.post(
+        "/api/v1/consultations",
+        json={
+            "full_name": "تست هوشمند",
+            "phone": "09120000001",
+            "email": "ai@example.com",
+            "service_slug": "family",
+            "topic": "سؤال مهریه",
+            "message": "مهریه عندالمطالبه چطور مطالبه می‌شود؟",
+            "source_page": "/consultation",
+            "website": "",
+        },
+    )
+    assert resp.status_code == 201
+    rid = resp.json()["id"]
+
+    msgs = (
+        (
+            await db_session.execute(
+                select(RequestMessage).where(RequestMessage.request_id == uuid.UUID(rid))
+            )
+        )
+        .scalars()
+        .all()
+    )
+    ai = [m for m in msgs if m.sender_type == "assistant"]
+    assert ai, "expected an assistant message on the thread"
+    assert "هوشمند" in ai[0].body or "اطلاعات" in ai[0].body
+
+    # status untouched — still waiting for a real specialist
+    track = await client.post(
+        "/api/v1/public/track",
+        json={"code": resp.json()["tracking_code"], "credential": resp.json()["access_code"]},
+    )
+    assert track.status_code == 200
+    assert track.json()["status"] == "new"
+
+
+async def test_consultation_ai_reply_disabled_setting(client, seeded_session, db_session):
+    """ai.auto_reply=false → no assistant message, submission still succeeds."""
+    from sqlalchemy import select
+
+    import uuid
+
+    from main.models.content import SiteSetting
+    from main.models.request_ops import RequestMessage
+
+    row = await db_session.get(SiteSetting, "ai")
+    row.value = {**row.value, "auto_reply": False}
+    await db_session.commit()
+
+    resp = await client.post(
+        "/api/v1/consultations",
+        json={
+            "full_name": "تست خاموش",
+            "phone": "09120000002",
+            "email": "off@example.com",
+            "service_slug": "family",
+            "topic": "سؤال",
+            "message": "تست",
+            "source_page": "/consultation",
+            "website": "",
+        },
+    )
+    assert resp.status_code == 201
+    msgs = (
+        (
+            await db_session.execute(
+                select(RequestMessage).where(RequestMessage.request_id == uuid.UUID(resp.json()["id"]))
+            )
+        )
+        .scalars()
+        .all()
+    )
+    assert not [m for m in msgs if m.sender_type == "assistant"]
