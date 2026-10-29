@@ -167,14 +167,14 @@ export default function AccountApp() {
 
       <main className="acc__main">
         <Routes>
-          <Route index element={<DashboardPage />} />
-          <Route path="requests" element={<RequestsPage />} />
-          <Route path="requests/new" element={<NewRequestPage />} />
-          <Route path="requests/:id" element={<RequestDetailPage />} />
-          <Route path="notifications" element={<NotificationsPage />} />
-          <Route path="marketing" element={<MarketingPage />} />
-          <Route path="wallet" element={<WalletPage />} />
-          <Route path="profile" element={<ProfilePage />} />
+          <Route path="/panel" element={<DashboardPage />} />
+          <Route path="/panel/requests" element={<RequestsPage />} />
+          <Route path="/panel/requests/new" element={<NewRequestPage />} />
+          <Route path="/panel/requests/:id" element={<RequestDetailPage />} />
+          <Route path="/panel/notifications" element={<NotificationsPage />} />
+          <Route path="/panel/marketing" element={<MarketingPage />} />
+          <Route path="/panel/wallet" element={<WalletPage />} />
+          <Route path="/panel/profile" element={<ProfilePage />} />
           <Route path="*" element={<Navigate to="/panel" replace />} />
         </Routes>
       </main>
