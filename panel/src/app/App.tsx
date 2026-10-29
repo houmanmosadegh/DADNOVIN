@@ -16,7 +16,7 @@ import LabelsPage from "../pages/LabelsPage";
 import LawyerEditPage from "../pages/LawyerEditPage";
 import LawyersPage from "../pages/LawyersPage";
 import LoginPage from "../pages/LoginPage";
-import MarketerApplicationsPage from "../pages/MarketerApplicationsPage";
+import MarketersPage from "../pages/MarketersPage";
 import MediaPage from "../pages/MediaPage";
 import PageEditPage from "../pages/PageEditPage";
 import PagesPage from "../pages/PagesPage";
@@ -103,7 +103,7 @@ export default function App() {
                 <Route path="labels" element={<RoleGate roles={REQUEST_ROLES}><LabelsPage /></RoleGate>} />
                 <Route path="ai" element={<RoleGate roles={["super_admin", "admin"]}><AiPage /></RoleGate>} />
                 <Route path="ai/conversations" element={<RoleGate roles={["super_admin", "admin"]}><ConversationsPage /></RoleGate>} />
-                <Route path="marketers" element={<RoleGate roles={["super_admin"]}><MarketerApplicationsPage /></RoleGate>} />
+                <Route path="marketers" element={<RoleGate roles={["super_admin"]}><MarketersPage /></RoleGate>} />
                 <Route path="users" element={<RoleGate roles={["super_admin"]}><UsersPage /></RoleGate>} />
                 <Route path="audit" element={<RoleGate roles={["super_admin", "admin"]}><AuditPage /></RoleGate>} />
 
