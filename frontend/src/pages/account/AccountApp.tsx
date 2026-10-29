@@ -12,8 +12,8 @@ import {
   UserRound,
   Wallet,
 } from 'lucide-react'
-import { AuthModal } from '../../components/AuthModal'
 import { useAuth } from '../../services/auth'
+import AuthPage from './AuthPage'
 import DashboardPage from './DashboardPage'
 import MarketingPage from './MarketingPage'
 import NotificationsPage from './NotificationsPage'
@@ -38,16 +38,7 @@ export default function AccountApp() {
   }
 
   if (!me) {
-    return (
-      <div className="acc acc--gate">
-        <div className="acc__gate-card">
-          <Scale size={36} aria-hidden="true" />
-          <h1>پنل کاربری دادنوین</h1>
-          <p className="acc__muted">برای مشاهدهٔ درخواست‌ها و حساب خود وارد شوید.</p>
-          <AuthModal open onClose={() => navigate('/')} />
-        </div>
-      </div>
-    )
+    return <AuthPage />
   }
 
   const isStaff = me.roles.some((r) => STAFF_ROLES.includes(r))
