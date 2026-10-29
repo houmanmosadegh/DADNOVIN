@@ -35,3 +35,4 @@ storage/*
 .idea/
 .vscode/
 screenshots/
+*.tsbuildinfo
