@@ -11,7 +11,7 @@ ARG VITE_API_URL=""
 ENV VITE_API_URL=$VITE_API_URL
 RUN npm run build
 
-FROM nginxinc/nginx-unprivileged:1.27-alpine AS runtime
+FROM nginxinc/nginx-unprivileged:1.31-alpine AS runtime
 COPY infrastructure/nginx/panel.conf /etc/nginx/conf.d/default.conf
 # vite base=/admin/ → serve the bundle under /admin so paths resolve as-is
 COPY --from=build /app/dist /usr/share/nginx/html/admin
