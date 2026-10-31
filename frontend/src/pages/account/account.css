@@ -230,7 +230,7 @@
 }
 .authp__eye {
   position: absolute;
-  inset-inline-end: 0.3rem;
+  inset-inline-start: 0.3rem;
   inset-block-start: 50%;
   translate: 0 -50%;
   display: grid;
@@ -308,14 +308,14 @@
 }
 .authp__otp-btn {
   position: absolute;
-  inset-inline-end: 0.35rem;
+  inset-inline-start: 0.35rem;
   inset-block-start: 50%;
   translate: 0 -50%;
   inline-size: auto;
   block-size: calc(100% - 0.7rem);
   font-size: 0.8rem;
   color: var(--color-gold);
-  border-inline-start: 1px solid rgb(var(--border-rgb) / 0.5);
+  border-inline-end: 1px solid rgb(var(--border-rgb) / 0.5);
   padding-inline: 0.75rem;
   white-space: nowrap;
 }
