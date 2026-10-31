@@ -27,7 +27,7 @@ export default function DashboardPage() {
       {/* سلام + قدم بعدی */}
       <div className="acc__hello">
         <div>
-          <h1 className="acc__title">سلام {me?.full_name?.split(' ')[0] || ''} 👋</h1>
+          <h1 className="acc__title">سلام، {me?.full_name?.split(' ')[0] || ''}</h1>
           <p className="acc__muted">{today}</p>
         </div>
         <Link to="/panel/requests/new" className="btn btn--primary">

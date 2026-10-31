@@ -143,14 +143,29 @@ function OverviewTab({ home, mainUrl, copy }: {
       {/* کد + لینک اصلی + اشتراک */}
       <div className="acc__card">
         <h2><Share2 size={16} /> کد و لینک ارجاع شما</h2>
-        <div className="acc__refbox">
-          <code dir="ltr">{home.ref_code}</code>
-          <button className="btn btn--ghost" onClick={() => copy(home.ref_code ?? '', 'کد کپی شد')}>
-            <Copy size={14} /> کپی کد
-          </button>
-          <button className="btn btn--ghost" onClick={() => copy(mainUrl, 'لینک کپی شد')}>
-            <Copy size={14} /> کپی لینک
-          </button>
+        <div className="acc__copygrid">
+          <div className="acc__copyrow">
+            <code dir="ltr">{home.ref_code}</code>
+            <button
+              className="acc__copybtn"
+              aria-label="کپی کد ارجاع"
+              title="کپی کد"
+              onClick={() => copy(home.ref_code ?? '', 'کد کپی شد')}
+            >
+              <Copy size={15} />
+            </button>
+          </div>
+          <div className="acc__copyrow" dir="ltr">
+            <code dir="ltr">{mainUrl}</code>
+            <button
+              className="acc__copybtn"
+              aria-label="کپی لینک ارجاع"
+              title="کپی لینک"
+              onClick={() => copy(mainUrl, 'لینک کپی شد')}
+            >
+              <Copy size={15} />
+            </button>
+          </div>
         </div>
         <div className="acc__share">
           <a
@@ -158,14 +173,14 @@ function OverviewTab({ home, mainUrl, copy }: {
             href={`https://t.me/share/url?url=${encodeURIComponent(mainUrl)}`}
             target="_blank" rel="noopener noreferrer"
           >
-            <Send size={14} /> اشتراک در تلگرام
+            <Send size={13} /> تلگرام
           </a>
           <a
             className="btn btn--ghost btn--sm"
             href={`https://wa.me/?text=${encodeURIComponent(mainUrl)}`}
             target="_blank" rel="noopener noreferrer"
           >
-            اشتراک در واتس‌اپ
+            واتس‌اپ
           </a>
           <a
             className="btn btn--ghost btn--sm"
@@ -173,7 +188,7 @@ function OverviewTab({ home, mainUrl, copy }: {
             target="_blank" rel="noopener noreferrer"
             download={`qr-${home.ref_code}.svg`}
           >
-            <QrCode size={14} /> دانلود QR
+            <QrCode size={13} /> QR
           </a>
         </div>
         <p className="acc__muted acc__hint">
