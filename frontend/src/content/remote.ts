@@ -46,6 +46,7 @@ interface PublicLawyer {
 export const siteFlags = {
   aiEnabled: true,
   hasArticles: false,
+  marketingEnabled: true,
 }
 
 /**
@@ -102,6 +103,9 @@ function applySettings(s: PublicSettings) {
   }
   if (typeof s.meta?.has_articles === 'boolean') {
     siteFlags.hasArticles = s.meta.has_articles
+  }
+  if (typeof s.meta?.marketing_enabled === 'boolean') {
+    siteFlags.marketingEnabled = s.meta.marketing_enabled
   }
 }
 

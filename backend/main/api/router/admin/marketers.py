@@ -5,7 +5,7 @@ import csv
 import io
 import json
 import uuid
-from datetime import datetime
+from datetime import UTC, datetime, timedelta
 from typing import Annotated
 
 from fastapi import APIRouter, Depends, HTTPException, Query, Request, Response
@@ -19,6 +19,7 @@ from ....models.account import (
     CommissionRule,
     MarketerApplication,
     MarketerProfile,
+    MarketingTerms,
     ReferralAttribution,
     ReferralClick,
 )
@@ -30,10 +31,18 @@ from ....services import referrals as ref_svc
 from ....services.audit import audit
 from ...dependencies.auth import CurrentUser, manage_users
 
+async def _marketing_gate(
+    db: Annotated[AsyncSession, Depends(get_db)],
+) -> None:
+    """404 the whole admin marketing surface while the switch is off."""
+    if not await comm_svc.marketing_enabled(db):
+        raise HTTPException(404, {"code": "not_found", "message": "یافت نشد."})
+
+
 router = APIRouter(
     prefix="/marketers",
     tags=["admin-marketers"],
-    dependencies=[Depends(manage_users)],
+    dependencies=[Depends(manage_users), Depends(_marketing_gate)],
 )
 DbDep = Annotated[AsyncSession, Depends(get_db)]
 
@@ -48,6 +57,8 @@ def _profile_out(p: MarketerProfile) -> dict:
         "iban_masked": mask_digits(decrypt_field(p.iban_enc)) if p.iban_enc else "",
         "card_masked": mask_digits(decrypt_field(p.card_enc)) if p.card_enc else "",
         "fraud_flag": p.fraud_flag,
+        "custom_rate": p.custom_rate,
+        "accepted_terms_version": p.accepted_terms_version,
     }
 
 
@@ -137,6 +148,7 @@ async def profiles(db: DbDep) -> list[dict]:
 class ProfilePatchIn(BaseModel):
     is_active: bool | None = None
     fraud_flag: bool | None = None
+    custom_rate: int | None = Field(default=None, ge=0, le=100)
 
 
 @router.patch("/{profile_id}")
@@ -146,15 +158,51 @@ async def patch_profile(
     prof = await db.get(MarketerProfile, profile_id)
     if prof is None:
         raise HTTPException(404, {"code": "not_found", "message": "بازاریاب یافت نشد."})
-    before = {"is_active": prof.is_active, "fraud_flag": prof.fraud_flag}
+    before = {
+        "is_active": prof.is_active,
+        "fraud_flag": prof.fraud_flag,
+        "custom_rate": prof.custom_rate,
+    }
     if payload.is_active is not None:
         prof.is_active = payload.is_active
     if payload.fraud_flag is not None:
         prof.fraud_flag = payload.fraud_flag
+    if payload.custom_rate is not None:
+        prof.custom_rate = payload.custom_rate or None
     await audit(db, actor=user, action="marketer.update", entity="marketer_profile",
                 entity_id=prof.id, before=before,
-                after={"is_active": prof.is_active, "fraud_flag": prof.fraud_flag},
+                after={"is_active": prof.is_active, "fraud_flag": prof.fraud_flag,
+                       "custom_rate": prof.custom_rate},
                 request=request)
+    await db.commit()
+    return _profile_out(prof)
+
+
+@router.post("/{profile_id}/suspend")
+async def suspend_profile(
+    db: DbDep, user: CurrentUser, profile_id: uuid.UUID, request: Request
+) -> dict:
+    """Suspend — the ref code/link stop working until reactivated."""
+    prof = await db.get(MarketerProfile, profile_id)
+    if prof is None:
+        raise HTTPException(404, {"code": "not_found", "message": "بازاریاب یافت نشد."})
+    await ref_svc.suspend(db, prof, user)
+    await audit(db, actor=user, action="marketer.suspend", entity="marketer_profile",
+                entity_id=prof.id, request=request)
+    await db.commit()
+    return _profile_out(prof)
+
+
+@router.post("/{profile_id}/reactivate")
+async def reactivate_profile(
+    db: DbDep, user: CurrentUser, profile_id: uuid.UUID, request: Request
+) -> dict:
+    prof = await db.get(MarketerProfile, profile_id)
+    if prof is None:
+        raise HTTPException(404, {"code": "not_found", "message": "بازاریاب یافت نشد."})
+    await ref_svc.reactivate(db, prof, user)
+    await audit(db, actor=user, action="marketer.reactivate", entity="marketer_profile",
+                entity_id=prof.id, request=request)
     await db.commit()
     return _profile_out(prof)
 
@@ -237,7 +285,7 @@ async def profile_commissions(db: DbDep, profile_id: uuid.UUID) -> list[dict]:
 commissions_router = APIRouter(
     prefix="/commissions",
     tags=["admin-commissions"],
-    dependencies=[Depends(manage_users)],
+    dependencies=[Depends(manage_users), Depends(_marketing_gate)],
 )
 
 
@@ -311,16 +359,37 @@ async def rule_toggle(
 
 
 @commissions_router.get("")
-async def commission_list(db: DbDep) -> list[dict]:
-    rows = (
-        await db.execute(
-            select(Commission, MarketerProfile, User)
-            .join(MarketerProfile, MarketerProfile.id == Commission.marketer_id)
-            .join(User, User.id == MarketerProfile.user_id)
-            .order_by(Commission.created_at.desc())
-            .limit(500)
-        )
-    ).all()
+async def commission_list(
+    db: DbDep,
+    marketer_id: Annotated[uuid.UUID | None, Query()] = None,
+    status: Annotated[str, Query(max_length=15)] = "",
+) -> list[dict]:
+    q = (
+        select(Commission, MarketerProfile, User)
+        .join(MarketerProfile, MarketerProfile.id == Commission.marketer_id)
+        .join(User, User.id == MarketerProfile.user_id)
+    )
+    if marketer_id is not None:
+        q = q.where(Commission.marketer_id == marketer_id)
+    if status:
+        q = q.where(Commission.status == status)
+    rows = (await db.execute(q.order_by(Commission.created_at.desc()).limit(500))).all()
+    tracking = {
+        str(c.id): (c.tracking_code, c.full_name)
+        for c in (
+            await db.execute(
+                select(
+                    ConsultationRequest.id,
+                    ConsultationRequest.tracking_code,
+                    ConsultationRequest.full_name,
+                ).where(
+                    ConsultationRequest.id.in_(
+                        [r[0].request_id for r in rows] or [uuid.uuid4()]
+                    )
+                )
+            )
+        ).all()
+    }
     return [
         {
             "id": str(c.id),
@@ -329,10 +398,15 @@ async def commission_list(db: DbDep) -> list[dict]:
             "ref_code": m.ref_code,
             "request_type": c.request_type,
             "request_id": str(c.request_id),
+            "tracking_code": (tracking.get(str(c.request_id)) or ("", ""))[0],
+            "client_name": (tracking.get(str(c.request_id)) or ("", ""))[1],
+            "entry_type": c.entry_type,
+            "parent_id": str(c.parent_id) if c.parent_id else None,
             "amount": c.amount,
             "status": c.status,
             "basis_kind": c.basis_kind,
             "basis_amount": c.basis_amount,
+            "rate": c.rate_bp / 100,
             "rule_snapshot": json.loads(c.rule_snapshot) if c.rule_snapshot else None,
             "paid_at": c.paid_at.isoformat() if c.paid_at else None,
             "paid_note": c.paid_note,
@@ -340,6 +414,39 @@ async def commission_list(db: DbDep) -> list[dict]:
         }
         for c, m, u in rows
     ]
+
+
+@commissions_router.get("/summary")
+async def commission_summary(db: DbDep) -> dict:
+    """Net ledger totals — unpaid/paid per marketer plus the office-wide row."""
+    rows = (
+        await db.execute(
+            select(Commission, MarketerProfile, User)
+            .join(MarketerProfile, MarketerProfile.id == Commission.marketer_id)
+            .join(User, User.id == MarketerProfile.user_id)
+        )
+    ).all()
+    per_marketer: dict[str, dict] = {}
+    for c, m, u in rows:
+        key = str(c.marketer_id)
+        bucket = per_marketer.setdefault(
+            key,
+            {
+                "marketer_id": key,
+                "full_name": u.full_name,
+                "ref_code": m.ref_code,
+                "rows": [],
+            },
+        )
+        bucket["rows"].append(c)
+    office = dict.fromkeys(("pending", "approved", "paid", "cancelled"), 0)
+    items = []
+    for b in per_marketer.values():
+        totals = comm_svc.net_totals(b.pop("rows"))
+        items.append({**b, "totals": totals})
+        for k, v in totals.items():
+            office[k] += v
+    return {"marketers": items, "office": office}
 
 
 class CommissionDecideIn(BaseModel):
@@ -381,6 +488,56 @@ async def commission_pay(
                 after={"amount": comm.amount, "note": payload.note}, request=request)
     await db.commit()
     return {"status": "paid", "paid_at": comm.paid_at.isoformat() if comm.paid_at else None}
+
+
+class CommissionReverseIn(BaseModel):
+    amount: int | None = Field(default=None, gt=0)  # NULL = full reversal
+    note: str = Field(default="", max_length=300)
+
+
+@commissions_router.post("/{commission_id}/reverse")
+async def commission_reverse(
+    db: DbDep, user: CurrentUser, commission_id: uuid.UUID,
+    payload: CommissionReverseIn, request: Request,
+) -> dict:
+    """Refund/cancel path — posts a negative ledger entry, never deletes."""
+    comm = await db.get(Commission, commission_id)
+    if comm is None:
+        raise HTTPException(404, {"code": "not_found", "message": "کمیسیون یافت نشد."})
+    if comm.entry_type != "accrual":
+        raise HTTPException(409, {"code": "not_accrual", "message": "فقط ورودیِ ایجادشده قابل برگشت است."})
+    entry = await comm_svc.reverse_accrual(
+        db, comm, user.id, note=payload.note, amount=payload.amount
+    )
+    await audit(db, actor=user, action="commission.reverse", entity="commission",
+                entity_id=comm.id,
+                after={"reversal_id": str(entry.id), "amount": entry.amount,
+                       "note": payload.note},
+                request=request)
+    await db.commit()
+    return {"reversal_id": str(entry.id), "amount": entry.amount, "status": comm.status}
+
+
+class BulkApproveIn(BaseModel):
+    ids: list[uuid.UUID] = Field(min_length=1, max_length=200)
+
+
+@commissions_router.post("/bulk-approve")
+async def commission_bulk_approve(
+    db: DbDep, user: CurrentUser, payload: BulkApproveIn, request: Request
+) -> dict:
+    rows = (
+        await db.execute(select(Commission).where(Commission.id.in_(payload.ids)))
+    ).scalars().all()
+    n = 0
+    for c in rows:
+        if c.entry_type == "accrual" and c.status == "pending":
+            await comm_svc.approve_commission(db, c, user.id)
+            n += 1
+    await audit(db, actor=user, action="commission.bulk_approve", entity="commission",
+                after={"count": n, "ids": [str(i) for i in payload.ids]}, request=request)
+    await db.commit()
+    return {"approved": n}
 
 
 @commissions_router.post("/{commission_id}/cancel")
@@ -635,3 +792,234 @@ async def marketer_report_csv(
         headers={"Content-Disposition": 'attachment; filename="marketers.csv"'},
     )
 
+
+
+# ─── referrals (admin sees all + flags + manual attach/reassign) ────
+
+
+@router.get("/referrals")
+async def all_referrals(
+    db: DbDep,
+    flag: Annotated[str, Query(max_length=20)] = "",
+    q: Annotated[str | None, Query(max_length=80)] = None,
+) -> list[dict]:
+    q2 = (
+        select(ReferralAttribution, MarketerProfile, User)
+        .join(MarketerProfile, MarketerProfile.id == ReferralAttribution.marketer_id)
+        .join(User, User.id == MarketerProfile.user_id)
+        .order_by(ReferralAttribution.created_at.desc())
+        .limit(500)
+    )
+    if flag:
+        q2 = q2.where(ReferralAttribution.flag == flag)
+    if q:
+        like = f"%{q.strip()}%"
+        q2 = q2.where(
+            or_(
+                User.full_name.ilike(like),
+                MarketerProfile.ref_code.ilike(like),
+            )
+        )
+    rows = (await db.execute(q2)).all()
+    consults = {
+        str(c.id): c
+        for c in (
+            await db.execute(
+                select(ConsultationRequest).where(
+                    ConsultationRequest.id.in_(
+                        [r[0].request_id for r in rows if r[0].request_type == "consultation"]
+                        or [uuid.uuid4()]
+                    )
+                )
+            )
+        ).scalars().all()
+    }
+    out = []
+    for a, m, u in rows:
+        row = consults.get(str(a.request_id))
+        out.append(
+            {
+                "id": str(a.id),
+                "marketer_id": str(m.id),
+                "marketer_name": u.full_name,
+                "ref_code": a.ref_code,
+                "flag": a.flag,
+                "request_id": str(a.request_id),
+                "tracking_code": row.tracking_code if row else "",
+                "client_name": row.full_name if row else "",
+                "status": row.status if row else "",
+                "created_at": a.created_at.isoformat(),
+            }
+        )
+    return out
+
+
+class ReferralAttachIn(BaseModel):
+    request_id: uuid.UUID | None = None
+    tracking_code: str = Field(default="", max_length=40)
+    ref_code: str = Field(min_length=4, max_length=24)
+    flag: str = Field(default="", pattern="^(|review)$")
+
+
+@router.post("/referrals/attach", status_code=201)
+async def attach_referral(
+    db: DbDep, user: CurrentUser, payload: ReferralAttachIn, request: Request
+) -> dict:
+    """Link a case to a marketer's code (first-touch locked — admin override).
+    Case is addressed by UUID or its public tracking code."""
+    case = None
+    if payload.request_id is not None:
+        case = await db.get(ConsultationRequest, payload.request_id)
+    elif payload.tracking_code.strip():
+        case = (
+            await db.execute(
+                select(ConsultationRequest).where(
+                    ConsultationRequest.tracking_code == payload.tracking_code.strip()
+                )
+            )
+        ).scalar_one_or_none()
+    if case is None:
+        raise HTTPException(404, {"code": "not_found", "message": "پرونده یافت نشد."})
+    prof = await ref_svc.resolve_code(db, payload.ref_code) or (
+        await db.execute(
+            select(MarketerProfile).where(
+                MarketerProfile.ref_code == payload.ref_code.strip().upper()
+            )
+        )
+    ).scalar_one_or_none()
+    if prof is None:
+        raise HTTPException(404, {"code": "not_found", "message": "کد معرف یافت نشد."})
+    existing = (
+        await db.execute(
+            select(ReferralAttribution).where(
+                ReferralAttribution.request_type == "consultation",
+                ReferralAttribution.request_id == case.id,
+            )
+        )
+    ).scalar_one_or_none()
+    if existing is not None:
+        before = {"marketer_id": str(existing.marketer_id), "ref_code": existing.ref_code}
+        await ref_svc.reassign(db, existing, prof)
+        if payload.flag:
+            existing.flag = payload.flag
+        await audit(db, actor=user, action="referral.reassign", entity="referral_attribution",
+                    entity_id=existing.id, before=before,
+                    after={"marketer_id": str(prof.id), "ref_code": prof.ref_code,
+                           "flag": existing.flag},
+                    request=request)
+        await db.commit()
+        return {"id": str(existing.id), "ref_code": prof.ref_code, "reassigned": True}
+    attr = await ref_svc.attribute(
+        db, prof, request_type="consultation", request_id=case.id,
+        ip="", ua="", flag=payload.flag,
+    )
+    case.ref_code = prof.ref_code
+    case.referrer_id = prof.id
+    await thread_svc_add(db, case.id, user, prof.ref_code)
+    await audit(db, actor=user, action="referral.attach", entity="referral_attribution",
+                entity_id=attr.id,
+                after={"marketer_id": str(prof.id), "ref_code": prof.ref_code,
+                       "request_id": str(case.id), "flag": attr.flag},
+                request=request)
+    await db.commit()
+    return {"id": str(attr.id), "ref_code": prof.ref_code, "reassigned": False}
+
+
+async def thread_svc_add(db, request_id, user, ref_code):
+    from ....services import thread as thread_svc
+
+    await thread_svc.add_event(
+        db, "consultation", request_id, "referred",
+        actor=user, payload={"ref_code": ref_code, "manual": True},
+    )
+
+
+class ReferralFlagIn(BaseModel):
+    flag: str = Field(pattern="^(|review)$")
+
+
+@router.patch("/referrals/{attribution_id}")
+async def flag_referral(
+    db: DbDep, user: CurrentUser, attribution_id: uuid.UUID,
+    payload: ReferralFlagIn, request: Request,
+) -> dict:
+    """Flag/unflag a referral for review — flagged ones accrue no commission."""
+    attr = await db.get(ReferralAttribution, attribution_id)
+    if attr is None:
+        raise HTTPException(404, {"code": "not_found", "message": "ارجاع یافت نشد."})
+    before = {"flag": attr.flag}
+    attr.flag = payload.flag
+    await audit(db, actor=user, action="referral.flag", entity="referral_attribution",
+                entity_id=attr.id, before=before, after={"flag": attr.flag},
+                request=request)
+    await db.commit()
+    return {"id": str(attr.id), "flag": attr.flag}
+
+
+# ─── versioned marketing terms ──────────────────────────────────────
+
+
+@router.get("/terms")
+async def terms_list(db: DbDep) -> list[dict]:
+    rows = (
+        await db.execute(
+            select(MarketingTerms).order_by(MarketingTerms.version.desc()).limit(50)
+        )
+    ).scalars().all()
+    return [
+        {
+            "id": str(t.id), "version": t.version, "is_active": t.is_active,
+            "body": t.body, "created_at": t.created_at.isoformat(),
+        }
+        for t in rows
+    ]
+
+
+class TermsIn(BaseModel):
+    body: str = Field(min_length=20, max_length=20000)
+
+
+@router.post("/terms", status_code=201)
+async def terms_create(
+    db: DbDep, user: CurrentUser, payload: TermsIn, request: Request
+) -> dict:
+    """Every edit = a new version; past versions + acceptances are preserved."""
+    row = await comm_svc.create_terms_version(db, payload.body, user.id)
+    await audit(db, actor=user, action="marketing_terms.create", entity="marketing_terms",
+                entity_id=row.id, after={"version": row.version}, request=request)
+    await db.commit()
+    return {"id": str(row.id), "version": row.version}
+
+
+# ─── monthly rollup ─────────────────────────────────────────────────
+
+
+@router.get("/report/monthly")
+async def monthly_report(db: DbDep, months: Annotated[int, Query(ge=1, le=24)] = 12) -> list[dict]:
+    """Per-month referrals + accruals/payments for the reports tab."""
+    start = datetime.now(UTC) - timedelta(days=months * 31)
+    attr_rows = (
+        await db.execute(
+            select(ReferralAttribution.created_at).where(
+                ReferralAttribution.created_at >= start
+            )
+        )
+    ).all()
+    comm_rows = (
+        await db.execute(
+            select(Commission).where(Commission.created_at >= start)
+        )
+    ).scalars().all()
+    buckets: dict[str, dict] = {}
+    for (dt,) in attr_rows:
+        k = dt.strftime("%Y-%m")
+        buckets.setdefault(k, {"month": k, "referrals": 0, "accrued": 0, "paid": 0})
+        buckets[k]["referrals"] += 1
+    for c in comm_rows:
+        k = c.created_at.strftime("%Y-%m")
+        b = buckets.setdefault(k, {"month": k, "referrals": 0, "accrued": 0, "paid": 0})
+        if c.entry_type == "accrual":
+            b["accrued"] += c.amount
+            if c.status == "paid":
+                b["paid"] += c.amount
+    return [buckets[k] for k in sorted(buckets)]

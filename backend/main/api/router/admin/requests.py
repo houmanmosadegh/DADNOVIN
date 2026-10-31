@@ -9,6 +9,7 @@ from sqlalchemy import select
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from ....db.session import get_db
+from ....models.account import CaseFeeReceipt, Commission
 from ....models.consultation import ConsultationRequest
 from ....models.request_ops import (
     REQUEST_TYPES,
@@ -55,6 +56,13 @@ _MODELS = {
 class CallLogIn(BaseModel):
     outcome: str = Field(min_length=2, max_length=40)
     note: str = Field(default="", max_length=1000)
+
+
+class FeeReceiptIn(BaseModel):
+    """Office's received attorney fee on the case — whole or an installment.
+    Each receipt accrues one commission entry for the referring marketer."""
+    amount: int = Field(gt=0, le=10_000_000_000_000)  # rials
+    note: str = Field(default="", max_length=300)
 
 
 def _request_dict(row) -> dict:
@@ -273,20 +281,15 @@ async def change_status(
     await thread_svc.set_status(
         db, rtype, row, payload.status, actor=user, reason=payload.reason
     )
-    if payload.status == "accepted" and rtype == "consultation":
-        comm = await commissions_svc.on_request_accepted(db, rtype, request_id, row)
-        if comm is not None:
+    if before == "accepted" and payload.status in ("cancelled", "rejected"):
+        # برگشت/لغو پرونده از وضعیت پذیرفته → کمیسیون‌های پرداخت‌نشده برمی‌گردند
+        n = await commissions_svc.on_request_rolled_back(
+            db, rtype, request_id, actor_id=user.id
+        )
+        if n:
             await thread_svc.add_event(
-                db, rtype, request_id, "commission_created",
-                actor=user, payload={"commission_id": str(comm.id), "amount": comm.amount},
-            )
-    elif before == "accepted" and payload.status in ("cancelled", "rejected"):
-        # برگشت/لغو پرونده از وضعیت پذیرفته → کمیسیون‌اش هم لغو می‌شود
-        rolled = await commissions_svc.on_request_rolled_back(db, rtype, request_id)
-        if rolled is not None:
-            await thread_svc.add_event(
-                db, rtype, request_id, "commission_cancelled",
-                actor=user, payload={"commission_id": str(rolled.id)},
+                db, rtype, request_id, "commission_reversed",
+                actor=user, payload={"count": n},
             )
     STATUS_FA = {
         "new": "جدید", "reviewing": "در حال بررسی", "awaiting_call": "در انتظار تماس",
@@ -432,3 +435,99 @@ async def assignees(_: SupportDep, db: DbDep) -> list[dict]:
         )
     ).scalars().all()
     return [{"id": str(u.id), "name": u.full_name, "username": u.username} for u in rows]
+
+
+# ─── attorney-fee receipts (commission accrual trigger) ─────────────
+
+
+@router.get("/requests/consultation/{request_id}/fee-receipts")
+async def fee_receipts(
+    request_id: uuid.UUID, _: SupportDep, db: DbDep
+) -> dict:
+    """Received attorney-fee payments on this case + resulting commissions."""
+    row = await thread_svc.load_request(db, "consultation", request_id)
+    receipts = (
+        await db.execute(
+            select(CaseFeeReceipt)
+            .where(CaseFeeReceipt.request_id == row.id)
+            .order_by(CaseFeeReceipt.created_at)
+        )
+    ).scalars().all()
+    comms = (
+        await db.execute(
+            select(Commission)
+            .where(
+                Commission.request_id == row.id,
+                Commission.request_type == "consultation",
+            )
+            .order_by(Commission.created_at)
+        )
+    ).scalars().all()
+    return {
+        "fee_amount": row.fee_amount,
+        "receipts": [
+            {
+                "id": str(r.id),
+                "amount": r.amount,
+                "note": r.note,
+                "created_at": r.created_at.isoformat(),
+            }
+            for r in receipts
+        ],
+        "commissions": [
+            {
+                "id": str(c.id),
+                "entry_type": c.entry_type,
+                "basis_amount": c.basis_amount,
+                "rate": c.rate_bp / 100,
+                "amount": c.amount,
+                "status": c.status,
+                "created_at": c.created_at.isoformat(),
+            }
+            for c in comms
+        ],
+    }
+
+
+@router.post("/requests/consultation/{request_id}/fee-receipts", status_code=201)
+async def add_fee_receipt(
+    request_id: uuid.UUID,
+    payload: FeeReceiptIn,
+    request: Request,
+    user: SupportDep,
+    db: DbDep,
+) -> dict:
+    """Record received attorney fee → accrues one commission entry when the
+    case is referral-attributed (transactional + idempotent per receipt)."""
+    row = await thread_svc.load_request(db, "consultation", request_id)
+    receipt = CaseFeeReceipt(
+        request_id=row.id,
+        amount=payload.amount,
+        note=payload.note.strip(),
+        created_by=user.id,
+    )
+    db.add(receipt)
+    await db.flush()
+    comm = await commissions_svc.accrue_for_receipt(db, receipt, user.id)
+    await thread_svc.add_event(
+        db, "consultation", request_id, "fee_received",
+        actor=user,
+        payload={
+            "receipt_id": str(receipt.id),
+            "amount": receipt.amount,
+            "commission_id": str(comm.id) if comm else None,
+            "commission_amount": comm.amount if comm else 0,
+        },
+    )
+    await audit(
+        db, actor=user, action="fee_receipt.create", entity="consultation",
+        entity_id=request_id,
+        detail={"amount": payload.amount, "note": payload.note},
+        request=request,
+    )
+    await db.commit()
+    return {
+        "receipt_id": str(receipt.id),
+        "commission_id": str(comm.id) if comm else None,
+        "commission_amount": comm.amount if comm else 0,
+    }

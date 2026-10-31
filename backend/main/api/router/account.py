@@ -57,6 +57,13 @@ DbDep = Annotated[AsyncSession, Depends(get_db)]
 REF_COOKIE = "dn_ref"
 
 
+async def _marketing_on(db: AsyncSession) -> None:
+    """404 the marketing surface entirely while the admin switch is off —
+    routes must not even hint the feature exists."""
+    if not await comm_svc.marketing_enabled(db):
+        raise HTTPException(404, {"code": "not_found", "message": "یافت نشد."})
+
+
 async def _role(db: AsyncSession, name: str) -> Role:
     role = (
         await db.execute(select(Role).where(Role.name == name))
@@ -402,6 +409,77 @@ async def _own_request(db: AsyncSession, user: User, request_id: uuid.UUID) -> C
     return row
 
 
+class PanelConsultationIn(BaseModel):
+    """Logged-in consultation submit — name/phone come from the account."""
+    topic: str = Field(min_length=2, max_length=200)
+    message: str = Field(min_length=10, max_length=5000)
+    phone: str = Field(default="", max_length=40)  # preferred contact (optional)
+    ref_code: str = Field(default="", max_length=24)
+
+
+def _display_status(row: ConsultationRequest, last_sender: str | None) -> str:
+    """Coarse status for the user list: ثبت‌شده / در حال بررسی / پاسخ داده شد / بسته‌شده."""
+    if row.status in ("completed", "rejected", "cancelled"):
+        return "closed"
+    if row.status == "accepted" or last_sender == "staff":
+        return "answered"
+    if row.status in ("reviewing", "awaiting_call", "followed_up", "consulted"):
+        return "reviewing"
+    return "submitted"
+
+
+@router.post("/requests", status_code=201)
+async def create_request(
+    db: DbDep, user: CurrentUser, payload: PanelConsultationIn, request: Request
+) -> dict:
+    limiter.check(
+        "consult_submit", client_key(request), get_settings().rate_limit_public_post_per_minute
+    )
+    phone = (payload.phone or user.phone or "").strip()
+    code_str = secrets.token_hex(4)
+    row = ConsultationRequest(
+        tracking_code=await thread_svc.next_tracking_code(db, "consultation"),
+        access_code_hash=hash_password(code_str),
+        full_name=user.full_name or user.username,
+        phone=phone or user.phone,
+        email=user.email or "",
+        topic=payload.topic.strip(),
+        message=payload.message.strip(),
+        source_page="/panel",
+        user_id=user.id,
+        client_ip=client_key(request),
+        client_ua=request.headers.get("user-agent", "")[:300],
+    )
+    db.add(row)
+    await db.flush()
+    await thread_svc.stamp_sla(db, "consultation", row)
+    # referral attribution — form field beats the dn_ref cookie
+    code = (payload.ref_code or request.cookies.get(REF_COOKIE, "")).strip().upper()
+    if code and await comm_svc.marketing_enabled(db):
+        prof = await ref_svc.resolve_code(db, code)
+        if prof is not None:
+            reason = await ref_svc.attribution_block_reason(
+                db, prof, phone=row.phone, user=user, exclude_request_id=row.id
+            )
+            if reason:
+                await thread_svc.add_event(
+                    db, "consultation", row.id, "referral_blocked",
+                    payload={"reason": reason},
+                )
+            else:
+                await ref_svc.attribute(
+                    db, prof, request_type="consultation", request_id=row.id,
+                    ip=row.client_ip, ua=row.client_ua,
+                )
+                row.ref_code = code
+                row.referrer_id = prof.id
+    await thread_svc.add_event(
+        db, "consultation", row.id, "created", payload={"source": "/panel"}
+    )
+    await db.commit()
+    return {"id": str(row.id), "tracking_code": row.tracking_code}
+
+
 @router.get("/requests")
 async def my_requests(db: DbDep, user: CurrentUser) -> list[dict]:
     rows = (
@@ -457,6 +535,7 @@ async def my_requests(db: DbDep, user: CurrentUser) -> list[dict]:
             "tracking_code": r.tracking_code,
             "topic": r.topic or r.service_slug,
             "status": r.status,
+            "display_status": _display_status(r, last_sender.get(r.id)),
             "created_at": r.created_at.isoformat(),
             "last_activity": last_activity.get(r.id, r.created_at).isoformat(),
             "has_new_reply": last_sender.get(r.id) == "staff",
@@ -495,6 +574,9 @@ async def my_request_detail(db: DbDep, user: CurrentUser, request_id: uuid.UUID)
         "tracking_code": row.tracking_code,
         "topic": row.topic or row.service_slug,
         "status": row.status,
+        "display_status": _display_status(
+            row, msgs[-1].sender_type if msgs else None
+        ),
         "created_at": row.created_at.isoformat(),
         "events": [
             {
@@ -582,13 +664,20 @@ async def read_notification(db: DbDep, user: CurrentUser, notif_id: uuid.UUID) -
 async def marketer_apply(
     db: DbDep, user: CurrentUser, payload: MarketerApplyIn, request: Request
 ) -> dict:
+    await _marketing_on(db)
     if not payload.terms:
         raise HTTPException(
             422, {"code": "terms_required", "message": "پذیرش قوانین بازاریابی الزامی است."}
         )
     cfg = await comm_svc.referral_settings(db)
+    terms = await comm_svc.terms_view(db)
     app = await ref_svc.apply(
-        db, user, payload.note, payload.channel, int(cfg.get("reapply_days", 14))
+        db,
+        user,
+        payload.note,
+        payload.channel,
+        int(cfg.get("reapply_days", 14)),
+        terms_version=terms["version"] or payload.terms_version,
     )
     await audit(db, actor=user, action="marketer.apply", entity="marketer_application", entity_id=app.id, request=request)
     await db.commit()
@@ -597,9 +686,11 @@ async def marketer_apply(
 
 @router.get("/marketer")
 async def marketer_home(db: DbDep, user: CurrentUser) -> dict:
+    await _marketing_on(db)
     prof = await ref_svc.profile_for_user(db, user.id)
     cfg = await comm_svc.referral_settings(db)
-    if prof is None:
+    rate_bp, rate_source = await comm_svc.rate_for(db, prof, cfg)
+    if prof is None or not prof.is_active:
         app = (
             await db.execute(
                 select(MarketerApplication)
@@ -610,8 +701,11 @@ async def marketer_home(db: DbDep, user: CurrentUser) -> dict:
         ).scalar_one_or_none()
         out: dict = {
             "status": app.status if app else "none",
-            "commission_enabled": bool(cfg.get("commission_enabled")),
+            "marketing_enabled": True,
+            "my_rate": rate_bp / 100,
         }
+        if prof is not None and not prof.is_active:
+            out["status"] = "suspended"
         if app is not None and app.status == "rejected":
             out["reject_reason"] = app.review_note
             out["reapply_at"] = (
@@ -619,6 +713,9 @@ async def marketer_home(db: DbDep, user: CurrentUser) -> dict:
             ).date().isoformat() if app.reviewed_at else ""
         if app is not None and app.status == "pending":
             out["applied_at"] = app.created_at.isoformat()
+        if app is None or app.status == "rejected":
+            out["terms"] = await comm_svc.terms_view(db)
+            out["default_rate"] = int(cfg.get("default_rate") or 0)
         return out
     stats = await ref_svc.stats_for(db, prof.id)
     links = await ref_svc.links_for(db, prof)
@@ -628,6 +725,7 @@ async def marketer_home(db: DbDep, user: CurrentUser) -> dict:
             select(CommissionRule)
             .where(
                 CommissionRule.is_active.is_(True),
+                CommissionRule.kind == "percent",
                 or_(
                     CommissionRule.marketer_id.is_(None),
                     CommissionRule.marketer_id == prof.id,
@@ -649,7 +747,10 @@ async def marketer_home(db: DbDep, user: CurrentUser) -> dict:
         "ref_code": prof.ref_code,
         "ref_link": f"/r/{prof.ref_code}",
         "is_active": prof.is_active,
-        "commission_enabled": bool(cfg.get("commission_enabled")),
+        "marketing_enabled": True,
+        "my_rate": rate_bp / 100,
+        "rate_source": rate_source,
+        "accepted_terms_version": prof.accepted_terms_version,
         "cookie_days": int(cfg.get("cookie_days", 30)),
         "stats": stats,
         "links": links,
@@ -677,6 +778,7 @@ class LinkIn(BaseModel):
 
 @router.get("/marketer/links")
 async def marketer_links(db: DbDep, user: CurrentUser) -> list[dict]:
+    await _marketing_on(db)
     prof = await ref_svc.profile_for_user(db, user.id)
     if prof is None:
         raise HTTPException(403, {"code": "not_marketer", "message": "حساب بازاریاب نیستید."})
@@ -685,6 +787,7 @@ async def marketer_links(db: DbDep, user: CurrentUser) -> list[dict]:
 
 @router.post("/marketer/links", status_code=201)
 async def marketer_link_create(db: DbDep, user: CurrentUser, payload: LinkIn) -> dict:
+    await _marketing_on(db)
     prof = await ref_svc.profile_for_user(db, user.id)
     if prof is None:
         raise HTTPException(403, {"code": "not_marketer", "message": "حساب بازاریاب نیستید."})
@@ -695,6 +798,7 @@ async def marketer_link_create(db: DbDep, user: CurrentUser, payload: LinkIn) ->
 
 @router.delete("/marketer/links/{link_id}", status_code=204)
 async def marketer_link_delete(db: DbDep, user: CurrentUser, link_id: uuid.UUID) -> Response:
+    await _marketing_on(db)
     prof = await ref_svc.profile_for_user(db, user.id)
     if prof is None:
         raise HTTPException(403, {"code": "not_marketer", "message": "حساب بازاریاب نیستید."})
@@ -712,6 +816,7 @@ async def marketer_qr(
 
     import segno
 
+    await _marketing_on(db)
     prof = await ref_svc.profile_for_user(db, user.id)
     if prof is None:
         raise HTTPException(403, {"code": "not_marketer", "message": "حساب بازاریاب نیستید."})
@@ -731,6 +836,7 @@ async def marketer_referrals(db: DbDep, user: CurrentUser) -> list[dict]:
     Never includes topic/message/documents — the marketer must not see
     any case details.
     """
+    await _marketing_on(db)
     prof = await ref_svc.profile_for_user(db, user.id)
     if prof is None:
         return []
@@ -769,6 +875,7 @@ def _mask_name(name: str) -> str:
 
 @router.post("/marketer/bank")
 async def marketer_bank(db: DbDep, user: CurrentUser, payload: BankDetailsIn) -> dict:
+    await _marketing_on(db)
     prof = await ref_svc.profile_for_user(db, user.id)
     if prof is None:
         raise HTTPException(403, {"code": "not_marketer", "message": "حساب بازاریاب نیستید."})
@@ -783,42 +890,18 @@ async def marketer_bank(db: DbDep, user: CurrentUser, payload: BankDetailsIn) ->
     return {"message": "اطلاعات بانکی ذخیره شد.", "iban_masked": _iban_masked(prof)}
 
 
-# ─── commissions (no wallet — admins settle payouts outside the system) ───
-
-_REQUEST_TYPE_FA = {
-    "consultation": "درخواست مشاوره",
-    "contact": "فرم تماس",
-    "ticket": "تیکت",
-    "callback": "درخواست تماس",
-}
-
-
-def _commission_row(comm: Commission, tracking: str | None) -> dict:
-    snap = {}
-    try:
-        import json
-
-        snap = json.loads(comm.rule_snapshot) if comm.rule_snapshot else {}
-    except (ValueError, TypeError):
-        pass
-    return {
-        "id": str(comm.id),
-        "request_type": comm.request_type,
-        "request_label": _REQUEST_TYPE_FA.get(comm.request_type, comm.request_type),
-        "tracking_code": tracking,
-        "basis_kind": comm.basis_kind,
-        "basis_amount": comm.basis_amount,
-        "percent": snap.get("value") if comm.basis_kind == "percent" else None,
-        "amount": comm.amount,
-        "status": comm.status,
-        "paid_at": comm.paid_at.isoformat() if comm.paid_at else None,
-        "created_at": comm.created_at.isoformat(),
-    }
+# ─── commissions (append-only ledger — no wallet, manual settlement) ───
 
 
 @router.get("/commissions")
 async def my_commissions(db: DbDep, user: CurrentUser) -> dict:
-    """Own commissions only — marketers never see each other's data."""
+    """Own commissions only — strict whitelist fields, never any case detail.
+
+    A marketer learns: masked referred name, coarse stage, the office's
+    received fee, their own rate, their commission, status, dates. Subject,
+    claim amount, parties, phone and tracking stay invisible.
+    """
+    await _marketing_on(db)
     prof = await ref_svc.profile_for_user(db, user.id)
     if prof is None:
         raise HTTPException(403, {"code": "not_marketer", "message": "حساب بازاریاب نیستید."})
@@ -830,27 +913,33 @@ async def my_commissions(db: DbDep, user: CurrentUser) -> dict:
             .limit(200)
         )
     ).scalars().all()
-    tracking = {
-        str(c.id): c.tracking_code
+    consults = {
+        str(c.id): c
         for c in (
             await db.execute(
-                select(ConsultationRequest.id, ConsultationRequest.tracking_code).where(
+                select(ConsultationRequest).where(
                     ConsultationRequest.id.in_(
                         [r.request_id for r in rows] or [uuid.uuid4()]
                     )
                 )
             )
-        ).all()
+        ).scalars().all()
     }
-    sums = dict.fromkeys(("pending", "approved", "paid", "cancelled"), 0)
+    items = []
     for r in rows:
-        if r.status in sums:
-            sums[r.status] += r.amount
+        consult = consults.get(str(r.request_id))
+        items.append(
+            comm_svc.marketer_commission_row(
+                r,
+                comm_svc.mask_name(consult.full_name if consult else ""),
+                comm_svc._STAGE_FA.get(consult.status if consult else "", "—"),
+            )
+        )
     cfg = await comm_svc.referral_settings(db)
     return {
-        "items": [_commission_row(r, tracking.get(str(r.request_id))) for r in rows],
-        "totals": sums,
-        "commission_enabled": bool(cfg.get("commission_enabled")),
+        "items": items,
+        "totals": comm_svc.net_totals(rows),
+        "marketing_enabled": bool(cfg.get("marketing_enabled")),
     }
 
 

@@ -42,11 +42,30 @@ class MarketerApplication(Base):
         DateTime(timezone=True), nullable=True
     )
     review_note: Mapped[str] = mapped_column(Text, default="")
+    # version of the terms text the applicant accepted (0 = legacy/pre-versioning)
+    terms_version: Mapped[int] = mapped_column(Integer, default=0)
+    created_at: Mapped[datetime] = created_at_col()
+
+
+class MarketingTerms(Base):
+    """Versioned terms & conditions for the marketing programme.
+
+    Rows are append-only: editing creates a new version and deactivates the
+    old one, so past acceptances always resolve to the text that was shown.
+    """
+
+    __tablename__ = "marketing_terms"
+
+    id: Mapped[uuid.UUID] = uuid_pk()
+    version: Mapped[int] = mapped_column(Integer, unique=True, index=True)
+    body: Mapped[str] = mapped_column(Text)
+    is_active: Mapped[bool] = mapped_column(Boolean, default=True, index=True)
+    created_by: Mapped[uuid.UUID | None] = mapped_column(Uuid, nullable=True)
     created_at: Mapped[datetime] = created_at_col()
 
 
 class MarketerProfile(Base):
-    """Approved marketer: immutable referral code + payout coordinates."""
+    """Approved marketer: immutable referral code + bank coordinates."""
 
     __tablename__ = "marketer_profiles"
 
@@ -62,6 +81,13 @@ class MarketerProfile(Base):
     approved_by: Mapped[uuid.UUID | None] = mapped_column(Uuid, nullable=True)
     # admin flag for suspicious activity — shown in the marketers list
     fraud_flag: Mapped[bool] = mapped_column(Boolean, default=False)
+    # optional per-marketer commission percent (0..100); NULL = global default
+    custom_rate: Mapped[int | None] = mapped_column(Integer, nullable=True)
+    # terms the marketer accepted — copied from the application at approval
+    accepted_terms_version: Mapped[int] = mapped_column(Integer, default=0)
+    accepted_at: Mapped[datetime | None] = mapped_column(
+        DateTime(timezone=True), nullable=True
+    )
     created_at: Mapped[datetime] = created_at_col()
     updated_at: Mapped[datetime] = updated_at_col()
 
@@ -117,6 +143,8 @@ class ReferralAttribution(Base):
     ref_code: Mapped[str] = mapped_column(String(24))
     ip: Mapped[str] = mapped_column(String(45), default="")
     user_agent: Mapped[str] = mapped_column(String(300), default="")
+    # '' = clean | 'review' = flagged, no commission until an admin clears it
+    flag: Mapped[str] = mapped_column(String(20), default="", index=True)
     created_at: Mapped[datetime] = created_at_col()
 
     __table_args__ = (
@@ -154,7 +182,31 @@ class CommissionRule(Base):
     created_at: Mapped[datetime] = created_at_col()
 
 
+class CaseFeeReceipt(Base):
+    """A payment of the office's attorney fee received on a case (installments
+    allowed) — each receipt accrues one commission entry for the referrer."""
+
+    __tablename__ = "case_fee_receipts"
+
+    id: Mapped[uuid.UUID] = uuid_pk()
+    request_id: Mapped[uuid.UUID] = mapped_column(
+        Uuid, ForeignKey("consultation_requests.id", ondelete="CASCADE"), index=True
+    )
+    amount: Mapped[int] = mapped_column(BigInteger)  # rials received by the office
+    note: Mapped[str] = mapped_column(String(300), default="")
+    created_by: Mapped[uuid.UUID | None] = mapped_column(Uuid, nullable=True)
+    created_at: Mapped[datetime] = created_at_col()
+
+
 class Commission(Base):
+    """Append-only commission ledger — rows are never deleted or re-computed.
+
+    entry_type:
+      accrual  — one per CaseFeeReceipt (positive, basis = receipt amount)
+      reversal — negative entry when a fee is refunded / the case unravels
+    Status lifecycle on accruals: pending → approved → paid | cancelled.
+    """
+
     __tablename__ = "commissions"
 
     id: Mapped[uuid.UUID] = uuid_pk()
@@ -163,9 +215,25 @@ class Commission(Base):
     )
     request_type: Mapped[str] = mapped_column(String(20))
     request_id: Mapped[uuid.UUID] = mapped_column(Uuid, index=True)
-    basis_kind: Mapped[str] = mapped_column(String(10), default="fixed")
-    basis_amount: Mapped[int] = mapped_column(BigInteger, default=0)  # fee set by admin (percent mode)
-    amount: Mapped[int] = mapped_column(BigInteger, default=0)
+    # attribution row that linked this case to the marketer (provenance)
+    referral_id: Mapped[uuid.UUID | None] = mapped_column(
+        Uuid, ForeignKey("referral_attributions.id", ondelete="SET NULL"),
+        nullable=True, index=True,
+    )
+    # accrual | reversal
+    entry_type: Mapped[str] = mapped_column(String(10), default="accrual", index=True)
+    # for accruals: the receipt this entry was created from (idempotency key)
+    receipt_id: Mapped[uuid.UUID | None] = mapped_column(
+        Uuid, ForeignKey("case_fee_receipts.id", ondelete="SET NULL"),
+        nullable=True, unique=True,
+    )
+    # for reversals: the accrual being reversed
+    parent_id: Mapped[uuid.UUID | None] = mapped_column(Uuid, nullable=True)
+    basis_kind: Mapped[str] = mapped_column(String(10), default="percent")
+    basis_amount: Mapped[int] = mapped_column(BigInteger, default=0)  # received fee
+    # commission rate at creation, basis points (1500 = 15%) — snapshotted
+    rate_bp: Mapped[int] = mapped_column(Integer, default=0)
+    amount: Mapped[int] = mapped_column(BigInteger, default=0)  # signed rials
     # pending → approved → paid | cancelled (manual settlement, no wallet)
     status: Mapped[str] = mapped_column(String(15), default="pending", index=True)
     hold_until: Mapped[datetime | None] = mapped_column(
@@ -176,15 +244,11 @@ class Commission(Base):
     )
     paid_note: Mapped[str] = mapped_column(String(300), default="")
     paid_by: Mapped[uuid.UUID | None] = mapped_column(Uuid, nullable=True)
-    # JSON snapshot of the rule applied at creation — later rule edits never
-    # rewrite history
+    # JSON snapshot of the rate source applied at creation
     rule_snapshot: Mapped[str] = mapped_column(Text, default="")
+    created_by: Mapped[uuid.UUID | None] = mapped_column(Uuid, nullable=True)
     created_at: Mapped[datetime] = created_at_col()
     updated_at: Mapped[datetime] = updated_at_col()
-
-    __table_args__ = (
-        UniqueConstraint("request_type", "request_id", name="uq_commission_request"),
-    )
 
 
 class InboxNotification(Base):

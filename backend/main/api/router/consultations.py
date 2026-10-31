@@ -14,6 +14,7 @@ from ...models.consultation import ConsultationRequest
 from ...models.content import SiteSetting
 from ...schemas.consultation import ConsultationCreatedOut, ConsultationIn
 from ...security.passwords import hash_password
+from ...services import commissions as comm_svc
 from ...services import referrals as ref_svc
 from ...services import thread as thread_svc
 from ...utils.ids import access_code
@@ -80,7 +81,7 @@ async def _maybe_attribute(
     self-referrals and non-new clients — submission never fails on it.
     """
     code = (payload.ref_code or request.cookies.get(REF_COOKIE, "")).strip().upper()
-    if not code:
+    if not code or not await comm_svc.marketing_enabled(db):
         return
     prof = await ref_svc.resolve_code(db, code)
     if prof is None:

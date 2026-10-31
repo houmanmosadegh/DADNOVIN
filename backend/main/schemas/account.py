@@ -99,6 +99,7 @@ class MarketerApplyIn(BaseModel):
     note: str = Field(default="", max_length=1000)
     channel: str = Field(default="", max_length=200)
     terms: bool = False
+    terms_version: int = Field(default=0, ge=0, le=999999)
 
 
 class MarketerReviewIn(BaseModel):

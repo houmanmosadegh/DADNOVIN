@@ -3,7 +3,7 @@
 import pytest
 from sqlalchemy import select
 
-from main.models.account import Commission, CommissionRule
+from main.models.account import CaseFeeReceipt, Commission, CommissionRule
 from main.models.consultation import ConsultationRequest
 from main.models.content import SiteSetting
 
@@ -76,11 +76,19 @@ async def _consult_row(seeded_session, client, phone, name="مراجع تست", 
     ).scalar_one()
 
 
-async def _make_marketer(client, phone):
+async def _enable_marketing(seeded_session):
+    srow = await seeded_session.get(SiteSetting, "commission")
+    srow.value = {**(srow.value or {}), "marketing_enabled": True}
+    await seeded_session.commit()
+
+
+async def _make_marketer(client, seeded_session, phone):
     """Register → apply → admin approve → re-login user → ref_code.
 
+    Enables the marketing switch first — it's off by default in seed data.
     The shared httpx client holds one cookie jar — re-login swaps roles.
     """
+    await _enable_marketing(seeded_session)
     r = await _register(client, phone, "بازاریاب تست")
     assert r.status_code == 201, r.text
     r = await client.post("/api/v1/account/marketer/apply", json={"note": "", "channel": "", "terms": True})
@@ -168,8 +176,8 @@ class TestMyRequests:
 
 
 class TestReferral:
-    async def test_apply_approve_ref_code(self, client):
-        code = await _make_marketer(client, PHONE_M)
+    async def test_apply_approve_ref_code(self, client, seeded_session):
+        code = await _make_marketer(client, seeded_session, PHONE_M)
         assert code.startswith("DN-")
         r = await client.get("/api/v1/account/marketer")
         assert r.status_code == 200
@@ -177,18 +185,18 @@ class TestReferral:
         assert r.json()["is_active"] is True
 
     async def test_attribution_on_submit(self, client, seeded_session):
-        code = await _make_marketer(client, PHONE_M)
+        code = await _make_marketer(client, seeded_session, PHONE_M)
         row = await _consult_row(seeded_session, client, PHONE_B, ref=code)
         assert row.ref_code == code
         assert row.referrer_id is not None
 
     async def test_self_referral_blocked(self, client, seeded_session):
-        code = await _make_marketer(client, PHONE_M)
+        code = await _make_marketer(client, seeded_session, PHONE_M)
         row = await _consult_row(seeded_session, client, PHONE_M, ref=code)
         assert row.referrer_id is None
 
     async def test_existing_client_not_attributed(self, client, seeded_session):
-        code = await _make_marketer(client, PHONE_M)
+        code = await _make_marketer(client, seeded_session, PHONE_M)
         await _consult_row(seeded_session, client, PHONE_B)  # no longer "new"
         row = await _consult_row(seeded_session, client, PHONE_B, ref=code)
         assert row.referrer_id is None
@@ -199,154 +207,262 @@ class TestReferral:
 
 
 class TestCommissionLifecycle:
-    """No-wallet commission flow — pending → approved → paid | cancelled."""
+    """Receipt-driven commission ledger — pending → approved → paid | reversal."""
 
-    async def _enable(self, seeded_session, *, kind="fixed", value=500_000):
+    async def _enable(self, seeded_session, *, rate=15):
         row = await seeded_session.get(SiteSetting, "commission")
-        row.value = {**row.value, "commission_enabled": True}
-        seeded_session.add(CommissionRule(kind=kind, value=value, tier_min=0))
+        row.value = {
+            **(row.value or {}),
+            "marketing_enabled": True,
+            "default_rate": rate,
+        }
         await seeded_session.commit()
 
-    async def _accepted_case(self, client, seeded_session, ref_code, fee):
-        row = await _consult_row(seeded_session, client, PHONE_B, ref=ref_code)
+    async def _referred_case(self, client, seeded_session, ref_code, phone=PHONE_B):
+        row = await _consult_row(seeded_session, client, phone, ref=ref_code)
         await _set_status(client, row.id, "reviewing")
         await _set_status(client, row.id, "consulted")
-        r = await _set_status(client, row.id, "accepted", fee=fee)
+        r = await _set_status(client, row.id, "accepted")
         assert r.status_code == 200, r.text
         return row
 
-    async def test_lifecycle_and_manual_pay(self, client, seeded_session):
-        await self._enable(seeded_session)
-        code = await _make_marketer(client, PHONE_M)
+    async def _receipt(self, client, request_id, amount, note=""):
+        return await client.post(
+            f"/api/v1/admin/requests/consultation/{request_id}/fee-receipts",
+            json={"amount": amount, "note": note},
+        )
+
+    async def test_accrual_15pct_of_40m(self, client, seeded_session):
+        """۴۰٬۰۰۰٬۰۰۰ × ۱۵٪ = ۶٬۰۰۰٬۰۰۰ — the spec's canonical example."""
+        await self._enable(seeded_session, rate=15)
+        code = await _make_marketer(client, seeded_session, PHONE_M)
         await _admin(client)
-        row = await self._accepted_case(client, seeded_session, code, 10_000_000)
-
+        row = await self._referred_case(client, seeded_session, code)
+        r = await self._receipt(client, row.id, 40_000_000)
+        assert r.status_code == 201, r.text
+        assert r.json()["commission_amount"] == 6_000_000
         comm = (await seeded_session.execute(select(Commission))).scalar_one()
-        assert comm.amount == 500_000 and comm.status == "pending"
+        assert comm.entry_type == "accrual"
+        assert comm.basis_amount == 40_000_000
+        assert comm.rate_bp == 1500
+        assert comm.amount == 6_000_000
+        assert comm.status == "pending"
 
+    async def test_installments_one_entry_each(self, client, seeded_session):
+        """هر قسط حق‌الوکاله یک ورودی accrual جدا."""
+        await self._enable(seeded_session, rate=10)
+        code = await _make_marketer(client, seeded_session, PHONE_M)
+        await _admin(client)
+        row = await self._referred_case(client, seeded_session, code)
+        r1 = await self._receipt(client, row.id, 20_000_000, "قسط اول")
+        r2 = await self._receipt(client, row.id, 30_000_000, "قسط دوم")
+        assert r1.json()["commission_amount"] == 2_000_000
+        assert r2.json()["commission_amount"] == 3_000_000
+        comms = (
+            await seeded_session.execute(
+                select(Commission).where(Commission.entry_type == "accrual")
+            )
+        ).scalars().all()
+        assert len(comms) == 2
+        assert sum(c.amount for c in comms) == 5_000_000
+
+    async def test_rate_snapshot_immutable(self, client, seeded_session):
+        """تغییر نرخ بعد از ثبت، کمیسیون‌های قبلی را عوض نمی‌کند."""
+        await self._enable(seeded_session, rate=15)
+        code = await _make_marketer(client, seeded_session, PHONE_M)
+        await _admin(client)
+        row = await self._referred_case(client, seeded_session, code)
+        await self._receipt(client, row.id, 10_000_000)
+        comm = (await seeded_session.execute(select(Commission))).scalar_one()
+        assert comm.amount == 1_500_000 and comm.rate_bp == 1500
+
+        row = await seeded_session.get(SiteSetting, "commission")
+        row.value = {**row.value, "default_rate": 25}
+        await seeded_session.commit()
+        await seeded_session.refresh(comm)
+        assert comm.amount == 1_500_000 and comm.rate_bp == 1500
+
+    async def test_custom_rate_overrides_default(self, client, seeded_session):
+        await self._enable(seeded_session, rate=15)
+        code = await _make_marketer(client, seeded_session, PHONE_M)
+        await _admin(client)
+        from main.models.account import MarketerProfile
+
+        prof = (
+            await seeded_session.execute(select(MarketerProfile))
+        ).scalar_one()
+        prof.custom_rate = 20
+        await seeded_session.commit()
+        row = await self._referred_case(client, seeded_session, code)
+        await self._receipt(client, row.id, 10_000_000)
+        comm = (await seeded_session.execute(select(Commission))).scalar_one()
+        assert comm.rate_bp == 2000 and comm.amount == 2_000_000
+
+    async def test_reversal_on_cancel(self, client, seeded_session):
+        """برگشت پرونده → ورودی reversal منفی، نه حذف رکورد."""
+        await self._enable(seeded_session, rate=10)
+        code = await _make_marketer(client, seeded_session, PHONE_M)
+        await _admin(client)
+        row = await self._referred_case(client, seeded_session, code)
+        await self._receipt(client, row.id, 10_000_000)
+        accrual = (await seeded_session.execute(select(Commission))).scalar_one()
+
+        r = await client.post(
+            f"/api/v1/admin/requests/consultation/{row.id}/status",
+            json={"status": "cancelled", "reason": "عودت وجه به موکل"},
+        )
+        assert r.status_code == 200, r.text
+        await seeded_session.refresh(accrual)
+        assert accrual.status == "cancelled"
+        rev = (
+            await seeded_session.execute(
+                select(Commission).where(Commission.entry_type == "reversal")
+            )
+        ).scalar_one()
+        assert rev.amount == -accrual.amount
+        assert rev.parent_id == accrual.id
+
+    async def test_manual_reverse_endpoint(self, client, seeded_session):
+        await self._enable(seeded_session, rate=10)
+        code = await _make_marketer(client, seeded_session, PHONE_M)
+        await _admin(client)
+        row = await self._referred_case(client, seeded_session, code)
+        await self._receipt(client, row.id, 10_000_000)
+        comm = (await seeded_session.execute(select(Commission))).scalar_one()
+        r = await client.post(
+            f"/api/v1/admin/commissions/{comm.id}/reverse",
+            json={"amount": 500_000, "note": "برگشت جزئی"},
+        )
+        assert r.status_code == 200, r.text
+        assert r.json()["amount"] == -500_000
+        # full second reversal then hits the already_reversed guard eventually
+        r = await client.post(
+            f"/api/v1/admin/commissions/{comm.id}/reverse", json={}
+        )
+        assert r.status_code == 200
+        r = await client.post(
+            f"/api/v1/admin/commissions/{comm.id}/reverse", json={}
+        )
+        assert r.status_code == 409
+
+    async def test_idempotent_accrual(self, client, seeded_session):
+        from main.services import commissions as comm_svc
+
+        await self._enable(seeded_session, rate=10)
+        code = await _make_marketer(client, seeded_session, PHONE_M)
+        await _admin(client)
+        row = await self._referred_case(client, seeded_session, code)
+        await self._receipt(client, row.id, 10_000_000)
+        receipt = (
+            await seeded_session.execute(select(CaseFeeReceipt))
+        ).scalar_one()
+        again = await comm_svc.accrue_for_receipt(seeded_session, receipt, None)
+        assert again is None
+        assert len((await seeded_session.execute(select(Commission))).scalars().all()) == 1
+
+    async def test_pay_flow_and_marketer_view(self, client, seeded_session):
+        await self._enable(seeded_session, rate=10)
+        code = await _make_marketer(client, seeded_session, PHONE_M)
+        await _admin(client)
+        row = await self._referred_case(client, seeded_session, code)
+        await self._receipt(client, row.id, 10_000_000)
+        comm = (await seeded_session.execute(select(Commission))).scalar_one()
+
+        r = await client.post(
+            f"/api/v1/admin/commissions/{comm.id}/pay", json={"note": ""}
+        )
+        assert r.status_code == 409  # must be approved first
         r = await client.post(f"/api/v1/admin/commissions/{comm.id}/approve")
         assert r.status_code == 200
-        # pay before approve must fail — enforced order
-        assert comm.status == "approved"
-
         r = await client.post(
             f"/api/v1/admin/commissions/{comm.id}/pay",
             json={"note": "فیش 123456"},
         )
         assert r.status_code == 200
-        await seeded_session.refresh(comm)
-        assert comm.status == "paid" and comm.paid_at is not None
-        assert comm.paid_note == "فیش 123456"
 
-        # marketer sees own commission + totals — nothing wallet-shaped
+        # marketer sees the SAME amounts as admin — whitelist fields only
         await _login_user(client, PHONE_M)
         r = await client.get("/api/v1/account/commissions")
         assert r.status_code == 200
         data = r.json()
-        assert data["totals"]["paid"] == 500_000
-        assert len(data["items"]) == 1
-        assert data["items"][0]["tracking_code"] == row.tracking_code
-
-    async def test_percent_15_of_100m(self, client, seeded_session):
-        """۱۰۰ میلیون × ۱۵٪ = ۱۵ میلیون — spec's canonical example."""
-        await self._enable(seeded_session, kind="percent", value=15)
-        code = await _make_marketer(client, PHONE_M)
-        await _admin(client)
-        await self._accepted_case(client, seeded_session, code, 100_000_000)
-        comm = (await seeded_session.execute(select(Commission))).scalar_one()
-        assert comm.basis_kind == "percent"
-        assert comm.basis_amount == 100_000_000
-        assert comm.amount == 15_000_000
-
-    async def test_rule_snapshot_immutable(self, client, seeded_session):
-        """Editing the rate later never rewrites an existing commission."""
-        await self._enable(seeded_session, kind="percent", value=15)
-        code = await _make_marketer(client, PHONE_M)
-        await _admin(client)
-        await self._accepted_case(client, seeded_session, code, 100_000_000)
-        comm = (await seeded_session.execute(select(Commission))).scalar_one()
-        assert comm.amount == 15_000_000
-
-        # change the global rate to 20% — the snapshot stays 15%
-        seeded_session.add(CommissionRule(kind="percent", value=20, tier_min=1))
-        await seeded_session.commit()
-        await seeded_session.refresh(comm)
-        assert comm.amount == 15_000_000
-        assert '"value": 15' in comm.rule_snapshot
-
-    async def test_cancel_on_rollback(self, client, seeded_session):
-        """Case rolled back from accepted → commission cancelled too."""
-        await self._enable(seeded_session)
-        code = await _make_marketer(client, PHONE_M)
-        await _admin(client)
-        row = await self._accepted_case(client, seeded_session, code, 10_000_000)
-        comm = (await seeded_session.execute(select(Commission))).scalar_one()
-
-        r = await client.post(
-            f"/api/v1/admin/requests/consultation/{row.id}/status",
-            json={"status": "cancelled", "reason": "مراجع انصراف داد"},
-        )
-        assert r.status_code == 200, r.text
-        await seeded_session.refresh(comm)
-        assert comm.status == "cancelled"
-
-    async def test_duplicate_commission_impossible(self, client, seeded_session):
-        from main.services import commissions as comm_svc
-
-        await self._enable(seeded_session)
-        code = await _make_marketer(client, PHONE_M)
-        await _admin(client)
-        row = await self._accepted_case(client, seeded_session, code, 10_000_000)
-        # calling the creation hook again → no second row (unique constraint)
-        again = await comm_svc.on_request_accepted(
-            seeded_session, "consultation", row.id, row
-        )
-        assert again is None
-        count = (
-            await seeded_session.execute(select(Commission))
-        ).scalars().all()
-        assert len(count) == 1
-
-    async def test_pay_requires_approved(self, client, seeded_session):
-        await self._enable(seeded_session)
-        code = await _make_marketer(client, PHONE_M)
-        await _admin(client)
-        await self._accepted_case(client, seeded_session, code, 10_000_000)
-        comm = (await seeded_session.execute(select(Commission))).scalar_one()
-        r = await client.post(
-            f"/api/v1/admin/commissions/{comm.id}/pay", json={"note": ""}
-        )
-        assert r.status_code == 409
+        assert data["totals"]["paid"] == 1_000_000
+        item = data["items"][0]
+        assert item["amount"] == comm.amount
+        assert item["fee_amount"] == comm.basis_amount
+        assert item["rate"] == 10
+        # legal confidentiality — none of these may ever appear
+        body = str(data)
+        for forbidden in ("tracking_code", "topic", "phone", "message", "request_id"):
+            assert forbidden not in body, forbidden
 
     async def test_commissions_idor(self, client, seeded_session):
-        """A marketer only ever sees their own commissions."""
         await self._enable(seeded_session)
-        code = await _make_marketer(client, PHONE_M)
+        code = await _make_marketer(client, seeded_session, PHONE_M)
         await _admin(client)
-        await self._accepted_case(client, seeded_session, code, 10_000_000)
-
-        # second marketer — no commissions of their own
-        await _make_marketer(client, "09121110004")
+        row = await self._referred_case(client, seeded_session, code)
+        await self._receipt(client, row.id, 10_000_000)
+        await _make_marketer(client, seeded_session, "09121110004")
         r = await client.get("/api/v1/account/commissions")
         assert r.status_code == 200
         assert r.json()["items"] == []
         assert r.json()["totals"]["pending"] == 0
 
-    async def test_no_commission_when_disabled(self, client, seeded_session):
-        # commission_enabled stays False (default) — spec compliance switch
-        code = await _make_marketer(client, PHONE_M)
-        row = await _consult_row(seeded_session, client, PHONE_B, ref=code)
+    async def test_marketing_off_gates_everything(self, client, seeded_session):
+        """سوئیچ خاموش → apply/commissions/link ۴۰۴، روت /r/ ۴۰۴، بدون accrual."""
+        await self._enable(seeded_session)
+        code = await _make_marketer(client, seeded_session, PHONE_M)
+        # flip the switch OFF
+        row = await seeded_session.get(SiteSetting, "commission")
+        row.value = {**row.value, "marketing_enabled": False}
+        await seeded_session.commit()
+
+        r = await client.get(f"/api/v1/referrals/r/{code}")
+        assert r.status_code == 404
+        r = await client.get("/api/v1/account/commissions")
+        assert r.status_code == 404
+        r = await client.get("/api/v1/account/marketer")
+        assert r.status_code == 404
+        await _register(client, PHONE_B)
+        r = await client.post(
+            "/api/v1/account/marketer/apply", json={"terms": True}
+        )
+        assert r.status_code == 404
         await _admin(client)
-        await _set_status(client, row.id, "reviewing")
-        await _set_status(client, row.id, "consulted")
-        await _set_status(client, row.id, "accepted")
+        r = await client.get("/api/v1/admin/commissions")
+        assert r.status_code == 404
+
+    async def test_flagged_referral_accrues_nothing(self, client, seeded_session):
+        from main.models.account import ReferralAttribution
+
+        await self._enable(seeded_session, rate=10)
+        code = await _make_marketer(client, seeded_session, PHONE_M)
+        await _admin(client)
+        row = await self._referred_case(client, seeded_session, code)
+        attr = (
+            await seeded_session.execute(select(ReferralAttribution))
+        ).scalar_one()
+        attr.flag = "review"
+        await seeded_session.commit()
+        r = await self._receipt(client, row.id, 10_000_000)
+        assert r.status_code == 201
+        assert r.json()["commission_id"] is None
+        assert (
+            await seeded_session.execute(select(Commission))
+        ).scalar_one_or_none() is None
+
+    async def test_no_accrual_without_receipt(self, client, seeded_session):
+        """قبولی پرونده به‌خوده‌خود کمیسیون نمی‌سازد — فقط رسید دریافتی."""
+        await self._enable(seeded_session, rate=15)
+        code = await _make_marketer(client, seeded_session, PHONE_M)
+        await _admin(client)
+        await self._referred_case(client, seeded_session, code)
         assert (
             await seeded_session.execute(select(Commission))
         ).scalar_one_or_none() is None
 
     async def test_marketer_privacy_mask(self, client, seeded_session):
         """Marketer sees masked name + coarse status — never case details."""
-        code = await _make_marketer(client, PHONE_M)
+        code = await _make_marketer(client, seeded_session, PHONE_M)
         await _consult_row(seeded_session, client, PHONE_B, name="علی رضایی", ref=code)
         r = await client.get("/api/v1/account/marketer/referrals")
         assert r.status_code == 200
@@ -435,8 +551,8 @@ class TestUsernameOtp:
 
 
 class TestReferralLinks:
-    async def test_redirect_records_click_and_cookie(self, client):
-        code = await _make_marketer(client, PHONE_M)
+    async def test_redirect_records_click_and_cookie(self, client, seeded_session):
+        code = await _make_marketer(client, seeded_session, PHONE_M)
         r = await client.get(
             f"/api/v1/referrals/r/{code}?src=instagram", follow_redirects=False
         )
@@ -444,12 +560,15 @@ class TestReferralLinks:
         assert r.headers["location"] == "/"
         assert "dn_ref" in r.headers["set-cookie"]
 
-    async def test_bad_code_still_redirects(self, client):
+    async def test_bad_code_still_redirects(self, client, seeded_session):
+        srow = await seeded_session.get(SiteSetting, "commission")
+        srow.value = {**(srow.value or {}), "marketing_enabled": True}
+        await seeded_session.commit()
         r = await client.get("/api/v1/referrals/r/DN-NOPE", follow_redirects=False)
         assert r.status_code == 302
 
-    async def test_labeled_links_crud_and_stats(self, client):
-        code = await _make_marketer(client, PHONE_M)
+    async def test_labeled_links_crud_and_stats(self, client, seeded_session):
+        code = await _make_marketer(client, seeded_session, PHONE_M)
         r = await client.post(
             "/api/v1/account/marketer/links", json={"label": "instagram"}
         )
@@ -469,13 +588,16 @@ class TestReferralLinks:
         r = await client.get("/api/v1/account/marketer/links")
         assert r.json() == []
 
-    async def test_qr_svg(self, client):
-        await _make_marketer(client, PHONE_M)
+    async def test_qr_svg(self, client, seeded_session):
+        await _make_marketer(client, seeded_session, PHONE_M)
         r = await client.get("/api/v1/account/marketer/qr?src=telegram")
         assert r.status_code == 200
         assert r.text.startswith("<svg") or "<svg" in r.text[:200]
 
-    async def test_links_forbidden_for_non_marketer(self, client):
+    async def test_links_forbidden_for_non_marketer(self, client, seeded_session):
+        srow = await seeded_session.get(SiteSetting, "commission")
+        srow.value = {**(srow.value or {}), "marketing_enabled": True}
+        await seeded_session.commit()
         await _register(client, PHONE_A)
         r = await client.get("/api/v1/account/marketer/links")
         assert r.status_code == 403
@@ -483,6 +605,7 @@ class TestReferralLinks:
 
 class TestAdminMarketing:
     async def test_preview_calculator(self, client, seeded_session):
+        await _enable_marketing(seeded_session)
         seeded_session.add(
             CommissionRule(kind="percent", value=10, max_amount=1_000_000)
         )
@@ -503,6 +626,7 @@ class TestAdminMarketing:
         assert r.json()["amount"] == 1_000_000  # clamped by max_amount
 
     async def test_rule_validity_window_and_clamps(self, client, seeded_session):
+        await _enable_marketing(seeded_session)
         await _admin(client)
         r = await client.post(
             "/api/v1/admin/commissions/rules",
@@ -517,7 +641,7 @@ class TestAdminMarketing:
         assert rule["min_amount"] == 200_000 and rule["ends_at"] is not None
 
     async def test_report_and_csv(self, client, seeded_session):
-        await _make_marketer(client, PHONE_M)
+        await _make_marketer(client, seeded_session, PHONE_M)
         await _admin(client)
         r = await client.get("/api/v1/admin/marketers/report")
         assert r.status_code == 200
@@ -529,7 +653,7 @@ class TestAdminMarketing:
         assert "ref_code" in r.text and "DN-" in r.text
 
     async def test_suspicious_click_flood_flagged(self, client, seeded_session):
-        code = await _make_marketer(client, PHONE_M)
+        code = await _make_marketer(client, seeded_session, PHONE_M)
         for _ in range(21):
             await client.get(f"/api/v1/referrals/r/{code}")
         await _admin(client)

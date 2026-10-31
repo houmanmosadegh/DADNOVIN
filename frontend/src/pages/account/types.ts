@@ -31,7 +31,12 @@ export interface MarketerHome {
   ref_code?: string
   ref_link?: string
   is_active?: boolean
-  commission_enabled?: boolean
+  marketing_enabled?: boolean
+  my_rate?: number
+  rate_source?: string
+  default_rate?: number
+  accepted_terms_version?: number
+  terms?: { version: number; body: string }
   cookie_days?: number
   stats?: {
     clicks: number
@@ -57,16 +62,16 @@ export interface MarketerLink {
   url: string
 }
 
+/** فیلدهای whitelist بازاریاب — هیچ جزئیات پرونده‌ای در پاسخ نیست. */
 export interface MyCommission {
   id: string
-  request_type: string
-  request_label: string
-  tracking_code: string | null
-  basis_kind: string
-  basis_amount: number
-  percent: number | null
+  masked_name: string
+  stage: string
+  fee_amount: number
+  rate: number
   amount: number
   status: string
+  entry_type: 'accrual' | 'reversal'
   paid_at: string | null
   created_at: string
 }
@@ -74,7 +79,7 @@ export interface MyCommission {
 export interface CommissionsView {
   items: MyCommission[]
   totals: { pending: number; approved: number; paid: number; cancelled: number }
-  commission_enabled: boolean
+  marketing_enabled: boolean
 }
 
 export interface Referral {

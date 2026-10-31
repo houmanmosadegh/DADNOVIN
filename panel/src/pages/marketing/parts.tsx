@@ -45,6 +45,8 @@ interface ProfileOut {
   fraud_flag: boolean;
   iban_masked: string;
   card_masked: string;
+  custom_rate: number | null;
+  accepted_terms_version: number;
   full_name: string;
   phone: string;
   stats: Stats;
@@ -89,10 +91,17 @@ interface CommissionOut {
   marketer_id: string;
   full_name: string;
   ref_code: string;
+  request_type: string;
+  request_id: string;
+  tracking_code: string;
+  client_name: string;
+  entry_type: "accrual" | "reversal";
+  parent_id: string | null;
   amount: number;
   status: string;
   basis_kind: string;
   basis_amount: number;
+  rate: number;
   rule_snapshot: {
     kind: string; value: number; tier_min: number;
     min_amount: number; max_amount: number;
@@ -183,11 +192,24 @@ export function ProfilesTab() {
   const invalidate = () => qc.invalidateQueries({ queryKey: ["marketer-profiles"] });
 
   const patch = useMutation({
-    mutationFn: ({ id, body }: { id: string; body: Record<string, boolean> }) =>
+    mutationFn: ({ id, body }: { id: string; body: Record<string, boolean | number | null> }) =>
       api.patch(`/admin/marketers/${id}`, body),
-    onSuccess: invalidate,
+    onSuccess: () => {
+      invalidate();
+      toast("success", "ذخیره شد.");
+    },
     onError: (e) => toast("error", e instanceof ApiError ? e.message : "خطا"),
   });
+
+  const editRate = (p: ProfileOut) => {
+    const raw = window.prompt(
+      `نرخ اختصاصی ${p.full_name} (٪) — خالی یعنی نرخ پیش‌فرض:`,
+      p.custom_rate != null ? String(p.custom_rate) : "",
+    );
+    if (raw === null) return;
+    const v = raw.trim();
+    patch.mutate({ id: p.id, body: { custom_rate: v === "" ? 0 : Number(v) } });
+  };
 
   const rows = list.data ?? [];
   const totals = rows.reduce(
@@ -217,7 +239,7 @@ export function ProfilesTab() {
       )}
 
       {rows.length > 0 && (
-        <Table head={["بازاریاب", "کد ارجاع", "کلیک (یکتا)", "درخواست", "پذیرفته", "تبدیل", "وضعیت", ""]}>
+        <Table head={["بازاریاب", "کد ارجاع", "نرخ", "کلیک (یکتا)", "درخواست", "پذیرفته", "تبدیل", "وضعیت", ""]}>
           {rows.map((p) => (
             <tr key={p.id} className="border-b border-sand-2 last:border-0">
               <td className="td">
@@ -226,6 +248,15 @@ export function ProfilesTab() {
               </td>
               <td className="td">
                 <span dir="ltr" className="font-mono text-[12px] text-gold-1">{p.ref_code}</span>
+              </td>
+              <td className="td">
+                <button
+                  className="text-[12px] text-ink-1 underline decoration-dotted underline-offset-4 hover:text-gold-1"
+                  onClick={() => editRate(p)}
+                  title="تنظیم نرخ اختصاصی"
+                >
+                  {p.custom_rate != null ? `${p.custom_rate.toLocaleString("fa-IR")}٪` : "پیش‌فرض"}
+                </button>
               </td>
               <td className="td">
                 {p.stats.clicks.toLocaleString("fa-IR")}
@@ -240,7 +271,7 @@ export function ProfilesTab() {
                   onClick={() => patch.mutate({ id: p.id, body: { is_active: !p.is_active } })}
                 >
                   {p.is_active ? <ToggleRight size={16} /> : <ToggleLeft size={16} />}
-                  {p.is_active ? "فعال" : "غیرفعال"}
+                  {p.is_active ? "فعال" : "معلق"}
                 </button>
                 {p.fraud_flag && <Pill value="rejected" map={{ rejected: ["پرچم تقلب", "bg-red-500/10 text-red-400"] }} />}
               </td>
@@ -631,6 +662,9 @@ export function CommissionsTab() {
   const [cancelling, setCancelling] = useState<CommissionOut | null>(null);
   const [paying, setPaying] = useState<CommissionOut | null>(null);
   const [payNote, setPayNote] = useState("");
+  const [reversing, setReversing] = useState<CommissionOut | null>(null);
+  const [revAmount, setRevAmount] = useState("");
+  const [revNote, setRevNote] = useState("");
   const [statusFilter, setStatusFilter] = useState("");
 
   const list = useQuery({
@@ -668,12 +702,33 @@ export function CommissionsTab() {
     },
     onError: (e) => toast("error", e instanceof ApiError ? e.message : "خطا"),
   });
+  const reverseComm = useMutation({
+    mutationFn: ({ id, amount, note }: { id: string; amount?: number; note?: string }) =>
+      api.post(`/admin/commissions/${id}/reverse`, { amount, note }),
+    onSuccess: () => {
+      toast("success", "ورودی برگشت ثبت شد.");
+      setReversing(null);
+      setRevAmount("");
+      setRevNote("");
+      invalidate();
+    },
+    onError: (e) => toast("error", e instanceof ApiError ? e.message : "خطا"),
+  });
+  const bulkApprove = useMutation({
+    mutationFn: () => api.post<{ approved: number }>("/admin/commissions/bulk-approve", {}),
+    onSuccess: (r: { approved: number }) => {
+      toast("success", `${r.approved.toLocaleString("fa-IR")} کمیسیون تأیید شد.`);
+      invalidate();
+    },
+    onError: (e) => toast("error", e instanceof ApiError ? e.message : "خطا"),
+  });
 
   const rows = (list.data ?? []).filter((c) => !statusFilter || c.status === statusFilter);
   const sums = rows.reduce(
     (a, c) => ({ ...a, [c.status]: (a[c.status] ?? 0) + c.amount }),
     {} as Record<string, number>,
   );
+  const pendingCount = (list.data ?? []).filter((c) => c.status === "pending").length;
 
   return (
     <div className="space-y-4">
@@ -684,7 +739,12 @@ export function CommissionsTab() {
           ))}
         </div>
       )}
-      <div className="flex justify-end">
+      <div className="flex items-center justify-between gap-2">
+        {pendingCount > 1 ? (
+          <button className="btn-ghost btn-sm" disabled={bulkApprove.isPending} onClick={() => bulkApprove.mutate()}>
+            <Check size={13} /> تأیید گروهی ({pendingCount.toLocaleString("fa-IR")})
+          </button>
+        ) : <span />}
         <select value={statusFilter} onChange={(e) => setStatusFilter(e.target.value)} className="w-40">
           <option value="">همهٔ وضعیت‌ها</option>
           <option value="pending">در انتظار</option>
@@ -695,26 +755,39 @@ export function CommissionsTab() {
       </div>
       {list.isLoading && <Skeleton className="h-40" />}
       {list.isError && <ErrorState text="بارگذاری ناموفق بود." onRetry={() => list.refetch()} />}
-      {list.data && rows.length === 0 && <EmptyState text="کمیسیونی ثبت نشده است" />}
+      {list.data && rows.length === 0 && <EmptyState text="کمیسیونی ثبت نشده است" hint="با ثبت «حق‌الوکالهٔ دریافتی» در صفحهٔ پرونده، کمیسیون خودکار ساخته می‌شود." />}
       {rows.length > 0 && (
-        <Table head={["بازاریاب", "مبلغ", "مبنا", "قاعدهٔ اعمال‌شده", "وضعیت", "پرداخت", "تاریخ", ""]}>
+        <Table head={["بازاریاب", "پرونده", "نوع", "حق‌الوکاله", "نرخ", "کمیسیون", "وضعیت", "پرداخت", "تاریخ", ""]}>
           {rows.map((c) => (
             <tr key={c.id} className="border-b border-sand-2 last:border-0">
               <td className="td">
                 <div className="font-medium">{c.full_name}</div>
                 <div dir="ltr" className="font-mono text-[11px] text-ink-2">{c.ref_code}</div>
               </td>
-              <td className="td font-medium text-gold-1">{fmt(c.amount)}</td>
-              <td className="td text-[12px] text-ink-1">
-                {c.basis_kind === "percent" ? "درصدی" : "ثابت"}
-                {c.basis_kind === "percent" && c.basis_amount > 0 && (
-                  <span className="block text-[11px] text-ink-2">قرارداد: {fmt(c.basis_amount)}</span>
-                )}
+              <td className="td">
+                {c.tracking_code ? (
+                  <a
+                    className="font-mono text-[11px] text-gold-1 hover:underline"
+                    href={`/requests/${c.request_type}/${c.request_id}`}
+                  >
+                    {c.tracking_code}
+                  </a>
+                ) : "—"}
+                {c.client_name && <div className="text-[11px] text-ink-2">{c.client_name}</div>}
               </td>
-              <td className="td text-[11px] text-ink-2">
-                {c.rule_snapshot
-                  ? `${c.rule_snapshot.kind === "percent" ? `${c.rule_snapshot.value.toLocaleString("fa-IR")}٪` : fmt(c.rule_snapshot.value)}${c.rule_snapshot.tier_min > 0 ? ` · از ${c.rule_snapshot.tier_min.toLocaleString("fa-IR")}مین` : ""}`
-                  : "—"}
+              <td className="td">
+                {c.entry_type === "reversal"
+                  ? <span className="text-[11px] text-red-400">برگشت</span>
+                  : <span className="text-[11px] text-ink-1">تخصیص</span>}
+              </td>
+              <td className="td text-[12px] text-ink-1">
+                {c.basis_amount > 0 ? fmt(c.basis_amount) : "—"}
+              </td>
+              <td className="td text-[12px] text-ink-1">
+                {c.rate ? `${c.rate.toLocaleString("fa-IR")}٪` : "—"}
+              </td>
+              <td className={`td font-medium ${c.amount < 0 ? "text-red-400" : "text-gold-1"}`}>
+                {fmt(c.amount)}
               </td>
               <td className="td"><Pill value={c.status} map={COMM_STATUS} /></td>
               <td className="td text-[12px] text-ink-2">
@@ -724,7 +797,7 @@ export function CommissionsTab() {
               </td>
               <td className="td text-[12px] text-ink-2">{faDate(c.created_at)}</td>
               <td className="td text-left">
-                {c.status === "pending" && (
+                {c.entry_type === "accrual" && c.status === "pending" && (
                   <div className="flex gap-1">
                     <button className="btn-gold btn-sm" disabled={approveComm.isPending} onClick={() => approveComm.mutate(c.id)}>
                       <Check size={13} /> تأیید
@@ -734,15 +807,20 @@ export function CommissionsTab() {
                     </button>
                   </div>
                 )}
-                {c.status === "approved" && (
+                {c.entry_type === "accrual" && c.status === "approved" && (
                   <div className="flex gap-1">
                     <button className="btn-gold btn-sm" onClick={() => setPaying(c)}>
                       <Check size={13} /> پرداخت شد
                     </button>
-                    <button className="btn-ghost btn-sm" onClick={() => setCancelling(c)}>
-                      <X size={13} /> لغو
+                    <button className="btn-ghost btn-sm" onClick={() => setReversing(c)}>
+                      برگشت
                     </button>
                   </div>
+                )}
+                {c.entry_type === "accrual" && c.status === "paid" && (
+                  <button className="btn-ghost btn-sm" onClick={() => setReversing(c)}>
+                    برگشت
+                  </button>
                 )}
               </td>
             </tr>
@@ -770,6 +848,45 @@ export function CommissionsTab() {
               onClick={() => payComm.mutate({ id: paying.id, note: payNote })}
             >
               ثبت پرداخت
+            </button>
+          </div>
+        )}
+      </Drawer>
+
+      {/* برگشت کمیسیون — ورودی منفی append-only، نه حذف */}
+      <Drawer open={!!reversing} onClose={() => setReversing(null)} title="ثبت برگشت کمیسیون">
+        {reversing && (
+          <div className="space-y-3">
+            <p className="text-sm">
+              برای برگشت، یک ورودی منفی (reversal) ثبت می‌شود — رکورد اصلی حذف نمی‌گردد.
+              خالی‌گذاشتن مبلغ یعنی برگشت کامل {fmt(reversing.amount)}.
+            </p>
+            <input
+              className="w-full"
+              inputMode="numeric"
+              placeholder={`مبلغ برگشت (ریال) — حداکثر ${reversing.amount.toLocaleString("fa-IR")}`}
+              value={revAmount}
+              onChange={(e) => setRevAmount(e.target.value)}
+            />
+            <input
+              className="w-full"
+              placeholder="دلیل برگشت (عودت وجه به موکل، لغوی پرونده…)"
+              value={revNote}
+              onChange={(e) => setRevNote(e.target.value)}
+            />
+            <button
+              className="btn-gold btn-sm"
+              disabled={reverseComm.isPending}
+              onClick={() => {
+                const n = Number(revAmount.replace(/[,،\s]/g, ""));
+                reverseComm.mutate({
+                  id: reversing.id,
+                  amount: n > 0 ? n : undefined,
+                  note: revNote || undefined,
+                });
+              }}
+            >
+              ثبت برگشت
             </button>
           </div>
         )}
@@ -825,6 +942,13 @@ export function ReportTab() {
   const q = useQuery({
     queryKey: ["marketer-report", qs],
     queryFn: () => api.get<ReportOut>(`/admin/marketers/report${qs ? `?${qs}` : ""}`),
+  });
+  const monthly = useQuery({
+    queryKey: ["marketer-monthly"],
+    queryFn: () =>
+      api.get<{ month: string; referrals: number; accrued: number; paid: number }[]>(
+        "/admin/marketers/report/monthly",
+      ),
   });
   const funnel = q.data?.funnel;
   const maxBar = funnel?.clicks || 1;
@@ -957,6 +1081,26 @@ export function ReportTab() {
               </div>
             </div>
           </div>
+
+          {/* monthly rollup — جمع‌های ماهانهٔ ارجاع و کمیسیون */}
+          <div className="card p-4">
+            <h3 className="mb-3 text-[14px] font-semibold">جمع‌های ماهانه</h3>
+            {monthly.data && monthly.data.length === 0 && (
+              <p className="text-[12px] text-ink-2">داده‌ای نیست.</p>
+            )}
+            {monthly.data && monthly.data.length > 0 && (
+              <Table head={["ماه", "ارجاع", "کمیسیون تخصیص‌یافته", "کمیسیون پرداخت‌شده"]}>
+                {[...monthly.data].reverse().map((m) => (
+                  <tr key={m.month} className="border-b border-sand-2 last:border-0">
+                    <td className="td" dir="ltr">{m.month}</td>
+                    <td className="td">{m.referrals.toLocaleString("fa-IR")}</td>
+                    <td className="td text-gold-1">{fmt(m.accrued)}</td>
+                    <td className="td">{fmt(m.paid)}</td>
+                  </tr>
+                ))}
+              </Table>
+            )}
+          </div>
         </>
       )}
     </div>
@@ -966,8 +1110,10 @@ export function ReportTab() {
 // ---------- referral settings (بازاریابی ← تنظیمات ارجاع) ----------
 
 interface CommissionSettings {
-  commission_enabled: boolean;
+  marketing_enabled: boolean;
+  default_rate: number;
   cookie_days: number;
+  holdback_days: number;
   monthly_cap: number;
   reapply_days: number;
   attribution_model: string;
@@ -984,8 +1130,10 @@ export function SettingsTab() {
   });
 
   const defaults: CommissionSettings = {
-    commission_enabled: false,
+    marketing_enabled: false,
+    default_rate: 0,
     cookie_days: 30,
+    holdback_days: 0,
     monthly_cap: 0,
     reapply_days: 14,
     attribution_model: "first_touch",
@@ -1012,15 +1160,17 @@ export function SettingsTab() {
         <div className="card space-y-4 p-5">
           <label className="flex items-center justify-between gap-3">
             <span>
-              <span className="block text-[14px] font-medium">کمیسیون فعال</span>
-              <span className="block text-[12px] text-ink-2">با خاموش‌بودن، کمیسیونی ثبت نمی‌شود و بخش کمیسیون در پنل بازاریاب پنهان می‌ماند.</span>
+              <span className="block text-[14px] font-medium">بازاریابی و ارجاع فعال</span>
+              <span className="block text-[12px] text-ink-2">
+                با خاموش‌بودن، همهٔ لینک‌ها/منوها/روت‌های بازاریابی در سایت و پنل پنهان می‌شوند و API مربوطه ۴۰۴ می‌دهد.
+              </span>
             </span>
             <button
-              className={`inline-flex items-center gap-1 text-[13px] ${current.commission_enabled ? "text-emerald-400" : "text-ink-3"}`}
-              onClick={() => set("commission_enabled", !current.commission_enabled)}
+              className={`inline-flex items-center gap-1 text-[13px] ${current.marketing_enabled ? "text-emerald-400" : "text-ink-3"}`}
+              onClick={() => set("marketing_enabled", !current.marketing_enabled)}
             >
-              {current.commission_enabled ? <ToggleRight size={22} /> : <ToggleLeft size={22} />}
-              {current.commission_enabled ? "فعال" : "غیرفعال"}
+              {current.marketing_enabled ? <ToggleRight size={22} /> : <ToggleLeft size={22} />}
+              {current.marketing_enabled ? "فعال" : "غیرفعال"}
             </button>
           </label>
 
@@ -1032,13 +1182,14 @@ export function SettingsTab() {
               onChange={(e) => set("attribution_model", e.target.value)}
             >
               <option value="first_touch">اولین تماس (first_touch)</option>
-              <option value="last_touch">آخرین تماس (last_touch)</option>
             </select>
           </label>
 
           {(
             [
+              ["default_rate", "درصد پیش‌فرض کمیسیون (٪ از حق‌الوکالهٔ دریافتی)"],
               ["cookie_days", "عمر کوکی ارجاع (روز)"],
+              ["holdback_days", "مهلت نگه‌داشت پیش از تأیید (روز — ۰ یعنی بدون مهلة)"],
               ["monthly_cap", "سقف کمیسیون ماهانه (ریال — ۰ یعنی نامحدود)"],
               ["reapply_days", "فاصلهٔ درخواست مجدد پس از رد (روز)"],
             ] as [keyof CommissionSettings, string][]
@@ -1061,6 +1212,246 @@ export function SettingsTab() {
         </div>
       )}
       {q.isError && <ErrorState text="بارگذاری تنظیمات ناموفق بود." onRetry={() => q.refetch()} />}
+    </div>
+  );
+}
+
+// ---------- referrals admin (بازاریابی ← ارجاع‌ها) ----------
+
+interface AdminReferralOut {
+  id: string;
+  marketer_id: string;
+  marketer_name: string;
+  ref_code: string;
+  flag: string;
+  request_id: string;
+  tracking_code: string;
+  client_name: string;
+  status: string;
+  created_at: string;
+}
+
+export function ReferralsTab() {
+  const toast = useToast();
+  const qc = useQueryClient();
+  const [flagFilter, setFlagFilter] = useState("");
+  const [search, setSearch] = useState("");
+  const [attaching, setAttaching] = useState(false);
+  const [trackCode, setTrackCode] = useState("");
+  const [refCode, setRefCode] = useState("");
+
+  const q = useQuery({
+    queryKey: ["admin-referrals", flagFilter, search],
+    queryFn: () => {
+      const p = new URLSearchParams();
+      if (flagFilter) p.set("flag", flagFilter);
+      if (search.trim()) p.set("q", search.trim());
+      const qs = p.toString();
+      return api.get<AdminReferralOut[]>(`/admin/marketers/referrals${qs ? `?${qs}` : ""}`);
+    },
+  });
+  const invalidate = () => qc.invalidateQueries({ queryKey: ["admin-referrals"] });
+
+  const flagMut = useMutation({
+    mutationFn: ({ id, flag }: { id: string; flag: string }) =>
+      api.patch(`/admin/marketers/referrals/${id}`, { flag }),
+    onSuccess: () => {
+      toast("success", "به‌روز شد.");
+      invalidate();
+    },
+    onError: (e) => toast("error", e instanceof ApiError ? e.message : "خطا"),
+  });
+
+  const attach = useMutation({
+    mutationFn: (p: { tracking_code: string; ref_code: string }) =>
+      api.post<{ reassigned: boolean }>("/admin/marketers/referrals/attach", p),
+    onSuccess: (r: { reassigned: boolean }) => {
+      toast("success", r.reassigned ? "ارجاع به بازاریاب جدید منتقل شد." : "ارجاع متصل شد.");
+      setAttaching(false);
+      setTrackCode("");
+      setRefCode("");
+      invalidate();
+    },
+    onError: (e) => toast("error", e instanceof ApiError ? e.message : "خطا"),
+  });
+
+  const rows = q.data ?? [];
+  return (
+    <div className="space-y-4">
+      <div className="flex flex-wrap items-center justify-between gap-2">
+        <div className="flex items-center gap-2">
+          <input
+            className="w-52 !py-1.5 text-[13px]"
+            placeholder="جستجو (نام بازاریاب، کد)…"
+            value={search}
+            onChange={(e) => setSearch(e.target.value)}
+          />
+          <select value={flagFilter} onChange={(e) => setFlagFilter(e.target.value)} className="w-36 !py-1.5">
+            <option value="">همه</option>
+            <option value="review">نیازمند بررسی</option>
+          </select>
+        </div>
+        <button className="btn-gold btn-sm" onClick={() => setAttaching(true)}>
+          <Plus size={13} /> اتصال دستی به پرونده
+        </button>
+      </div>
+
+      {q.isLoading && <Skeleton className="h-40" />}
+      {q.isError && <ErrorState text="بارگذاری ناموفق بود." onRetry={() => q.refetch()} />}
+      {q.data && rows.length === 0 && <EmptyState text="ارجاعی ثبت نشده است" />}
+      {rows.length > 0 && (
+        <Table head={["بازاریاب", "کد", "مراجع", "پرونده", "وضعیت پرونده", "پرچم", "تاریخ", ""]}>
+          {rows.map((r) => (
+            <tr key={r.id} className="border-b border-sand-2 last:border-0">
+              <td className="td font-medium">{r.marketer_name}</td>
+              <td className="td"><span dir="ltr" className="font-mono text-[11px] text-gold-1">{r.ref_code}</span></td>
+              <td className="td">{r.client_name || "—"}</td>
+              <td className="td">
+                {r.tracking_code ? (
+                  <a className="font-mono text-[11px] text-gold-1 hover:underline" href={`/requests/consultation/${r.request_id}`}>
+                    {r.tracking_code}
+                  </a>
+                ) : "—"}
+              </td>
+              <td className="td">{r.status ? <Pill value={r.status} map={STATUS_PILL} /> : "—"}</td>
+              <td className="td">
+                {r.flag === "review"
+                  ? <span className="rounded-full bg-amber-500/10 px-2 py-0.5 text-[11px] text-amber-400">نیازمند بررسی</span>
+                  : <span className="text-[11px] text-ink-3">—</span>}
+              </td>
+              <td className="td text-[12px] text-ink-2">{faDate(r.created_at)}</td>
+              <td className="td text-left">
+                <button
+                  className="btn-ghost btn-sm"
+                  onClick={() => flagMut.mutate({ id: r.id, flag: r.flag === "review" ? "" : "review" })}
+                >
+                  {r.flag === "review" ? "رفع پرچم" : "پرچم بررسی"}
+                </button>
+              </td>
+            </tr>
+          ))}
+        </Table>
+      )}
+      <p className="text-[12px] text-ink-3">
+        ارجاعِ «نیازمند بررسی» تا رفع پرچم هیچ کمیسیونی نمی‌سازد.
+      </p>
+
+      <Drawer open={attaching} onClose={() => setAttaching(false)} title="اتصال دستی ارجاع به پرونده">
+        <div className="space-y-3">
+          <p className="text-[13px] text-ink-2">
+            پرونده را با کد پیگیری و کد معرف به یک بازاریاب وصل کنید؛ اگر قبلاً ارجاع داشته، انتساب جایگزین می‌شود (با ثبت در لاگ ممیزی).
+          </p>
+          <input
+            className="w-full"
+            placeholder="کد پیگیری پرونده (مثلاً DN-1234)"
+            value={trackCode}
+            onChange={(e) => setTrackCode(e.target.value)}
+          />
+          <input
+            className="w-full"
+            dir="ltr"
+            placeholder="کد معرف بازاریاب (DN-XXXXXX)"
+            value={refCode}
+            onChange={(e) => setRefCode(e.target.value)}
+          />
+          <button
+            className="btn-gold btn-sm"
+            disabled={attach.isPending || !trackCode.trim() || !refCode.trim()}
+            onClick={() => attach.mutate({ tracking_code: trackCode.trim(), ref_code: refCode.trim() })}
+          >
+            {attach.isPending ? "در حال اتصال…" : "اتصال"}
+          </button>
+        </div>
+      </Drawer>
+    </div>
+  );
+}
+
+// ---------- versioned terms (بازاریابی ← قوانین همکاری) ----------
+
+interface TermsOut {
+  id: string;
+  version: number;
+  is_active: boolean;
+  body: string;
+  created_at: string;
+}
+
+export function TermsTab() {
+  const toast = useToast();
+  const qc = useQueryClient();
+  const [draft, setDraft] = useState("");
+  const [showNew, setShowNew] = useState(false);
+
+  const q = useQuery({
+    queryKey: ["marketing-terms"],
+    queryFn: () => api.get<TermsOut[]>("/admin/marketers/terms"),
+  });
+
+  const create = useMutation({
+    mutationFn: (body: string) => api.post("/admin/marketers/terms", { body }),
+    onSuccess: () => {
+      toast("success", "نسخهٔ جدید قوانین فعال شد.");
+      setDraft("");
+      setShowNew(false);
+      qc.invalidateQueries({ queryKey: ["marketing-terms"] });
+    },
+    onError: (e) => toast("error", e instanceof ApiError ? e.message : "خطا"),
+  });
+
+  const rows = q.data ?? [];
+  return (
+    <div className="max-w-2xl space-y-4">
+      <div className="flex items-center justify-between">
+        <p className="text-[13px] text-ink-2">
+          هر ویرایش یک نسخهٔ جدید می‌سازد؛ نسخهٔ پذیرفته‌شدهٔ هر بازاریاب ثبت می‌ماند.
+        </p>
+        <button className="btn-gold btn-sm" onClick={() => setShowNew((v) => !v)}>
+          <Plus size={13} /> نسخهٔ جدید
+        </button>
+      </div>
+
+      {showNew && (
+        <div className="card space-y-3 p-4">
+          <textarea
+            className="min-h-40 w-full text-[13px] leading-6"
+            placeholder="متن قوانین و شرایط همکاری در بازاریابی…"
+            value={draft}
+            onChange={(e) => setDraft(e.target.value)}
+          />
+          <div className="flex items-center justify-between">
+            <span className="text-[11px] text-ink-3">حداقل ۲۰ نویسه — پس از ذخیره، نسخهٔ قبلی غیرفعال می‌شود.</span>
+            <button
+              className="btn-gold btn-sm"
+              disabled={create.isPending || draft.trim().length < 20}
+              onClick={() => create.mutate(draft.trim())}
+            >
+              انتشار نسخهٔ جدید
+            </button>
+          </div>
+        </div>
+      )}
+
+      {q.isLoading && <Skeleton className="h-40" />}
+      {q.data && rows.length === 0 && <EmptyState text="هنوز نسخه‌ای از قوانین منتشر نشده است" hint="پیش از بازکردن درخواست همکاری، یک نسخه بسازید." />}
+      <div className="space-y-2">
+        {rows.map((t) => (
+          <details key={t.id} className="card p-4" open={t.is_active}>
+            <summary className="flex cursor-pointer items-center justify-between text-[13px] font-medium">
+              <span>
+                نسخهٔ {t.version.toLocaleString("fa-IR")}
+                {t.is_active && (
+                  <span className="ms-2 rounded-full bg-emerald-500/10 px-2 py-0.5 text-[11px] text-emerald-400">فعال</span>
+                )}
+              </span>
+              <span className="text-[11px] text-ink-3">{faDate(t.created_at)}</span>
+            </summary>
+            <p className="mt-3 whitespace-pre-line border-t border-line pt-3 text-[13px] leading-6 text-ink-2">
+              {t.body}
+            </p>
+          </details>
+        ))}
+      </div>
     </div>
   );
 }

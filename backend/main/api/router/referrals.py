@@ -2,7 +2,7 @@
 
 from typing import Annotated
 
-from fastapi import APIRouter, Depends, Query, Request, Response
+from fastapi import APIRouter, Depends, HTTPException, Query, Request, Response
 from fastapi.responses import RedirectResponse
 from pydantic import BaseModel, Field
 from sqlalchemy.ext.asyncio import AsyncSession
@@ -18,6 +18,12 @@ DbDep = Annotated[AsyncSession, Depends(get_db)]
 
 REF_COOKIE = "dn_ref"
 
+
+async def _marketing_gate(db: DbDep) -> None:
+    """marketing_enabled off → referral surface returns 404, no click stored."""
+    if not await comm_svc.marketing_enabled(db):
+        raise HTTPException(404, {"code": "not_found", "message": "یافت نشد."})
+
 # where a bare /r/CODE can land — whitelist, never arbitrary redirects
 _ALLOWED_TARGETS = {"/", "/contact", "/services", "/about", "/panel/auth"}
 
@@ -27,7 +33,7 @@ def _set_ref_cookie(response: Response, code: str, days: int) -> None:
         REF_COOKIE,
         code,
         max_age=days * 86400,
-        httponly=False,  # JS-readable — the forms prefill from it
+        httponly=True,  # per spec — server reads it at submission
         secure=get_settings().cookie_secure,
         samesite="lax",
         path="/",
@@ -48,6 +54,7 @@ async def follow_link(
     whitelisted landing page. Anonymous visitors keep working without JS.
     """
     code = code.strip().upper()
+    await _marketing_gate(db)
     prof = await ref_svc.resolve_code(db, code)
     target = to if to in _ALLOWED_TARGETS else "/"
     if prof is None:
@@ -78,6 +85,7 @@ async def record_click(
     payload: ClickIn, request: Request, response: Response, db: DbDep
 ):
     """Record a `/?ref=` landing + set the referral cookie (admin-set TTL)."""
+    await _marketing_gate(db)
     cfg = await comm_svc.referral_settings(db)
     code = payload.code.strip().upper()
     prof = await ref_svc.resolve_code(db, code)
@@ -98,5 +106,6 @@ async def record_click(
 @router.get("/validate/{code}")
 async def validate_code(code: str, db: DbDep) -> dict:
     """Public validity probe — used by the forms to prefill/verify."""
+    await _marketing_gate(db)
     prof = await ref_svc.resolve_code(db, code)
     return {"valid": prof is not None}

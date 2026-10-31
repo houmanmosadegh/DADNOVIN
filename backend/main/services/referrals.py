@@ -39,7 +39,12 @@ def gen_ref_code() -> str:
 
 
 async def apply(
-    db: AsyncSession, user: User, note: str, channel: str = "", reapply_days: int = 14
+    db: AsyncSession,
+    user: User,
+    note: str,
+    channel: str = "",
+    reapply_days: int = 14,
+    terms_version: int = 0,
 ) -> MarketerApplication:
     """One pending application per user; re-apply allowed after `reapply_days`."""
     latest = (
@@ -70,7 +75,11 @@ async def apply(
             409, {"code": "already_marketer", "message": "حساب شما هم‌اکنون بازاریاب است."}
         )
     app = MarketerApplication(
-        user_id=user.id, note=note.strip(), channel=channel.strip()[:200], accepted_terms=True
+        user_id=user.id,
+        note=note.strip(),
+        channel=channel.strip()[:200],
+        accepted_terms=True,
+        terms_version=terms_version,
     )
     db.add(app)
     await db.flush()
@@ -105,7 +114,13 @@ async def approve(
             break
     else:  # pragma: no cover
         raise HTTPException(500, {"code": "code_gen", "message": "خطا در تولید کد ارجاع."})
-    prof = MarketerProfile(user_id=user.id, ref_code=code, approved_by=admin.id)
+    prof = MarketerProfile(
+        user_id=user.id,
+        ref_code=code,
+        approved_by=admin.id,
+        accepted_terms_version=app.terms_version,
+        accepted_at=app.created_at,
+    )
     db.add(prof)
     role = (
         await db.execute(select(Role).where(Role.name == "marketer"))
@@ -131,6 +146,17 @@ async def reject(
     app.review_note = note.strip()
     await db.flush()
     return app
+
+
+async def suspend(db: AsyncSession, profile: MarketerProfile, admin: User) -> None:
+    """Suspend: link/code stop resolving (resolve_code checks is_active)."""
+    profile.is_active = False
+    await db.flush()
+
+
+async def reactivate(db: AsyncSession, profile: MarketerProfile, admin: User) -> None:
+    profile.is_active = True
+    await db.flush()
 
 
 async def resolve_code(db: AsyncSession, code: str) -> MarketerProfile | None:
@@ -303,8 +329,10 @@ async def attribute(
     request_id: uuid.UUID,
     ip: str,
     ua: str,
+    flag: str = "",
 ) -> ReferralAttribution:
-    """Immutable attribution — unique per request."""
+    """Immutable attribution — unique per request. `flag='review'` keeps the
+    row for admin triage but blocks commission accrual until cleared."""
     attr = ReferralAttribution(
         marketer_id=profile.id,
         request_type=request_type,
@@ -312,10 +340,22 @@ async def attribute(
         ref_code=profile.ref_code,
         ip=ip[:45],
         user_agent=ua[:300],
+        flag=flag,
     )
     db.add(attr)
     await db.flush()
     return attr
+
+
+async def reassign(
+    db: AsyncSession,
+    attr: ReferralAttribution,
+    profile: MarketerProfile,
+) -> None:
+    """Admin override of attribution — callers write an audit row."""
+    attr.marketer_id = profile.id
+    attr.ref_code = profile.ref_code
+    await db.flush()
 
 
 async def stats_for(db: AsyncSession, marketer_id: uuid.UUID) -> dict:

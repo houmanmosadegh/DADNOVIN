@@ -1,29 +1,27 @@
-import { useState } from 'react'
+import { useEffect, useState } from 'react'
 import { Link } from 'react-router-dom'
 import { CheckCircle2 } from 'lucide-react'
 import { api } from '../../services/api'
-import { useAuth } from '../../services/auth'
 import { readRefCookie } from '../../services/referral'
 
-const TOPICS = ['کیفری', 'خانواده', 'ملکی', 'قراردادها', 'مطالبات مالی / چک', 'سایر']
+const FALLBACK_TOPICS = ['کیفری', 'خانواده', 'ملکی', 'قراردادها', 'مطالبات مالی / چک', 'سایر']
 const CONTACT_PREFS = ['تماس تلفنی', 'پیامک / پیام‌رسان']
 
 interface Created {
   id: string
   tracking_code: string
-  access_code: string
-  message: string
 }
 
 export default function NewRequestPage() {
-  const { me } = useAuth()
+  const [topics, setTopics] = useState<string[]>(FALLBACK_TOPICS)
   const [done, setDone] = useState<Created | null>(null)
   const [err, setErr] = useState('')
   const [busy, setBusy] = useState(false)
   const [f, setF] = useState({
-    topic: TOPICS[0],
+    topic: FALLBACK_TOPICS[0],
     title: '',
     body: '',
+    phone: '',
     contact: CONTACT_PREFS[0],
     time: '',
     ref: readRefCookie(),
@@ -32,6 +30,18 @@ export default function NewRequestPage() {
   })
   const [touched, setTouched] = useState<Record<string, boolean>>({})
   const blur = (k: string) => () => setTouched((p) => ({ ...p, [k]: true }))
+
+  // admin-managed topic list — static fallback when the API is unreachable
+  useEffect(() => {
+    api.get<string[]>('/public/legal-topics')
+      .then((rows) => {
+        if (rows.length > 0) {
+          setTopics(rows)
+          setF((p) => ({ ...p, topic: p.topic in rows ? p.topic : rows[0] }))
+        }
+      })
+      .catch(() => {})
+  }, [])
 
   const fieldErr = {
     title: touched.title && f.title.trim().length < 4 ? 'عنوان کوتاه است.' : '',
@@ -54,14 +64,11 @@ export default function NewRequestPage() {
       f.time.trim() && `زمان مناسب: ${f.time.trim()}`,
     ].filter(Boolean).join('\n')
     try {
-      const out = await api.post<Created>('/consultations', {
-        full_name: me?.full_name ?? '',
-        phone: me?.phone ?? '',
+      const out = await api.post<Created>('/account/requests', {
         topic: f.topic,
         message,
-        source_page: '/panel/requests/new',
+        phone: f.phone.trim(),
         ref_code: f.ref.trim().toUpperCase(),
-        website: f.website,
       })
       setDone(out)
     } catch (ex) {
@@ -98,7 +105,7 @@ export default function NewRequestPage() {
           <label className="acc__field">
             <span>نوع موضوع</span>
             <select value={f.topic} onChange={(e) => setF({ ...f, topic: e.target.value })}>
-              {TOPICS.map((t) => <option key={t} value={t}>{t}</option>)}
+              {topics.map((t) => <option key={t} value={t}>{t}</option>)}
             </select>
           </label>
           <label className="acc__field">
@@ -140,14 +147,23 @@ export default function NewRequestPage() {
 
         <div className="acc__grid">
           <label className="acc__field">
+            <span>شمارهٔ تماس ترجیحی <em>(اختیاری)</em></span>
+            <input
+              dir="ltr" inputMode="tel" value={f.phone}
+              onChange={(e) => setF({ ...f, phone: e.target.value })}
+              placeholder="همان شمارهٔ حساب شما"
+            />
+          </label>
+          <label className="acc__field">
             <span>زمان مناسب تماس <em>(اختیاری)</em></span>
             <input value={f.time} onChange={(e) => setF({ ...f, time: e.target.value })} placeholder="مثلاً عصرها" />
           </label>
-          <label className="acc__field">
-            <span>کد معرف <em>(اختیاری)</em></span>
-            <input dir="ltr" value={f.ref} onChange={(e) => setF({ ...f, ref: e.target.value })} placeholder="DN-XXXXXX" />
-          </label>
         </div>
+
+        <label className="acc__field" style={{ maxWidth: '16rem' }}>
+          <span>کد معرف <em>(اختیاری)</em></span>
+          <input dir="ltr" value={f.ref} onChange={(e) => setF({ ...f, ref: e.target.value })} placeholder="DN-XXXXXX" />
+        </label>
 
         {/* honeypot — مخفی از کاربر */}
         <input

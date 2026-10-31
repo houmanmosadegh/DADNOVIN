@@ -1,10 +1,12 @@
 """ORM models — kept one module per aggregate."""
 
 from .account import (
+    CaseFeeReceipt,
     Commission,
     InboxNotification,
     MarketerApplication,
     MarketerProfile,
+    MarketingTerms,
     PasswordResetToken,
     ReferralAttribution,
     ReferralClick,
@@ -34,6 +36,7 @@ __all__ = [
     "AIMessage",
     "Article",
     "AuditLog",
+    "CaseFeeReceipt",
     "Commission",
     "ConsultationNote",
     "ConsultationRequest",
@@ -44,6 +47,7 @@ __all__ = [
     "Lawyer",
     "MarketerApplication",
     "MarketerProfile",
+    "MarketingTerms",
     "MediaAsset",
     "OutboundDelivery",
     "Page",

@@ -14,6 +14,7 @@ import {
   X,
 } from 'lucide-react'
 import { api } from '../../services/api'
+import { siteFlags } from '../../content/remote'
 import { useAuth } from '../../services/auth'
 import AuthPage from './AuthPage'
 import DashboardPage from './DashboardPage'
@@ -77,10 +78,13 @@ export default function AccountApp() {
 
   const isStaff = me.roles.some((r) => STAFF_ROLES.includes(r))
   // منوی ۵‌تایی (spec §5) — اعلان‌ها زنگ topbar؛ «درخواست جدید» CTA است
+  // بازاریابی فقط وقتی دیده می‌شود که سوئیچ مدیریت روشن باشد
   const items: { to: string; label: string; icon: React.ReactNode; end?: boolean; badge?: number }[] = [
     { to: '/panel', label: 'داشبورد', icon: <LayoutDashboard size={17} />, end: true },
     { to: '/panel/requests', label: 'درخواست‌های من', icon: <FileText size={17} /> },
-    { to: '/panel/marketing', label: 'بازاریابی', icon: <Share2 size={17} /> },
+    ...(siteFlags.marketingEnabled
+      ? [{ to: '/panel/marketing', label: 'بازاریابی', icon: <Share2 size={17} /> }]
+      : []),
     { to: '/panel/profile', label: 'پروفایل', icon: <UserRound size={17} /> },
   ]
 
@@ -166,8 +170,11 @@ export default function AccountApp() {
           <Route path="/panel/requests/new" element={<NewRequestPage />} />
           <Route path="/panel/requests/:id" element={<RequestDetailPage />} />
           <Route path="/panel/notifications" element={<NotificationsPage />} />
-          <Route path="/panel/marketing" element={<MarketingPage />} />
-          <Route path="/panel/wallet" element={<Navigate to="/panel/marketing?tab=commissions" replace />} />
+          <Route
+            path="/panel/marketing"
+            element={siteFlags.marketingEnabled ? <MarketingPage /> : <Navigate to="/panel" replace />}
+          />
+          <Route path="/panel/wallet" element={<Navigate to="/panel" replace />} />
           <Route path="/panel/profile" element={<ProfilePage />} />
           <Route path="*" element={<Navigate to="/panel" replace />} />
         </Routes>

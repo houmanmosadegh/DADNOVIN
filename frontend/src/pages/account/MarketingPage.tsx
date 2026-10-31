@@ -42,7 +42,9 @@ export default function MarketingPage() {
   const isMarketer = me?.is_marketer ?? false
 
   const load = () => {
-    api.get<MarketerHome>('/account/marketer').then(setHome).catch(() => setHome({ status: 'none' }))
+    api.get<MarketerHome>('/account/marketer')
+      .then(setHome)
+      .catch(() => setHome({ status: 'none', marketing_enabled: false }))
   }
   useEffect(load, [isMarketer]) // eslint-disable-line react-hooks/exhaustive-deps
 
@@ -51,6 +53,34 @@ export default function MarketingPage() {
   }
 
   if (!home) return <div className="acc__page"><p className="acc__muted">در حال بارگذاری…</p></div>
+
+  if (home.marketing_enabled === false) {
+    return (
+      <div className="acc__page">
+        <h1 className="acc__title">بازاریابی</h1>
+        <div className="acc__card acc__empty">
+          <p>سیستم بازاریابی و ارجاع فعلاً غیرفعال است.</p>
+        </div>
+      </div>
+    )
+  }
+
+  if (home.status === 'suspended') {
+    return (
+      <div className="acc__page">
+        <h1 className="acc__title">بازاریابی</h1>
+        <div className="acc__card">
+          <div className="acc__state acc__state--rejected">
+            <XCircle size={20} aria-hidden="true" />
+            <div>
+              <p>همکاری بازاریابی شما توسط مدیریت تعلیق شده است.</p>
+              <p className="acc__muted">کد و لینک ارجاع شما غیرفعال است؛ برای اطلاعات بیشتر با پشتیبانی در تماس باشید.</p>
+            </div>
+          </div>
+        </div>
+      </div>
+    )
+  }
 
   if (!isMarketer) {
     return <ApplyGate home={home} onApplied={async () => { await refresh(); load() }} />
@@ -66,6 +96,9 @@ export default function MarketingPage() {
         <p className="acc__err">کد ارجاع شما توسط مدیریت غیرفعال شده است.</p>
       )}
 
+      <p className="acc__muted acc__hint">
+        هزینه‌ای از مراجعه‌کننده دریافت نمی‌شود و کمیسیون از محل حق‌الوکالهٔ دفتر است.
+      </p>
       <div className="acc__chips" role="tablist" aria-label="بخش‌های بازاریابی">
         {TABS.map((t) => (
           <button
@@ -336,10 +369,10 @@ function CommissionsTab() {
 
   if (err && !view) return <p className="acc__err">{err}</p>
   if (!view) return <p className="acc__muted">در حال بارگذاری…</p>
-  if (!view.commission_enabled) {
+  if (!view.marketing_enabled) {
     return (
       <div className="acc__card acc__empty">
-        <p>سیستم کمیسیون فعلاً غیرفعال است — آمار ارجاع همچنان ثبت می‌شود.</p>
+        <p>سیستم بازاریابی فعلاً غیرفعال است.</p>
       </div>
     )
   }
@@ -351,38 +384,38 @@ function CommissionsTab() {
       {err && <p className="acc__err">{err}</p>}
       <div className="acc__stats">
         <div className="acc__card acc__stat"><p className="acc__stat-num">{rial(t.pending)}</p><p className="acc__muted">در انتظار</p></div>
-        <div className="acc__card acc__stat"><p className="acc__stat-num">{rial(t.approved)}</p><p className="acc__muted">تأییدشده</p></div>
+        <div className="acc__card acc__stat"><p className="acc__stat-num">{rial(t.approved)}</p><p className="acc__muted">تأییدشده (قابل پرداخت)</p></div>
         <div className="acc__card acc__stat"><p className="acc__stat-num">{rial(t.paid)}</p><p className="acc__muted">پرداخت‌شده</p></div>
       </div>
 
       <div className="acc__card">
         <h2><BadgePercent size={16} /> کمیسیون‌های من</h2>
         <p className="acc__muted acc__hint">
-          تسویهٔ کمیسیون توسط مدیریت به‌صورت دستی انجام می‌شود؛ وضعیت هر ردیف همین‌جا به‌روزرسانی می‌شود.
+          کمیسیون به‌ازای هر واریزی حق‌الوکالهٔ دفتر در پروندهٔ معرفی‌شده محاسبه می‌شود؛
+          تسویه توسط مدیریت به‌صورت دستی انجام و همین‌جا «پرداخت‌شده» علامت می‌خورد.
         </p>
         {view.items.length === 0 ? (
-          <p className="acc__muted">هنوز کمیسیونی ثبت نشده است — با پذیرش پروندهٔ معرفی‌شده، ردیف کمیسیون این‌جا می‌آید.</p>
+          <p className="acc__muted">هنوز کمیسیونی ثبت نشده است — با دریافت حق‌الوکاله در پروندهٔ معرفی‌شده، ردیف کمیسیون این‌جا می‌آید.</p>
         ) : (
           <div className="acc__list">
             <div className="acc__row acc__row--head">
-              <span>پرونده</span>
-              <span>مبلغ پرونده</span>
-              <span>نرخ</span>
-              <span>کمیسیون</span>
+              <span>معرفی‌شده</span>
+              <span>مرحله</span>
+              <span>حق‌الوکالهٔ دفتر</span>
+              <span>نرخ من</span>
+              <span>کمیسیون من</span>
               <span>وضعیت</span>
               <span>تاریخ</span>
             </div>
             {view.items.map((c) => (
               <div key={c.id} className="acc__row acc__row--comm">
-                <span className="acc__row-topic">
-                  {c.request_label}
-                  {c.tracking_code ? (
-                    <code className="acc__muted" dir="ltr"> {c.tracking_code}</code>
-                  ) : null}
+                <span className="acc__row-topic">{c.masked_name}</span>
+                <span className="acc__muted">{c.stage}</span>
+                <span>{c.fee_amount ? rial(c.fee_amount) : '—'}</span>
+                <span>٪{fa(c.rate)}</span>
+                <span className={`acc__amt ${c.amount < 0 ? 'is-neg' : 'is-pos'}`} dir="ltr">
+                  {c.entry_type === 'reversal' ? 'برگشت: ' : ''}{rial(c.amount)}
                 </span>
-                <span>{c.basis_amount ? rial(c.basis_amount) : '—'}</span>
-                <span>{c.percent != null ? `٪${fa(c.percent)}` : '—'}</span>
-                <span className="acc__amt is-pos" dir="ltr">{rial(c.amount)}</span>
                 <span className={`acc__badge${c.status === 'paid' ? ' acc__badge--gold' : ''}`}>
                   {COMMISSION_FA[c.status] ?? c.status}
                 </span>
@@ -418,11 +451,16 @@ function GuideTab({ home }: { home: MarketerHome }) {
   return (
     <>
       <div className="acc__card">
-        <h2>قواعد فعلی کمیسیون</h2>
-        {!home.commission_enabled ? (
-          <p className="acc__muted">سیستم کمیسیون فعلاً غیرفعال است.</p>
-        ) : rules.length === 0 ? (
-          <p className="acc__muted">هنوز قاعده‌ای تعریف نشده است.</p>
+        <h2>نرخ و قواعد کمیسیون</h2>
+        {home.my_rate != null && (
+          <p className="acc__muted">
+            نرخ فعلی شما: <strong>٪{fa(home.my_rate)}</strong> از حق‌الوکالهٔ دریافتی دفتر
+            {home.rate_source === 'custom' && ' (نرخ اختصاصی)'}
+            {home.rate_source === 'rule' && ' (قاعدهٔ تیری)'}
+          </p>
+        )}
+        {rules.length === 0 ? (
+          <p className="acc__muted">قاعدهٔ تکمیلی تعریف نشده است.</p>
         ) : (
           <div className="acc__list">
             {rules.map((r, i) => (
@@ -432,12 +470,15 @@ function GuideTab({ home }: { home: MarketerHome }) {
                   {r.own && <span className="acc__badge acc__badge--gold">اختصاصی شما</span>}
                 </span>
                 <span className="acc__muted">
-                  {r.kind === 'percent' ? `${fa(r.value)}٪ از مبنای پرونده` : rial(r.value)}
+                  {r.kind === 'percent' ? `${fa(r.value)}٪ از حق‌الوکالهٔ دفتر` : rial(r.value)}
                 </span>
               </div>
             ))}
           </div>
         )}
+        <p className="acc__muted acc__hint">
+          نرخ در لحظهٔ ثبت هر کمیسیون ذخیره می‌شود؛ تغییرات بعدی روی ردیف‌های قبلی اثری ندارد.
+        </p>
       </div>
 
       <div className="acc__card">
@@ -527,7 +568,16 @@ function ApplyGate({ home, onApplied }: { home: MarketerHome; onApplied: () => P
               <>
                 <p className="acc__muted">
                   با دریافت کد ارجاع اختصاصی، کاربرانی که با لینک شما درخواست مشاوره ثبت کنند به حساب شما منسوب می‌شوند.
+                  {home.default_rate != null && home.default_rate > 0 && (
+                    <> کمیسیون فعلی: <strong>٪{fa(home.default_rate)}</strong> از حق‌الوکالهٔ دریافتی دفتر.</>
+                  )}
                 </p>
+                {home.terms?.body && (
+                  <details className="acc__terms">
+                    <summary>قوانین و شرایط همکاری{home.terms.version ? ` — نسخهٔ ${fa(home.terms.version)}` : ''}</summary>
+                    <p className="acc__terms-body">{home.terms.body}</p>
+                  </details>
+                )}
                 <div className="acc__apply">
                   <label className="acc__field">
                     <span>کانال اصلی معرفی</span>
@@ -550,7 +600,10 @@ function ApplyGate({ home, onApplied }: { home: MarketerHome; onApplied: () => P
                       checked={terms}
                       onChange={(e) => { setTerms(e.target.checked); setTermsErr(false) }}
                     />
-                    <span>قوانین بازاریابی و حفظ محرمانگی موکل را می‌پذیرم</span>
+                    <span>
+                      قوانین بازاریابی و حفظ محرمانگی موکل را می‌پذیرم
+                      {home.terms?.version ? ` (نسخهٔ ${fa(home.terms.version)})` : ''}
+                    </span>
                   </label>
                   {termsErr && <em className="acc__hint authp__hint--err">پذیرش قوانین الزامی است.</em>}
                   <button className="btn btn--primary" disabled={busy} onClick={apply}>

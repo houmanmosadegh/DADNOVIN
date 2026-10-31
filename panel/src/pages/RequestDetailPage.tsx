@@ -131,6 +131,38 @@ export default function RequestDetailPage() {
     onError: (e) => toast("error", e instanceof ApiError ? e.message : "خطا در ویرایش"),
   });
 
+  const receipts = useQuery<{
+    fee_amount: number | null;
+    receipts: { id: string; amount: number; note: string; created_at: string }[];
+    commissions: { id: string; entry_type: string; basis_amount: number; rate: number; amount: number; status: string; created_at: string }[];
+  }>({
+    queryKey: ["fee-receipts", id],
+    queryFn: () => api.get(`/admin/requests/consultation/${id}/fee-receipts`),
+    enabled: type === "consultation",
+  });
+
+  const [feeAmount, setFeeAmount] = useState("");
+  const [feeNote, setFeeNote] = useState("");
+  const addReceipt = useMutation({
+    mutationFn: (p: { amount: number; note: string }) =>
+      api.post<{ commission_id: string | null; commission_amount: number }>(
+        `/admin/requests/consultation/${id}/fee-receipts`, p,
+      ),
+    onSuccess: (r: { commission_id: string | null; commission_amount: number }) => {
+      toast(
+        "success",
+        r.commission_id
+          ? `رسید ثبت شد — کمیسیون ${r.commission_amount.toLocaleString("fa-IR")} ریال ایجاد شد.`
+          : "رسید ثبت شد (بدون ارجاع — کمیسیونی ساخته نشد).",
+      );
+      setFeeAmount("");
+      setFeeNote("");
+      qc.invalidateQueries({ queryKey: ["fee-receipts", id] });
+      invalidate();
+    },
+    onError: (e) => toast("error", e instanceof ApiError ? e.message : "خطا در ثبت رسید"),
+  });
+
   const callLog = useMutation({
     mutationFn: (p: { outcome: string; note: string }) =>
       api.post(`/admin/requests/${type}/${id}/call-log`, p),
@@ -501,6 +533,73 @@ export default function RequestDetailPage() {
               </p>
             )}
           </div>
+
+          {/* attorney-fee receipts → commission accrual */}
+          {type === "consultation" && receipts.data && (
+            <div className="card p-4">
+              <p className="mb-2 text-[12px] font-medium text-ink-2">
+                حق‌الوکالهٔ دریافتی دفتر
+              </p>
+              {receipts.data.receipts.length > 0 && (
+                <ul className="mb-3 space-y-1.5 text-[12px]">
+                  {receipts.data.receipts.map((r) => (
+                    <li key={r.id} className="flex items-center justify-between gap-2 rounded-lg border border-line px-2.5 py-1.5">
+                      <span className="font-medium">{r.amount.toLocaleString("fa-IR")} ریال</span>
+                      <span className="text-ink-3">{fmtDate(r.created_at)}</span>
+                    </li>
+                  ))}
+                </ul>
+              )}
+              {receipts.data.commissions.length > 0 && (
+                <ul className="mb-3 space-y-1.5 text-[12px]">
+                  {receipts.data.commissions.map((c) => (
+                    <li key={c.id} className={`flex items-center justify-between gap-2 rounded-lg border px-2.5 py-1.5 ${c.entry_type === "reversal" ? "border-red-500/30 text-red-300" : "border-line"}`}>
+                      <span>
+                        {c.entry_type === "reversal" ? "برگشت" : `کمیسیون ${c.rate.toLocaleString("fa-IR")}٪`}:{" "}
+                        {c.amount.toLocaleString("fa-IR")} ریال
+                      </span>
+                      <StatusBadge value={c.status} />
+                    </li>
+                  ))}
+                </ul>
+              )}
+              {!["cancelled", "closed"].includes(d.request.status) && (
+                <form
+                  className="space-y-2"
+                  onSubmit={(e) => {
+                    e.preventDefault();
+                    const amount = Number(feeAmount.replace(/[,،\s]/g, ""));
+                    if (!amount || amount < 1) return;
+                    addReceipt.mutate({ amount, note: feeNote });
+                  }}
+                >
+                  <input
+                    className="w-full !py-1.5 text-[13px]"
+                    inputMode="numeric"
+                    placeholder="مبلغ دریافتی (ریال)"
+                    value={feeAmount}
+                    onChange={(e) => setFeeAmount(e.target.value)}
+                  />
+                  <input
+                    className="w-full !py-1.5 text-[13px]"
+                    placeholder="توضیح (اختیاری — مثلاً قسط اول)"
+                    value={feeNote}
+                    onChange={(e) => setFeeNote(e.target.value)}
+                  />
+                  <button
+                    className="btn-sm w-full"
+                    type="submit"
+                    disabled={addReceipt.isPending || !feeAmount.trim()}
+                  >
+                    {addReceipt.isPending ? "در حال ثبت…" : "ثبت دریافتی"}
+                  </button>
+                  <p className="text-[11px] leading-4 text-ink-3">
+                    با ثبت هر دریافتی، در صورت اتصال به ارجاع، کمیسیون به‌صورت خودکار محاسبه می‌شود.
+                  </p>
+                </form>
+              )}
+            </div>
+          )}
 
           {/* assignment + priority */}
           <div className="card space-y-3 p-4">

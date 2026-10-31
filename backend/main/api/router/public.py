@@ -9,6 +9,7 @@ from sqlalchemy.ext.asyncio import AsyncSession
 
 from ...core.config import get_settings
 from ...db.session import get_db
+from ...models.content import SiteSetting
 from ...models.lawyer import Lawyer
 from ...models.request_ops import Article
 from ...repositories.content import get_page_by_slug, list_pages, public_settings_map
@@ -28,8 +29,25 @@ DbDep = Annotated[AsyncSession, Depends(get_db)]
 @router.get("/settings")
 async def public_settings(db: DbDep) -> dict[str, dict]:
     settings = await public_settings_map(db)
-    settings["meta"] = {"has_articles": await _has_published_articles(db)}
+    settings["meta"] = {
+        "has_articles": await _has_published_articles(db),
+        "marketing_enabled": await _marketing_flag(db),
+    }
     return settings
+
+
+@router.get("/legal-topics")
+async def legal_topics(db: DbDep) -> list[str]:
+    """Admin-managed topic list for the consultation form (public-safe)."""
+    settings = await public_settings_map(db)
+    topics = (settings.get("legal_topics") or {}).get("items") or []
+    return [t for t in topics if isinstance(t, str) and t.strip()][:40]
+
+
+async def _marketing_flag(db: AsyncSession) -> bool:
+    row = await db.get(SiteSetting, "commission")
+    cfg = row.value if row and isinstance(row.value, dict) else {}
+    return bool(cfg.get("marketing_enabled", cfg.get("commission_enabled")))
 
 
 @router.get("/articles")

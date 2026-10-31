@@ -1,4 +1,8 @@
 User-agent: *
 Allow: /
+Disallow: /r/
+Disallow: /panel
+Disallow: /admin
+Disallow: /api
 
 Sitemap: https://dadnovin.ir/sitemap.xml

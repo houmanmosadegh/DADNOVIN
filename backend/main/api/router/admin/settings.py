@@ -21,7 +21,7 @@ DbDep = Annotated[AsyncSession, Depends(get_db)]
 
 ALLOWED_KEYS = {
     "brand", "contact", "seo", "footer", "socials", "ai",
-    "referral", "commission",
+    "referral", "commission", "legal_topics",
 }
 
 
