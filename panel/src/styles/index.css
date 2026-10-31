@@ -182,3 +182,11 @@ label {
 kbd {
   @apply rounded border border-line bg-sand-2 px-1.5 py-0.5 text-[11px] text-ink-2;
 }
+
+@media (prefers-reduced-motion: reduce) {
+  *, *::before, *::after {
+    animation-duration: .01ms !important;
+    animation-iteration-count: 1 !important;
+    transition-duration: .01ms !important;
+  }
+}

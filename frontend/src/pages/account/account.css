@@ -30,21 +30,6 @@
     radial-gradient(46rem 32rem at 92% 112%, rgb(20 38 82 / .55), transparent 62%),
     linear-gradient(168deg, #050B1A, #0A1633 78%);
 }
-/* هالهٔ طلایی خیلی کم‌رنگ پشت کارت */
-.authp::before {
-  content: '';
-  position: absolute;
-  top: 50%;
-  left: 50%;
-  translate: -50% -50%;
-  inline-size: 30rem;
-  block-size: 30rem;
-  border-radius: 50%;
-  background: radial-gradient(circle, rgb(var(--gold-rgb) / .12), transparent 65%);
-  filter: blur(30px);
-  pointer-events: none;
-}
-
 .authp__card {
   position: relative;
   display: grid;
@@ -271,12 +256,6 @@
   font-size: 1.3rem; margin: 0; color: var(--title-bone);
   flex: 1;
   display: flex; align-items: center; gap: .7rem;
-}
-.acc__topbar-title::after {
-  content: '';
-  inline-size: 2.2rem; block-size: 1px;
-  background: linear-gradient(90deg, rgb(var(--gold-rgb) / .7), transparent);
-  translate: 0 .15rem;
 }
 .acc__topbar-actions { display: flex; align-items: center; gap: .6rem; }
 .acc__burger {
