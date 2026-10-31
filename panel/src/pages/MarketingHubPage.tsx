@@ -1,5 +1,6 @@
 /** بازاریابی — یک بخش با تب: درخواست‌های همکاری · بازاریاب‌ها · ارجاع‌ها ·
- *  کمیسیون‌ها (ledger) · قواعد · قوانین نسخه‌دار · گزارش · تنظیمات (spec §3.2). */
+ *  کمیسیون‌ها (ledger) · قوانین نسخه‌دار · گزارش · تنظیمات (spec §3.2).
+ *  درصد کمیسیون: پیش‌فرض در «تنظیمات»، اختصاصی هر بازاریاب در «بازاریاب‌ها». */
 
 import { useQuery } from "@tanstack/react-query";
 import { useSearchParams } from "react-router-dom";
@@ -11,7 +12,6 @@ import {
   ProfilesTab,
   ReferralsTab,
   ReportTab,
-  RulesTab,
   SettingsTab,
   TermsTab,
   useApplications,
@@ -55,7 +55,6 @@ export default function MarketingHubPage() {
           { key: "marketers", label: "بازاریاب‌ها" },
           { key: "referrals", label: "ارجاع‌ها" },
           { key: "commissions", label: "کمیسیون‌ها" },
-          { key: "rules", label: "قواعد کمیسیون" },
           { key: "terms", label: "قوانین همکاری" },
           { key: "report", label: "گزارش‌ها" },
           { key: "settings", label: "تنظیمات" },
@@ -66,7 +65,6 @@ export default function MarketingHubPage() {
         {tab === "marketers" && <ProfilesTab />}
         {tab === "referrals" && <ReferralsTab />}
         {tab === "commissions" && <CommissionsTab />}
-        {tab === "rules" && <RulesTab />}
         {tab === "terms" && <TermsTab />}
         {tab === "report" && <ReportTab />}
         {tab === "settings" && <SettingsTab />}
