@@ -1,6 +1,6 @@
 /** Shared marketer-management tabs — consumed by the Marketing, Users and
  *  Requests hub pages (one sidebar item each per spec §2). Backend:
- *  /admin/marketers*, /admin/commissions*, /admin/payouts*, /admin/settings/commission. */
+ *  /admin/marketers*, /admin/commissions*, /admin/settings/commission. */
 
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import {
@@ -72,6 +72,18 @@ interface ReferralOut {
   status?: string;
 }
 
+interface ProfileCommission {
+  id: string;
+  tracking_code: string | null;
+  basis_kind: string;
+  basis_amount: number;
+  amount: number;
+  status: string;
+  paid_at: string | null;
+  paid_note: string;
+  created_at: string;
+}
+
 interface CommissionOut {
   id: string;
   marketer_id: string;
@@ -85,7 +97,8 @@ interface CommissionOut {
     kind: string; value: number; tier_min: number;
     min_amount: number; max_amount: number;
   } | null;
-  hold_until: string | null;
+  paid_at: string | null;
+  paid_note: string;
   created_at: string;
 }
 
@@ -102,18 +115,6 @@ interface RuleOut {
   is_active: boolean;
 }
 
-interface PayoutOut {
-  id: string;
-  full_name: string;
-  ref_code: string;
-  amount: number;
-  status: string;
-  iban_masked: string;
-  payment_ref: string;
-  reject_reason: string;
-  created_at: string;
-}
-
 // ---------- helpers ----------
 
 const fmt = (n: number) => `${n.toLocaleString("fa-IR")} ریال`;
@@ -126,16 +127,10 @@ const APP_STATUS: Record<string, [string, string]> = {
   rejected: ["رد شده", "bg-red-500/10 text-red-400"],
 };
 const COMM_STATUS: Record<string, [string, string]> = {
-  pending: ["در هولد", "bg-amber-500/10 text-amber-400"],
+  pending: ["در انتظار", "bg-amber-500/10 text-amber-400"],
   approved: ["تأییدشده", "bg-emerald-500/10 text-emerald-400"],
   paid: ["پرداخت‌شده", "bg-emerald-600/15 text-emerald-300"],
   cancelled: ["لغوشده", "bg-red-500/10 text-red-400"],
-};
-const PAYOUT_STATUS: Record<string, [string, string]> = {
-  pending: ["در انتظار", "bg-amber-500/10 text-amber-400"],
-  approved: ["تأییدشده", "bg-emerald-500/10 text-emerald-400"],
-  paid: ["پرداخت‌شده", "bg-emerald-500/10 text-emerald-400"],
-  rejected: ["رد شده", "bg-red-500/10 text-red-400"],
 };
 const STATUS_PILL: Record<string, [string, string]> = {
   new: ["جدید", "bg-sky-500/10 text-sky-400"],
@@ -270,6 +265,11 @@ function ReferralsDrawer({ profile, onClose }: { profile: ProfileOut | null; onC
     queryFn: () => api.get<ReferralOut[]>(`/admin/marketers/${profile!.id}/referrals`),
     enabled: !!profile,
   });
+  const comms = useQuery({
+    queryKey: ["marketer-comms", profile?.id],
+    queryFn: () => api.get<ProfileCommission[]>(`/admin/marketers/${profile!.id}/commissions`),
+    enabled: !!profile,
+  });
   const [copied, setCopied] = useState(false);
   const copy = () => {
     if (!profile) return;
@@ -278,7 +278,7 @@ function ReferralsDrawer({ profile, onClose }: { profile: ProfileOut | null; onC
     setTimeout(() => setCopied(false), 1500);
   };
   return (
-    <Drawer open={!!profile} onClose={onClose} title={profile ? `ارجاع‌های ${profile.full_name}` : ""}>
+    <Drawer open={!!profile} onClose={onClose} title={profile ? `جزئیات ${profile.full_name}` : ""}>
       {profile && (
         <div className="mb-4 flex items-center justify-between rounded-lg border border-sand-2 p-3">
           <span dir="ltr" className="font-mono text-sm text-gold-1">/r/{profile.ref_code}</span>
@@ -287,6 +287,33 @@ function ReferralsDrawer({ profile, onClose }: { profile: ProfileOut | null; onC
           </button>
         </div>
       )}
+
+      <h4 className="mb-2 text-[13px] font-semibold text-ink-1">کمیسیون‌ها</h4>
+      {comms.isLoading && <Skeleton className="h-24" />}
+      {comms.data && comms.data.length === 0 && <EmptyState text="کمیسیونی ثبت نشده است" />}
+      <div className="mb-5 space-y-2">
+        {(comms.data ?? []).map((c) => (
+          <div key={c.id} className="card p-3 text-sm">
+            <div className="flex items-center justify-between">
+              <span className="font-medium text-gold-1">{fmt(c.amount)}</span>
+              <Pill value={c.status} map={COMM_STATUS} />
+            </div>
+            <div className="mt-1 flex items-center justify-between text-[12px] text-ink-2">
+              <span>
+                {c.basis_kind === "percent" ? `درصدی${c.basis_amount ? ` · مبنا ${fmt(c.basis_amount)}` : ""}` : "ثابت"}
+              </span>
+              <span>{faDate(c.created_at)}</span>
+            </div>
+            {c.status === "paid" && c.paid_at && (
+              <p className="mt-1 text-[11px] text-ink-3">
+                پرداخت {faDate(c.paid_at)}{c.paid_note ? ` — ${c.paid_note}` : ""}
+              </p>
+            )}
+          </div>
+        ))}
+      </div>
+
+      <h4 className="mb-2 text-[13px] font-semibold text-ink-1">ارجاع‌ها</h4>
       {q.isLoading && <Skeleton className="h-40" />}
       {q.data && q.data.length === 0 && <EmptyState text="ارجاعی ثبت نشده است" />}
       <div className="space-y-2">
@@ -602,6 +629,8 @@ export function CommissionsTab() {
   const toast = useToast();
   const qc = useQueryClient();
   const [cancelling, setCancelling] = useState<CommissionOut | null>(null);
+  const [paying, setPaying] = useState<CommissionOut | null>(null);
+  const [payNote, setPayNote] = useState("");
   const [statusFilter, setStatusFilter] = useState("");
 
   const list = useQuery({
@@ -613,7 +642,18 @@ export function CommissionsTab() {
   const approveComm = useMutation({
     mutationFn: (id: string) => api.post(`/admin/commissions/${id}/approve`, {}),
     onSuccess: () => {
-      toast("success", "کمیسیون تأیید و به کیف پول واریز شد.");
+      toast("success", "کمیسیون تأیید شد.");
+      invalidate();
+    },
+    onError: (e) => toast("error", e instanceof ApiError ? e.message : "خطا"),
+  });
+  const payComm = useMutation({
+    mutationFn: ({ id, note }: { id: string; note: string }) =>
+      api.post(`/admin/commissions/${id}/pay`, { note }),
+    onSuccess: () => {
+      toast("success", "کمیسیون پرداخت‌شده علامت خورد.");
+      setPaying(null);
+      setPayNote("");
       invalidate();
     },
     onError: (e) => toast("error", e instanceof ApiError ? e.message : "خطا"),
@@ -647,7 +687,7 @@ export function CommissionsTab() {
       <div className="flex justify-end">
         <select value={statusFilter} onChange={(e) => setStatusFilter(e.target.value)} className="w-40">
           <option value="">همهٔ وضعیت‌ها</option>
-          <option value="pending">در هولد</option>
+          <option value="pending">در انتظار</option>
           <option value="approved">تأییدشده</option>
           <option value="paid">پرداخت‌شده</option>
           <option value="cancelled">لغوشده</option>
@@ -657,7 +697,7 @@ export function CommissionsTab() {
       {list.isError && <ErrorState text="بارگذاری ناموفق بود." onRetry={() => list.refetch()} />}
       {list.data && rows.length === 0 && <EmptyState text="کمیسیونی ثبت نشده است" />}
       {rows.length > 0 && (
-        <Table head={["بازاریاب", "مبلغ", "مبنا", "قاعدهٔ اعمال‌شده", "وضعیت", "هولد تا", "تاریخ", ""]}>
+        <Table head={["بازاریاب", "مبلغ", "مبنا", "قاعدهٔ اعمال‌شده", "وضعیت", "پرداخت", "تاریخ", ""]}>
           {rows.map((c) => (
             <tr key={c.id} className="border-b border-sand-2 last:border-0">
               <td className="td">
@@ -677,7 +717,11 @@ export function CommissionsTab() {
                   : "—"}
               </td>
               <td className="td"><Pill value={c.status} map={COMM_STATUS} /></td>
-              <td className="td text-[12px] text-ink-2">{c.hold_until ? faDate(c.hold_until) : "—"}</td>
+              <td className="td text-[12px] text-ink-2">
+                {c.status === "paid" && c.paid_at
+                  ? <>{faDate(c.paid_at)}{c.paid_note ? <span className="block text-[11px]">{c.paid_note}</span> : null}</>
+                  : "—"}
+              </td>
               <td className="td text-[12px] text-ink-2">{faDate(c.created_at)}</td>
               <td className="td text-left">
                 {c.status === "pending" && (
@@ -691,97 +735,12 @@ export function CommissionsTab() {
                   </div>
                 )}
                 {c.status === "approved" && (
-                  <button className="btn-ghost btn-sm" onClick={() => setCancelling(c)}>
-                    <X size={13} /> لغو
-                  </button>
-                )}
-              </td>
-            </tr>
-          ))}
-        </Table>
-      )}
-
-      <ConfirmDialog
-        open={!!cancelling}
-        danger
-        title="لغو کمیسیون"
-        body={`کمیسیون ${cancelling ? fmt(cancelling.amount) : ""} برای ${cancelling?.full_name} لغو شود؟${cancelling?.status === "approved" ? " مبلغ از کیف پول برمی‌گردد." : ""}`}
-        onCancel={() => setCancelling(null)}
-        onConfirm={() => cancelling && cancelComm.mutate({ id: cancelling.id, reason: "لغو دستی" })}
-      />
-    </div>
-  );
-}
-
-// ---------- payouts (درخواست‌ها ← برداشت و بازاریابی ← برداشت‌ها) ----------
-
-export function PayoutsTab() {
-  const toast = useToast();
-  const qc = useQueryClient();
-  const [approving, setApproving] = useState<PayoutOut | null>(null);
-  const [rejecting, setRejecting] = useState<PayoutOut | null>(null);
-  const [paymentRef, setPaymentRef] = useState("");
-  const [reason, setReason] = useState("");
-
-  const list = useQuery({
-    queryKey: ["payouts"],
-    queryFn: () => api.get<PayoutOut[]>("/admin/payouts"),
-  });
-  const invalidate = () => qc.invalidateQueries({ queryKey: ["payouts"] });
-
-  const approve = useMutation({
-    mutationFn: ({ id, payment_ref }: { id: string; payment_ref: string }) =>
-      api.post(`/admin/payouts/${id}/approve`, { payment_ref }),
-    onSuccess: () => {
-      toast("success", "برداشت پرداخت شد.");
-      setApproving(null);
-      setPaymentRef("");
-      invalidate();
-    },
-    onError: (e) => toast("error", e instanceof ApiError ? e.message : "خطا"),
-  });
-  const reject = useMutation({
-    mutationFn: ({ id, reason }: { id: string; reason: string }) =>
-      api.post(`/admin/payouts/${id}/reject`, { reason }),
-    onSuccess: () => {
-      toast("success", "برداشت رد شد.");
-      setRejecting(null);
-      setReason("");
-      invalidate();
-    },
-    onError: (e) => toast("error", e instanceof ApiError ? e.message : "خطا"),
-  });
-
-  const rows = list.data ?? [];
-
-  return (
-    <div className="space-y-3">
-      {list.isLoading && <Skeleton className="h-40" />}
-      {list.isError && <ErrorState text="بارگذاری ناموفق بود." onRetry={() => list.refetch()} />}
-      {list.data && rows.length === 0 && <EmptyState text="درخواست برداشتی نیست" />}
-      {rows.length > 0 && (
-        <Table head={["بازاریاب", "مبلغ", "شبا", "وضعیت", "تاریخ", "پیگیری/دلیل", ""]}>
-          {rows.map((p) => (
-            <tr key={p.id} className="border-b border-sand-2 last:border-0">
-              <td className="td">
-                <div className="font-medium">{p.full_name}</div>
-                <div dir="ltr" className="font-mono text-[11px] text-ink-2">{p.ref_code}</div>
-              </td>
-              <td className="td font-medium text-gold-1">{fmt(p.amount)}</td>
-              <td className="td" dir="ltr"><span className="font-mono text-[12px]">{p.iban_masked || "—"}</span></td>
-              <td className="td"><Pill value={p.status} map={PAYOUT_STATUS} /></td>
-              <td className="td text-[12px] text-ink-2">{faDate(p.created_at)}</td>
-              <td className="td text-[12px] text-ink-1">
-                {p.payment_ref || p.reject_reason || "—"}
-              </td>
-              <td className="td text-left">
-                {p.status === "pending" && (
                   <div className="flex gap-1">
-                    <button className="btn-gold btn-sm" onClick={() => setApproving(p)}>
-                      <Check size={13} /> پرداخت
+                    <button className="btn-gold btn-sm" onClick={() => setPaying(c)}>
+                      <Check size={13} /> پرداخت شد
                     </button>
-                    <button className="btn-ghost btn-sm" onClick={() => setRejecting(p)}>
-                      <X size={13} /> رد
+                    <button className="btn-ghost btn-sm" onClick={() => setCancelling(c)}>
+                      <X size={13} /> لغو
                     </button>
                   </div>
                 )}
@@ -791,25 +750,24 @@ export function PayoutsTab() {
         </Table>
       )}
 
-      {/* پرداخت */}
-      <Drawer open={!!approving} onClose={() => setApproving(null)} title="ثبت پرداخت">
-        {approving && (
+      {/* علامت پرداخت دستی — تاریخ + توضیح */}
+      <Drawer open={!!paying} onClose={() => setPaying(null)} title="ثبت پرداخت کمیسیون">
+        {paying && (
           <div className="space-y-3">
             <p className="text-sm">
-              پرداخت <strong className="text-gold-1">{fmt(approving.amount)}</strong> به{" "}
-              <strong>{approving.full_name}</strong> ({approving.iban_masked || "بدون شبا"})
+              پرداخت <strong className="text-gold-1">{fmt(paying.amount)}</strong> به{" "}
+              <strong>{paying.full_name}</strong> ثبت می‌شود؛ تاریخ همین لحظه درج می‌گردد.
             </p>
             <input
-              dir="ltr"
               className="w-full"
-              placeholder="شماره پیگیری پرداخت *"
-              value={paymentRef}
-              onChange={(e) => setPaymentRef(e.target.value)}
+              placeholder="توضیح پرداخت (شماره فیش، روش واریز…)"
+              value={payNote}
+              onChange={(e) => setPayNote(e.target.value)}
             />
             <button
               className="btn-gold btn-sm"
-              disabled={approve.isPending || paymentRef.trim().length < 2}
-              onClick={() => approve.mutate({ id: approving.id, payment_ref: paymentRef })}
+              disabled={payComm.isPending}
+              onClick={() => payComm.mutate({ id: paying.id, note: payNote })}
             >
               ثبت پرداخت
             </button>
@@ -817,27 +775,14 @@ export function PayoutsTab() {
         )}
       </Drawer>
 
-      {/* رد */}
-      <Drawer open={!!rejecting} onClose={() => setRejecting(null)} title="رد برداشت">
-        {rejecting && (
-          <div className="space-y-3">
-            <p className="text-sm">رد برداشت {fmt(rejecting.amount)} برای {rejecting.full_name}</p>
-            <input
-              className="w-full"
-              placeholder="دلیل رد"
-              value={reason}
-              onChange={(e) => setReason(e.target.value)}
-            />
-            <button
-              className="btn-danger btn-sm"
-              disabled={reject.isPending}
-              onClick={() => reject.mutate({ id: rejecting.id, reason })}
-            >
-              ثبت رد
-            </button>
-          </div>
-        )}
-      </Drawer>
+      <ConfirmDialog
+        open={!!cancelling}
+        danger
+        title="لغو کمیسیون"
+        body={`کمیسیون ${cancelling ? fmt(cancelling.amount) : ""} برای ${cancelling?.full_name} لغو شود؟`}
+        onCancel={() => setCancelling(null)}
+        onConfirm={() => cancelling && cancelComm.mutate({ id: cancelling.id, reason: "لغو دستی" })}
+      />
     </div>
   );
 }
@@ -848,41 +793,62 @@ interface ReportOut {
   leaderboard: {
     id: string;
     full_name: string;
+    phone: string;
     ref_code: string;
     is_active: boolean;
     fraud_flag: boolean;
     earned: number;
+    sales: number;
+    commissions: { pending: number; approved: number; paid: number; cancelled: number };
     clicks: number;
     unique_clicks: number;
     requests: number;
     accepted: number;
     conversion: number;
+    last_activity: string | null;
   }[];
-  funnel: { clicks: number; unique_clicks: number; requests: number; accepted: number };
+  funnel: { clicks: number; unique_clicks: number; requests: number; accepted: number; sales: number };
   sources: { label: string; clicks: number; unique: number }[];
   suspicious: { id: string; ref_code: string; reason: string; ip: string; created_at: string }[];
 }
 
 export function ReportTab() {
+  const [q_, setQ] = useState("");
+  const [start, setStart] = useState("");
+  const [end, setEnd] = useState("");
+  const params = new URLSearchParams();
+  if (q_.trim()) params.set("q", q_.trim());
+  if (start) params.set("start", new Date(start).toISOString());
+  if (end) params.set("end", new Date(end).toISOString());
+  const qs = params.toString();
+
   const q = useQuery({
-    queryKey: ["marketer-report"],
-    queryFn: () => api.get<ReportOut>("/admin/marketers/report"),
+    queryKey: ["marketer-report", qs],
+    queryFn: () => api.get<ReportOut>(`/admin/marketers/report${qs ? `?${qs}` : ""}`),
   });
   const funnel = q.data?.funnel;
   const maxBar = funnel?.clicks || 1;
 
   return (
     <div className="space-y-4">
-      <div className="flex items-center justify-between">
-        <p className="text-[13px] text-ink-2">رتبه‌بندی، قیف تبدیل، منابع و موارد مشکوک</p>
+      <div className="flex flex-wrap items-center gap-2">
+        <input
+          className="w-52"
+          placeholder="جستجو: نام، کد یا موبایل"
+          value={q_}
+          onChange={(e) => setQ(e.target.value)}
+        />
+        <input type="datetime-local" dir="ltr" title="از تاریخ" value={start} onChange={(e) => setStart(e.target.value)} />
+        <input type="datetime-local" dir="ltr" title="تا تاریخ" value={end} onChange={(e) => setEnd(e.target.value)} />
         <a
-          className="btn-ghost btn-sm"
-          href={`${location.origin}/api/v1/admin/marketers/report.csv`}
+          className="btn-ghost btn-sm mr-auto"
+          href={`${location.origin}/api/v1/admin/marketers/report.csv${qs ? `?${qs}` : ""}`}
           download
         >
           <Download size={13} /> خروجی CSV
         </a>
       </div>
+      <p className="text-[13px] text-ink-2">رتبه‌بندی، قیف تبدیل، فروش، کمیسیون و موارد مشکوک</p>
 
       {q.isLoading && <Skeleton className="h-56" />}
       {q.isError && <ErrorState text="بارگذاری ناموفق بود." onRetry={() => q.refetch()} />}
@@ -915,65 +881,79 @@ export function ReportTab() {
                 </div>
               ))}
             </div>
+            {funnel!.sales > 0 && (
+              <p className="mt-3 border-t border-sand-2 pt-3 text-[13px] text-ink-1">
+                مجموع فروش پرونده‌های پذیرفته:{" "}
+                <strong className="text-gold-1">{fmt(funnel!.sales)}</strong>
+              </p>
+            )}
+          </div>
+
+          {/* leaderboard — بازاریاب‌ها و فعالیتشان */}
+          <div className="card p-4">
+            <h3 className="mb-3 text-[14px] font-semibold">بازاریاب‌ها و فعالیتشان</h3>
+            <Table head={["#", "بازاریاب", "کلیک", "لید/پرونده", "موفق", "فروش", "کمیسیون", "آخرین فعالیت"]}>
+              {q.data.leaderboard.map((b, i) => (
+                <tr key={b.id} className="border-b border-sand-2 last:border-0">
+                  <td className="td text-ink-3">{(i + 1).toLocaleString("fa-IR")}</td>
+                  <td className="td">
+                    <div className="font-medium">{b.full_name}</div>
+                    <div dir="ltr" className="font-mono text-[11px] text-ink-2">{b.ref_code}</div>
+                  </td>
+                  <td className="td">{b.clicks.toLocaleString("fa-IR")}</td>
+                  <td className="td">{b.requests.toLocaleString("fa-IR")}</td>
+                  <td className="td">{b.accepted.toLocaleString("fa-IR")}</td>
+                  <td className="td">{b.sales ? fmt(b.sales) : "—"}</td>
+                  <td className="td text-[12px]">
+                    <span className="font-medium text-gold-1">{fmt(b.earned)}</span>
+                    <span className="block text-[11px] text-ink-2">
+                      انتظار {fmt(b.commissions.pending)} · تأیید {fmt(b.commissions.approved)} · پرداخت {fmt(b.commissions.paid)}
+                    </span>
+                  </td>
+                  <td className="td text-[12px] text-ink-2">
+                    {b.last_activity ? faDateTime(b.last_activity) : "—"}
+                  </td>
+                </tr>
+              ))}
+              {q.data.leaderboard.length === 0 && (
+                <tr><td className="td py-6 text-center text-ink-2" colSpan={8}>بازاریابی نیست</td></tr>
+              )}
+            </Table>
           </div>
 
           <div className="grid gap-4 lg:grid-cols-2">
-            {/* leaderboard */}
+            {/* top sources */}
             <div className="card p-4">
-              <h3 className="mb-3 text-[14px] font-semibold">رتبه‌بندی بازاریاب‌ها</h3>
-              <Table head={["#", "بازاریاب", "کلیک", "پذیرفته", "درآمد"]}>
-                {q.data.leaderboard.map((b, i) => (
-                  <tr key={b.id} className="border-b border-sand-2 last:border-0">
-                    <td className="td text-ink-3">{(i + 1).toLocaleString("fa-IR")}</td>
-                    <td className="td">
-                      <div className="font-medium">{b.full_name}</div>
-                      <div dir="ltr" className="font-mono text-[11px] text-ink-2">{b.ref_code}</div>
-                    </td>
-                    <td className="td">{b.clicks.toLocaleString("fa-IR")}</td>
-                    <td className="td">{b.accepted.toLocaleString("fa-IR")}</td>
-                    <td className="td font-medium text-gold-1">{fmt(b.earned)}</td>
-                  </tr>
+              <h3 className="mb-3 text-[14px] font-semibold">منابع پرترافیک</h3>
+              {q.data.sources.length === 0 && (
+                <p className="text-[12px] text-ink-2">کلیکی ثبت نشده است.</p>
+              )}
+              <div className="space-y-1.5">
+                {q.data.sources.map((s) => (
+                  <div key={s.label} className="flex items-center justify-between rounded-lg border border-sand-2 px-3 py-2 text-[13px]">
+                    <span dir="ltr" className="font-mono text-[12px]">{s.label}</span>
+                    <span className="text-ink-2">
+                      {s.clicks.toLocaleString("fa-IR")} کلیک ({s.unique.toLocaleString("fa-IR")} یکتا)
+                    </span>
+                  </div>
                 ))}
-                {q.data.leaderboard.length === 0 && (
-                  <tr><td className="td py-6 text-center text-ink-2" colSpan={5}>بازاریابی نیست</td></tr>
-                )}
-              </Table>
+              </div>
             </div>
 
-            <div className="space-y-4">
-              {/* top sources */}
-              <div className="card p-4">
-                <h3 className="mb-3 text-[14px] font-semibold">منابع پرترافیک</h3>
-                {q.data.sources.length === 0 && (
-                  <p className="text-[12px] text-ink-2">کلیکی ثبت نشده است.</p>
-                )}
-                <div className="space-y-1.5">
-                  {q.data.sources.map((s) => (
-                    <div key={s.label} className="flex items-center justify-between rounded-lg border border-sand-2 px-3 py-2 text-[13px]">
-                      <span dir="ltr" className="font-mono text-[12px]">{s.label}</span>
-                      <span className="text-ink-2">
-                        {s.clicks.toLocaleString("fa-IR")} کلیک ({s.unique.toLocaleString("fa-IR")} یکتا)
-                      </span>
-                    </div>
-                  ))}
-                </div>
-              </div>
-
-              {/* suspicious */}
-              <div className="card border-red-500/20 p-4">
-                <h3 className="mb-3 text-[14px] font-semibold text-red-400">موارد مشکوک</h3>
-                {q.data.suspicious.length === 0 && (
-                  <p className="text-[12px] text-ink-2">موردی نیست — پاک است.</p>
-                )}
-                <div className="max-h-56 space-y-1.5 overflow-y-auto">
-                  {q.data.suspicious.map((s) => (
-                    <div key={s.id} className="flex items-center justify-between rounded-lg border border-red-500/20 bg-red-500/5 px-3 py-2 text-[12px]">
-                      <span dir="ltr" className="font-mono">{s.ref_code}</span>
-                      <span className="text-ink-2">{s.reason} — {s.ip}</span>
-                      <span className="text-ink-3">{faDateTime(s.created_at)}</span>
-                    </div>
-                  ))}
-                </div>
+            {/* suspicious */}
+            <div className="card border-red-500/20 p-4">
+              <h3 className="mb-3 text-[14px] font-semibold text-red-400">موارد مشکوک</h3>
+              {q.data.suspicious.length === 0 && (
+                <p className="text-[12px] text-ink-2">موردی نیست — پاک است.</p>
+              )}
+              <div className="max-h-56 space-y-1.5 overflow-y-auto">
+                {q.data.suspicious.map((s) => (
+                  <div key={s.id} className="flex items-center justify-between rounded-lg border border-red-500/20 bg-red-500/5 px-3 py-2 text-[12px]">
+                    <span dir="ltr" className="font-mono">{s.ref_code}</span>
+                    <span className="text-ink-2">{s.reason} — {s.ip}</span>
+                    <span className="text-ink-3">{faDateTime(s.created_at)}</span>
+                  </div>
+                ))}
               </div>
             </div>
           </div>
@@ -987,9 +967,6 @@ export function ReportTab() {
 
 interface CommissionSettings {
   commission_enabled: boolean;
-  basis: string;
-  min_payout: number;
-  hold_days: number;
   cookie_days: number;
   monthly_cap: number;
   reapply_days: number;
@@ -1008,9 +985,6 @@ export function SettingsTab() {
 
   const defaults: CommissionSettings = {
     commission_enabled: false,
-    basis: "fixed",
-    min_payout: 1_000_000,
-    hold_days: 14,
     cookie_days: 30,
     monthly_cap: 0,
     reapply_days: 14,
@@ -1039,7 +1013,7 @@ export function SettingsTab() {
           <label className="flex items-center justify-between gap-3">
             <span>
               <span className="block text-[14px] font-medium">کمیسیون فعال</span>
-              <span className="block text-[12px] text-ink-2">با خاموش‌بودن، کمیسیونی ثبت نمی‌شود و کیف پول بازاریاب پنهان می‌ماند.</span>
+              <span className="block text-[12px] text-ink-2">با خاموش‌بودن، کمیسیونی ثبت نمی‌شود و بخش کمیسیون در پنل بازاریاب پنهان می‌ماند.</span>
             </span>
             <button
               className={`inline-flex items-center gap-1 text-[13px] ${current.commission_enabled ? "text-emerald-400" : "text-ink-3"}`}
@@ -1064,8 +1038,6 @@ export function SettingsTab() {
 
           {(
             [
-              ["min_payout", "حداقل مبلغ برداشت (ریال)"],
-              ["hold_days", "ایام هولد کمیسیون (روز)"],
               ["cookie_days", "عمر کوکی ارجاع (روز)"],
               ["monthly_cap", "سقف کمیسیون ماهانه (ریال — ۰ یعنی نامحدود)"],
               ["reapply_days", "فاصلهٔ درخواست مجدد پس از رد (روز)"],

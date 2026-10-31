@@ -21,6 +21,7 @@ interface PublicSettings {
   socials?: Dict
   footer?: Dict
   ai?: Dict
+  meta?: Dict
 }
 
 interface PublicPage {
@@ -44,6 +45,17 @@ interface PublicLawyer {
 /** Feature flags the UI can read (re-render applies them). */
 export const siteFlags = {
   aiEnabled: true,
+  hasArticles: false,
+}
+
+/**
+ * Public nav items — «مقالات» appears between services-contact only
+ * when at least one published article exists.
+ */
+export function publicNav(): { label: string; to: string }[] {
+  if (!siteFlags.hasArticles) return c.nav
+  const contactItem = c.nav[c.nav.length - 1]
+  return [...c.nav.slice(0, -1), { label: 'مقالات', to: '/articles' }, contactItem]
 }
 
 function mergeObj(target: Dict, source: Dict) {
@@ -87,6 +99,9 @@ function applySettings(s: PublicSettings) {
     if (typeof s.ai.welcome === 'string') c.aiConsultant.chat.welcome = s.ai.welcome
     if (typeof s.ai.placeholder === 'string')
       c.aiConsultant.chat.placeholder = s.ai.placeholder
+  }
+  if (typeof s.meta?.has_articles === 'boolean') {
+    siteFlags.hasArticles = s.meta.has_articles
   }
 }
 

@@ -38,14 +38,19 @@ export function canonicalFor(path: string): string {
 export function useSeo(page: SeoPage, path: string) {
   useEffect(() => {
     const meta = seo[page]
-    const url = canonicalFor(path)
-    document.title = meta.title
-    setMeta('name', 'description', meta.description)
-    setCanonical(url)
-    setMeta('property', 'og:title', meta.title)
-    setMeta('property', 'og:description', meta.description)
-    setMeta('property', 'og:url', url)
-    setMeta('name', 'twitter:title', meta.title)
-    setMeta('name', 'twitter:description', meta.description)
+    applySeo(meta.title, meta.description, path)
   }, [page, path])
+}
+
+/** Dynamic variant — e.g. article pages whose meta comes from the API. */
+export function applySeo(title: string, description: string, path: string) {
+  const url = canonicalFor(path)
+  document.title = title
+  setMeta('name', 'description', description)
+  setCanonical(url)
+  setMeta('property', 'og:title', title)
+  setMeta('property', 'og:description', description)
+  setMeta('property', 'og:url', url)
+  setMeta('name', 'twitter:title', title)
+  setMeta('name', 'twitter:description', description)
 }

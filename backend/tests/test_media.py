@@ -1,4 +1,6 @@
-"""Media: upload validation, signature sniffing, serving, deletion."""
+"""Media: upload validation, signature sniffing, serving.
+(Library list/delete endpoints were removed with the admin media page —
+only upload + file-serving remain for portraits and attachments.)"""
 
 import io
 
@@ -12,7 +14,7 @@ def _png_bytes(w=40, h=30) -> bytes:
     return buf.getvalue()
 
 
-async def test_upload_serve_delete_cycle(admin_client, tmp_path, monkeypatch):
+async def test_upload_serve_cycle(admin_client, tmp_path, monkeypatch):
     monkeypatch.setenv("STORAGE_DIR", str(tmp_path))
     from main.core.config import get_settings
 
@@ -30,10 +32,9 @@ async def test_upload_serve_delete_cycle(admin_client, tmp_path, monkeypatch):
     assert serve.status_code == 200
     assert serve.headers["content-type"] == "image/png"
 
+    # library endpoints are gone — delete now 404s
     delete = await admin_client.delete(f"/api/v1/admin/media/{asset['id']}")
-    assert delete.status_code == 200
-    gone = await admin_client.get(asset["url"])
-    assert gone.status_code == 404
+    assert delete.status_code == 404
     get_settings.cache_clear()  # restore default settings for later tests
 
 

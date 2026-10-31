@@ -70,3 +70,16 @@ class PublicPageOut(BaseModel):
     seo_title: str
     seo_description: str
     sections: list[PublicSectionOut]
+
+
+class PublicArticleOut(BaseModel):
+    slug: str
+    title: str
+    excerpt: str
+    published_at: datetime | None
+
+
+class PublicArticleDetailOut(PublicArticleOut):
+    body: str
+    seo_title: str
+    seo_description: str

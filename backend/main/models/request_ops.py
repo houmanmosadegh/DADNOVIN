@@ -42,7 +42,8 @@ TRANSITIONS: dict[str, dict[str, frozenset[str]]] = {
         "awaiting_call": frozenset({"reviewing", "followed_up", "consulted", "completed", "cancelled"}),
         "followed_up": frozenset({"awaiting_call", "consulted", "completed", "cancelled"}),
         "consulted": frozenset({"accepted", "rejected", "completed", "cancelled"}),
-        "accepted": frozenset(),
+        # پذیرفته‌شده فقط به سرنوشت نهایی می‌رود — کمیسیون در «لغو» باطل می‌شود
+        "accepted": frozenset({"completed", "cancelled"}),
         "rejected": frozenset(),
         "completed": frozenset(),
         "cancelled": frozenset({"new"}),

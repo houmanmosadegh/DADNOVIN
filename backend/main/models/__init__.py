@@ -6,10 +6,8 @@ from .account import (
     MarketerApplication,
     MarketerProfile,
     PasswordResetToken,
-    PayoutRequest,
     ReferralAttribution,
     ReferralClick,
-    WalletEntry,
 )
 from .ai import AIConversation, AIKnowledgeSource, AIMessage
 from .audit import AuditLog
@@ -51,7 +49,6 @@ __all__ = [
     "Page",
     "PageSection",
     "PasswordResetToken",
-    "PayoutRequest",
     "ReferralAttribution",
     "ReferralClick",
     "RequestEvent",
@@ -64,6 +61,5 @@ __all__ = [
     "TicketMessage",
     "TrackingCounter",
     "User",
-    "WalletEntry",
     "user_roles",
 ]

@@ -59,11 +59,10 @@ async def _seed_setting(
 
 REFERRAL_DEFAULTS = {
     "cookie_days": 30,
-    "min_payout": 1_000_000,
-    "hold_days": 14,
-    "basis": "fixed",
     "commission_enabled": False,
     "monthly_cap": 0,
+    "reapply_days": 14,
+    "attribution_model": "first_touch",
 }
 
 

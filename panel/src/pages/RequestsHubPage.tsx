@@ -1,9 +1,9 @@
 /** درخواست‌ها — یک صندوق واحد: ورودی · مشاوره · تماس · تیکت · بازاریابی ·
- *  برداشت · برچسب‌ها (spec §2 sidebar #2). */
+ *  برچسب‌ها (spec §2 sidebar #2). */
 
 import { useSearchParams } from "react-router-dom";
 import { PageHeader, Tabs } from "../components/ui";
-import { ApplicationsTab, PayoutsTab, useApplications } from "./marketing/parts";
+import { ApplicationsTab, useApplications } from "./marketing/parts";
 import InboxPage from "./InboxPage";
 import LabelsPage from "./LabelsPage";
 
@@ -17,7 +17,7 @@ export default function RequestsHubPage() {
     <div>
       <PageHeader
         title="درخواست‌ها"
-        subtitle="صندوق واحد — مشاوره، تماس، تیکت، بازاریابی و برداشت"
+        subtitle="صندوق واحد — مشاوره، تماس، تیکت و بازاریابی"
       />
       <Tabs
         active={tab}
@@ -28,7 +28,6 @@ export default function RequestsHubPage() {
           { key: "contacts", label: "تماس" },
           { key: "tickets", label: "تیکت‌ها" },
           { key: "marketers", label: "بازاریابی", count: pendingApps || undefined },
-          { key: "payouts", label: "برداشت‌ها" },
           { key: "labels", label: "برچسب‌ها" },
         ]}
       />
@@ -40,7 +39,6 @@ export default function RequestsHubPage() {
         {tab === "contacts" && <InboxPage key="contacts" fixedType="contact" embedded />}
         {tab === "tickets" && <InboxPage key="tickets" fixedType="ticket" embedded />}
         {tab === "marketers" && <ApplicationsTab />}
-        {tab === "payouts" && <PayoutsTab />}
         {tab === "labels" && <LabelsPage />}
       </div>
     </div>

@@ -1,7 +1,8 @@
 import { useEffect, useRef, useState } from 'react'
 import { Link, NavLink, useLocation } from 'react-router-dom'
-import { Menu, Phone, UserRound, X } from 'lucide-react'
-import { brand, contact, nav } from '../content/lawyers.fa.js'
+import { Menu, UserRound, X } from 'lucide-react'
+import { brand } from '../content/lawyers.fa.js'
+import { publicNav } from '../content/remote'
 import { useScrolled } from '../utils/useScrolled'
 import { useAuth } from '../services/auth'
 import './Header.css'
@@ -132,7 +133,7 @@ export function Header() {
           ref={navRef}
         >
           <ul className="site-nav__list" role="list" ref={listRef}>
-            {nav.map((item) => (
+            {publicNav().map((item) => (
               <li key={item.to}>
                 <NavLink
                   to={item.to}
@@ -148,43 +149,30 @@ export function Header() {
             <li className="site-nav__marker" ref={markerRef} aria-hidden="true" />
           </ul>
 
-          {/* ورود/پنل — نسخهٔ کشویی برای موبایل */}
+          {/* پنل کاربری — نسخهٔ کشویی برای موبایل */}
           <div className="site-nav__auth">
             {loading ? null : me ? (
               <a href={panelHome} className="site-nav__auth-link" onClick={() => setOpen(false)}>
-                <UserRound size={16} aria-hidden="true" /> پنل من
+                <UserRound size={16} aria-hidden="true" /> پنل کاربری
               </a>
             ) : (
               <Link to="/panel" className="site-nav__auth-link" onClick={() => setOpen(false)}>
-                <UserRound size={16} aria-hidden="true" /> ورود / ثبت‌نام
+                <UserRound size={16} aria-hidden="true" /> پنل کاربری
               </Link>
             )}
           </div>
-
-          {contact.phones.length > 0 ? (
-            <ul className="site-nav__phones" role="list">
-              {contact.phones.map((phone: string) => (
-                <li key={phone}>
-                  <a href={`tel:${phone}`} className="site-nav__phone">
-                    <Phone size={17} aria-hidden="true" />
-                    <span dir="ltr">{phone}</span>
-                  </a>
-                </li>
-              ))}
-            </ul>
-          ) : null}
         </nav>
 
         <div className="site-header__actions">
           {loading ? null : me ? (
-            <a href={panelHome} className="header-auth" aria-label="پنل من">
+            <a href={panelHome} className="header-auth" aria-label="پنل کاربری">
               <UserRound size={17} aria-hidden="true" />
-              <span>پنل من</span>
+              <span>پنل کاربری</span>
             </a>
           ) : (
-            <Link to="/panel" className="header-auth" aria-label="ورود یا ثبت‌نام">
+            <Link to="/panel" className="header-auth" aria-label="پنل کاربری">
               <UserRound size={17} aria-hidden="true" />
-              <span>ورود / ثبت‌نام</span>
+              <span>پنل کاربری</span>
             </Link>
           )}
           <button

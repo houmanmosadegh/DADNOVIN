@@ -33,7 +33,6 @@ const TITLES: [string, string][] = [
   ['/panel/requests', 'درخواست‌های مشاوره'],
   ['/panel/notifications', 'اعلان‌ها'],
   ['/panel/marketing', 'بازاریابی'],
-  ['/panel/wallet', 'کیف پول'],
   ['/panel/profile', 'پروفایل'],
 ]
 
@@ -168,7 +167,7 @@ export default function AccountApp() {
           <Route path="/panel/requests/:id" element={<RequestDetailPage />} />
           <Route path="/panel/notifications" element={<NotificationsPage />} />
           <Route path="/panel/marketing" element={<MarketingPage />} />
-          <Route path="/panel/wallet" element={<Navigate to="/panel/marketing?tab=wallet" replace />} />
+          <Route path="/panel/wallet" element={<Navigate to="/panel/marketing?tab=commissions" replace />} />
           <Route path="/panel/profile" element={<ProfilePage />} />
           <Route path="*" element={<Navigate to="/panel" replace />} />
         </Routes>

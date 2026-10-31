@@ -22,6 +22,7 @@ const routes = [
   ['/consultation', 'consultation'],
   ['/contact', 'contact'],
   ['/track', 'track'],
+  ['/articles', 'articles'],
 ]
 
 const escapeRegExp = (s) => s.replace(/[.*+?^${}()|[\]\\]/g, '\\$&')

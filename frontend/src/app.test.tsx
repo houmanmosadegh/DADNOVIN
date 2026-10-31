@@ -80,7 +80,7 @@ describe('HomePage', () => {
     expect(
       screen.getByRole('heading', {
         level: 1,
-        name: 'دفاعی تمام‌قد در کنار شما',
+        name: 'پروندهٔ شما، مسئولیتِ ماست',
       }),
     ).toBeTruthy()
     for (const s of services) {
@@ -290,7 +290,7 @@ describe('App', () => {
     expect(
       screen.getByRole('heading', {
         level: 1,
-        name: 'دفاعی تمام‌قد در کنار شما',
+        name: 'پروندهٔ شما، مسئولیتِ ماست',
       }),
     ).toBeTruthy()
   })

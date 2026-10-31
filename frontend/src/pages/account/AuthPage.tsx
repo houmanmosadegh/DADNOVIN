@@ -270,8 +270,8 @@ export default function AuthPage() {
                   type="button"
                   className="authp__eye"
                   aria-label={showPw ? 'مخفی کردن رمز' : 'نمایش رمز'}
+                  aria-pressed={showPw}
                   onClick={() => setShowPw((v) => !v)}
-                  tabIndex={-1}
                 >
                   {showPw ? <EyeOff size={17} /> : <Eye size={17} />}
                 </button>

@@ -1,6 +1,7 @@
 import { Link } from 'react-router-dom'
 import { Mail, MapPin, Phone } from 'lucide-react'
-import { brand, contact, nav, services } from '../content/lawyers.fa.js'
+import { brand, contact, services } from '../content/lawyers.fa.js'
+import { publicNav } from '../content/remote'
 import { SocialIcon } from './SocialIcon'
 import './Footer.css'
 
@@ -30,7 +31,7 @@ export function Footer() {
         <nav className="site-footer__col" aria-label="دسترسی سریع">
           <h3 className="site-footer__heading">دسترسی سریع</h3>
           <ul role="list">
-            {nav.map((item) => (
+            {publicNav().map((item) => (
               <li key={item.to}>
                 <Link to={item.to} className="site-footer__link">
                   {item.label}

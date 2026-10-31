@@ -280,6 +280,14 @@ async def change_status(
                 db, rtype, request_id, "commission_created",
                 actor=user, payload={"commission_id": str(comm.id), "amount": comm.amount},
             )
+    elif before == "accepted" and payload.status in ("cancelled", "rejected"):
+        # برگشت/لغو پرونده از وضعیت پذیرفته → کمیسیون‌اش هم لغو می‌شود
+        rolled = await commissions_svc.on_request_rolled_back(db, rtype, request_id)
+        if rolled is not None:
+            await thread_svc.add_event(
+                db, rtype, request_id, "commission_cancelled",
+                actor=user, payload={"commission_id": str(rolled.id)},
+            )
     STATUS_FA = {
         "new": "جدید", "reviewing": "در حال بررسی", "awaiting_call": "در انتظار تماس",
         "followed_up": "پیگیری شد", "consulted": "مشاوره انجام شد",

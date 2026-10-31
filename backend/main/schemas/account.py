@@ -1,4 +1,4 @@
-"""Public account, marketer, wallet and payout schemas."""
+"""Public account, marketer and commission schemas."""
 
 import re
 import uuid
@@ -103,14 +103,6 @@ class MarketerApplyIn(BaseModel):
 
 class MarketerReviewIn(BaseModel):
     note: str = Field(default="", max_length=1000)
-
-
-class PayoutIn(BaseModel):
-    amount: int = Field(gt=0)
-
-
-class PayoutReviewIn(BaseModel):
-    payment_ref: str = Field(default="", max_length=80)
 
 
 class BankDetailsIn(BaseModel):

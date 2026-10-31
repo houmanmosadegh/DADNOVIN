@@ -144,7 +144,6 @@ def create_app() -> FastAPI:
     app.include_router(admin_ai.router, prefix=admin)
     app.include_router(admin_audit.router, prefix=admin)
     app.include_router(admin_marketers.router, prefix=admin)
-    app.include_router(admin_marketers.payouts_router, prefix=admin)
     app.include_router(admin_marketers.commissions_router, prefix=admin)
 
     return app

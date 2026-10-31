@@ -9,6 +9,12 @@ import './AiFab.css'
 type Msg = { id: number; from: 'ai' | 'user'; text: string }
 
 const SESSION_KEY = 'dn_ai_session'
+/**
+ * Public AI consultant is not wired to the backend yet — the panel renders
+ * a «به‌زودی» state. Flip to true once /ai/chat is ready for the public site;
+ * the chat flow (send(), session key, message list) is already in place.
+ */
+const AI_LIVE = false
 
 /**
  * Floating AI-consultant button + chat panel — backed by the site's
@@ -36,7 +42,7 @@ export function AiFab() {
 
   useEffect(() => {
     if (!open) return
-    inputRef.current?.focus()
+    if (AI_LIVE) inputRef.current?.focus()
     if (msgs.length === 0) setMsgs([{ id: nextId.current++, from: 'ai', text: c.welcome }])
   }, [open]) // eslint-disable-line react-hooks/exhaustive-deps
 
@@ -115,7 +121,7 @@ export function AiFab() {
             </picture>
             <div className="ai-chat__id">
               <b>{c.title}</b>
-              <span className="ai-chat__status">
+              <span className="ai-chat__status" data-off={!AI_LIVE || undefined}>
                 <i aria-hidden="true" />
                 {c.status}
               </span>
@@ -131,28 +137,43 @@ export function AiFab() {
           </header>
 
           <div className="ai-chat__list" ref={listRef} data-lenis-prevent>
-            {msgs.map((m) => (
-              <p key={m.id} className={`ai-chat__msg ai-chat__msg--${m.from}`}>
-                {m.text}
-              </p>
-            ))}
-            {busy ? (
-              <p className="ai-chat__msg ai-chat__msg--ai ai-chat__msg--typing" aria-live="polite">
-                …
-              </p>
-            ) : null}
+            {AI_LIVE ? (
+              <>
+                {msgs.map((m) => (
+                  <p key={m.id} className={`ai-chat__msg ai-chat__msg--${m.from}`}>
+                    {m.text}
+                  </p>
+                ))}
+                {busy ? (
+                  <p
+                    className="ai-chat__msg ai-chat__msg--ai ai-chat__msg--typing"
+                    aria-live="polite"
+                  >
+                    …
+                  </p>
+                ) : null}
+              </>
+            ) : (
+              <>
+                <p className="ai-chat__msg ai-chat__msg--ai">{c.welcome}</p>
+                <p className="ai-chat__soon" aria-hidden="true">
+                  {c.soon}
+                </p>
+              </>
+            )}
             <Link className="ai-chat__cta" to={aiConsultant.to} onClick={() => setOpen(false)}>
               {c.cta}
             </Link>
           </div>
 
-          <div className="ai-chat__composer">
+          <div className="ai-chat__composer" data-disabled={!AI_LIVE || undefined}>
             <textarea
               ref={inputRef}
               rows={1}
               value={draft}
               placeholder={c.placeholder}
               aria-label={c.placeholder}
+              disabled={!AI_LIVE}
               onChange={(e) => setDraft(e.target.value)}
               onKeyDown={(e) => {
                 if (e.key === 'Enter' && !e.shiftKey) {
@@ -165,7 +186,7 @@ export function AiFab() {
               type="button"
               className="ai-chat__send"
               aria-label={c.send}
-              disabled={!draft.trim()}
+              disabled={!AI_LIVE || !draft.trim()}
               onClick={send}
             >
               <Send size={17} strokeWidth={1.8} aria-hidden="true" />

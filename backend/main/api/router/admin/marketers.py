@@ -1,4 +1,5 @@
-"""Admin — marketer applications, profiles, referrals, payouts, commissions."""
+"""Admin — marketer applications, profiles, referrals, commissions, report.
+No wallet: commissions are settled manually by marking them paid."""
 
 import csv
 import io
@@ -7,9 +8,9 @@ import uuid
 from datetime import datetime
 from typing import Annotated
 
-from fastapi import APIRouter, Depends, HTTPException, Request, Response
+from fastapi import APIRouter, Depends, HTTPException, Query, Request, Response
 from pydantic import BaseModel, Field
-from sqlalchemy import func, select
+from sqlalchemy import and_, func, or_, select
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from ....db.session import get_db
@@ -18,7 +19,6 @@ from ....models.account import (
     CommissionRule,
     MarketerApplication,
     MarketerProfile,
-    PayoutRequest,
     ReferralAttribution,
     ReferralClick,
 )
@@ -189,78 +189,46 @@ async def profile_referrals(db: DbDep, profile_id: uuid.UUID) -> list[dict]:
     return out
 
 
-# ─── payout queue ───────────────────────────────────────────────────
-
-
-payouts_router = APIRouter(
-    prefix="/payouts",
-    tags=["admin-payouts"],
-    dependencies=[Depends(manage_users)],
-)
-
-
-@payouts_router.get("")
-async def payout_queue(db: DbDep) -> list[dict]:
+@router.get("/{profile_id}/commissions")
+async def profile_commissions(db: DbDep, profile_id: uuid.UUID) -> list[dict]:
+    """Per-marketer commission detail for the admin detail drawer."""
+    prof = await db.get(MarketerProfile, profile_id)
+    if prof is None:
+        raise HTTPException(404, {"code": "not_found", "message": "بازاریاب یافت نشد."})
     rows = (
         await db.execute(
-            select(PayoutRequest, MarketerProfile, User)
-            .join(MarketerProfile, MarketerProfile.id == PayoutRequest.marketer_id)
-            .join(User, User.id == MarketerProfile.user_id)
-            .order_by(PayoutRequest.created_at)
+            select(Commission)
+            .where(Commission.marketer_id == prof.id)
+            .order_by(Commission.created_at.desc())
             .limit(300)
         )
-    ).all()
+    ).scalars().all()
+    tracking = {
+        str(c.id): c.tracking_code
+        for c in (
+            await db.execute(
+                select(ConsultationRequest.id, ConsultationRequest.tracking_code).where(
+                    ConsultationRequest.id.in_(
+                        [r.request_id for r in rows] or [uuid.uuid4()]
+                    )
+                )
+            )
+        ).all()
+    }
     return [
         {
-            "id": str(p.id),
-            "marketer_id": str(p.marketer_id),
-            "full_name": u.full_name,
-            "ref_code": m.ref_code,
-            "amount": p.amount,
-            "status": p.status,
-            "iban_masked": p.iban_masked,
-            "payment_ref": p.payment_ref,
-            "reject_reason": p.reject_reason,
-            "created_at": p.created_at.isoformat(),
+            "id": str(c.id),
+            "tracking_code": tracking.get(str(c.request_id)),
+            "basis_kind": c.basis_kind,
+            "basis_amount": c.basis_amount,
+            "amount": c.amount,
+            "status": c.status,
+            "paid_at": c.paid_at.isoformat() if c.paid_at else None,
+            "paid_note": c.paid_note,
+            "created_at": c.created_at.isoformat(),
         }
-        for p, m, u in rows
+        for c in rows
     ]
-
-
-class PayoutApproveIn(BaseModel):
-    payment_ref: str = Field(min_length=2, max_length=80)
-
-
-class PayoutRejectIn(BaseModel):
-    reason: str = Field(default="", max_length=300)
-
-
-@payouts_router.post("/{payout_id}/approve")
-async def payout_approve(
-    db: DbDep, user: CurrentUser, payout_id: uuid.UUID, payload: PayoutApproveIn, request: Request
-) -> dict:
-    payout = await db.get(PayoutRequest, payout_id)
-    if payout is None:
-        raise HTTPException(404, {"code": "not_found", "message": "درخواست برداشت یافت نشد."})
-    await comm_svc.approve_payout(db, payout, user, payload.payment_ref)
-    await audit(db, actor=user, action="payout.approve", entity="payout_request",
-                entity_id=payout.id, after={"payment_ref": payload.payment_ref}, request=request)
-    await db.commit()
-    return {"status": payout.status}
-
-
-@payouts_router.post("/{payout_id}/reject")
-async def payout_reject(
-    db: DbDep, user: CurrentUser, payout_id: uuid.UUID, payload: PayoutRejectIn, request: Request
-) -> dict:
-    payout = await db.get(PayoutRequest, payout_id)
-    if payout is None:
-        raise HTTPException(404, {"code": "not_found", "message": "درخواست برداشت یافت نشد."})
-    await comm_svc.reject_payout(db, payout, user, payload.reason)
-    await audit(db, actor=user, action="payout.reject", entity="payout_request",
-                entity_id=payout.id, after={"reason": payload.reason}, request=request)
-    await db.commit()
-    return {"status": payout.status}
 
 
 # ─── commissions ────────────────────────────────────────────────────
@@ -366,7 +334,8 @@ async def commission_list(db: DbDep) -> list[dict]:
             "basis_kind": c.basis_kind,
             "basis_amount": c.basis_amount,
             "rule_snapshot": json.loads(c.rule_snapshot) if c.rule_snapshot else None,
-            "hold_until": c.hold_until.isoformat() if c.hold_until else None,
+            "paid_at": c.paid_at.isoformat() if c.paid_at else None,
+            "paid_note": c.paid_note,
             "created_at": c.created_at.isoformat(),
         }
         for c, m, u in rows
@@ -375,6 +344,10 @@ async def commission_list(db: DbDep) -> list[dict]:
 
 class CommissionDecideIn(BaseModel):
     reason: str = Field(default="", max_length=300)
+
+
+class CommissionPayIn(BaseModel):
+    note: str = Field(default="", max_length=300)
 
 
 @commissions_router.post("/{commission_id}/approve")
@@ -391,6 +364,23 @@ async def commission_approve(
                 entity_id=comm.id, after={"amount": comm.amount}, request=request)
     await db.commit()
     return {"status": "approved"}
+
+
+@commissions_router.post("/{commission_id}/pay")
+async def commission_pay(
+    db: DbDep, user: CurrentUser, commission_id: uuid.UUID,
+    payload: CommissionPayIn, request: Request,
+) -> dict:
+    """Manual settlement — admin marks an approved commission as paid."""
+    comm = await db.get(Commission, commission_id)
+    if comm is None:
+        raise HTTPException(404, {"code": "not_found", "message": "کمیسیون یافت نشد."})
+    await comm_svc.mark_paid(db, comm, user, payload.note)
+    await audit(db, actor=user, action="commission.pay", entity="commission",
+                entity_id=comm.id,
+                after={"amount": comm.amount, "note": payload.note}, request=request)
+    await db.commit()
+    return {"status": "paid", "paid_at": comm.paid_at.isoformat() if comm.paid_at else None}
 
 
 @commissions_router.post("/{commission_id}/cancel")
@@ -426,35 +416,140 @@ async def commission_preview(db: DbDep, payload: PreviewIn) -> dict:
 # ─── performance report + suspicious ────────────────────────────────
 
 
+def _rng(col, start: datetime | None, end: datetime | None) -> list:
+    out = []
+    if start is not None:
+        out.append(col >= start)
+    if end is not None:
+        out.append(col <= end)
+    return out
+
+
 @router.get("/report")
-async def marketer_report(db: DbDep) -> dict:
-    """Leaderboard + funnel + top sources + suspicious items for the admin."""
-    rows = (
+async def marketer_report(
+    db: DbDep,
+    q: Annotated[str | None, Query(max_length=80)] = None,
+    start: Annotated[datetime | None, Query()] = None,
+    end: Annotated[datetime | None, Query()] = None,
+) -> dict:
+    """Leaderboard + funnel + sales/commissions + last activity per marketer.
+
+    `q` filters by name / ref_code / phone; `start`/`end` bound every
+    metric (clicks, attributions, commissions, sales) by its created_at.
+    """
+    stmt = select(MarketerProfile, User).join(User, User.id == MarketerProfile.user_id)
+    if q and q.strip():
+        like = f"%{q.strip()}%"
+        stmt = stmt.where(
+            or_(
+                User.full_name.ilike(like),
+                User.phone.ilike(like),
+                MarketerProfile.ref_code.ilike(like),
+            )
+        )
+    rows = (await db.execute(stmt)).all()
+
+    # ── aggregated metrics in range — grouped queries, one pass each ──
+    click_rows = (
         await db.execute(
-            select(MarketerProfile, User)
-            .join(User, User.id == MarketerProfile.user_id)
+            select(
+                ReferralClick.ref_code,
+                func.count(ReferralClick.id),
+                func.count(func.distinct(ReferralClick.visitor_hash)),
+                func.max(ReferralClick.created_at),
+            )
+            .where(ReferralClick.suspicious.is_(False), *_rng(ReferralClick.created_at, start, end))
+            .group_by(ReferralClick.ref_code)
         )
     ).all()
+    clicks = {rc: (n, uq, last) for rc, n, uq, last in click_rows}
+
+    attr_rows = (
+        await db.execute(
+            select(
+                ReferralAttribution.marketer_id,
+                func.count(ReferralAttribution.id),
+                func.max(ReferralAttribution.created_at),
+            )
+            .where(*_rng(ReferralAttribution.created_at, start, end))
+            .group_by(ReferralAttribution.marketer_id)
+        )
+    ).all()
+    attrs = {m: (n, last) for m, n, last in attr_rows}
+
+    case_rows = (
+        await db.execute(
+            select(
+                ReferralAttribution.marketer_id,
+                func.count(ConsultationRequest.id),
+                func.coalesce(func.sum(ConsultationRequest.fee_amount), 0),
+            )
+            .join(
+                ConsultationRequest,
+                and_(
+                    ConsultationRequest.id == ReferralAttribution.request_id,
+                    ReferralAttribution.request_type == "consultation",
+                ),
+            )
+            .where(
+                ConsultationRequest.status == "accepted",
+                *_rng(ReferralAttribution.created_at, start, end),
+            )
+            .group_by(ReferralAttribution.marketer_id)
+        )
+    ).all()
+    cases = {m: (n, sales) for m, n, sales in case_rows}
+
+    comm_rows = (
+        await db.execute(
+            select(
+                Commission.marketer_id,
+                Commission.status,
+                func.coalesce(func.sum(Commission.amount), 0),
+                func.max(Commission.created_at),
+            )
+            .where(*_rng(Commission.created_at, start, end))
+            .group_by(Commission.marketer_id, Commission.status)
+        )
+    ).all()
+    comms: dict[uuid.UUID, dict] = {}
+    comm_last: dict[uuid.UUID, datetime] = {}
+    for m, st, total, last in comm_rows:
+        comms.setdefault(m, {"pending": 0, "approved": 0, "paid": 0, "cancelled": 0})
+        if st in comms[m]:
+            comms[m][st] += total
+        if last and (m not in comm_last or last > comm_last[m]):
+            comm_last[m] = last
+
     board = []
     for p, u in rows:
-        stats = await ref_svc.stats_for(db, p.id)
-        earned = (
-            await db.execute(
-                select(func.coalesce(func.sum(Commission.amount), 0)).where(
-                    Commission.marketer_id == p.id,
-                    Commission.status.in_(["pending", "approved", "paid"]),
-                )
-            )
-        ).scalar_one()
+        cl_n, cl_uq, cl_last = clicks.get(p.ref_code, (0, 0, None))
+        at_n, at_last = attrs.get(p.id, (0, None))
+        ca_n, sales = cases.get(p.id, (0, 0))
+        ctotals = comms.get(
+            p.id, {"pending": 0, "approved": 0, "paid": 0, "cancelled": 0}
+        )
+        last_seen = max(
+            (t for t in (cl_last, at_last, comm_last.get(p.id)) if t is not None),
+            default=None,
+        )
         board.append(
             {
                 "id": str(p.id),
                 "full_name": u.full_name,
+                "phone": u.phone,
                 "ref_code": p.ref_code,
                 "is_active": p.is_active,
                 "fraud_flag": p.fraud_flag,
-                "earned": earned,
-                **stats,
+                "clicks": cl_n,
+                "unique_clicks": cl_uq,
+                "requests": at_n,          # لیدها/پرونده‌های منسوب
+                "accepted": ca_n,          # پرونده‌های موفق
+                "sales": sales,            # مجموع مبلغ پرونده‌های موفق
+                "commissions": ctotals,    # کمیسیون به تفکیک وضعیت
+                "earned": ctotals["pending"] + ctotals["approved"] + ctotals["paid"],
+                "conversion": round(at_n / cl_n * 100, 1) if cl_n else 0.0,
+                "last_activity": last_seen.isoformat() if last_seen else None,
             }
         )
     board.sort(key=lambda b: (b["accepted"], b["requests"], b["clicks"]), reverse=True)
@@ -464,6 +559,7 @@ async def marketer_report(db: DbDep) -> dict:
         "unique_clicks": sum(b["unique_clicks"] for b in board),
         "requests": sum(b["requests"] for b in board),
         "accepted": sum(b["accepted"] for b in board),
+        "sales": sum(b["sales"] for b in board),
     }
     sources = (
         await db.execute(
@@ -472,7 +568,10 @@ async def marketer_report(db: DbDep) -> dict:
                 func.count(ReferralClick.id),
                 func.count(func.distinct(ReferralClick.visitor_hash)),
             )
-            .where(ReferralClick.suspicious.is_(False))
+            .where(
+                ReferralClick.suspicious.is_(False),
+                *_rng(ReferralClick.created_at, start, end),
+            )
             .group_by(ReferralClick.link_label)
             .order_by(func.count(ReferralClick.id).desc())
             .limit(20)
@@ -506,20 +605,29 @@ async def marketer_report(db: DbDep) -> dict:
 
 
 @router.get("/report.csv")
-async def marketer_report_csv(db: DbDep) -> Response:
-    """Excel-friendly export of the leaderboard."""
-    report = await marketer_report(db)
+async def marketer_report_csv(
+    db: DbDep,
+    q: Annotated[str | None, Query(max_length=80)] = None,
+    start: Annotated[datetime | None, Query()] = None,
+    end: Annotated[datetime | None, Query()] = None,
+) -> Response:
+    """Excel-friendly export of the leaderboard (same filters as /report)."""
+    report = await marketer_report(db, q=q, start=start, end=end)
     buf = io.StringIO()
     w = csv.writer(buf)
     w.writerow(
         ["marketer", "ref_code", "active", "clicks", "unique_clicks",
-         "requests", "accepted", "conversion", "earned_rials", "fraud_flag"]
+         "requests", "accepted", "sales_rials", "conversion",
+         "comm_pending", "comm_approved", "comm_paid", "comm_cancelled",
+         "last_activity", "fraud_flag"]
     )
     for b in report["leaderboard"]:
+        c = b["commissions"]
         w.writerow(
             [b["full_name"], b["ref_code"], b["is_active"], b["clicks"],
-             b["unique_clicks"], b["requests"], b["accepted"],
-             b["conversion"], b["earned"], b["fraud_flag"]]
+             b["unique_clicks"], b["requests"], b["accepted"], b["sales"],
+             b["conversion"], c["pending"], c["approved"], c["paid"],
+             c["cancelled"], b["last_activity"], b["fraud_flag"]]
         )
     return Response(
         "﻿" + buf.getvalue(),  # BOM so Excel opens it as UTF-8

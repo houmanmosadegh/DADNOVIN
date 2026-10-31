@@ -588,3 +588,29 @@ img {
     transform: none;
   }
 }
+
+/* دکمهٔ فعال‌سازی ژیروسکوپ روی iOS — داخل stage مجسمه رندر می‌شود */
+.statue-motion-btn {
+  position: absolute;
+  inset-block-end: 1rem;
+  inset-inline-start: 50%;
+  translate: 50% 0;
+  z-index: 3;
+  display: inline-flex;
+  align-items: center;
+  gap: 0.4rem;
+  padding: 0.55rem 1rem;
+  border: 1px solid rgb(var(--gold-rgb, 200 146 45) / 0.45);
+  border-radius: 999px;
+  background: rgb(7 10 16 / 0.78);
+  backdrop-filter: blur(6px);
+  color: var(--color-text, #f5f3ee);
+  font: inherit;
+  font-size: 0.78rem;
+  cursor: pointer;
+  white-space: nowrap;
+}
+.statue-motion-btn:focus-visible {
+  outline: 2px solid var(--color-border-gold, #c8922d);
+  outline-offset: 2px;
+}

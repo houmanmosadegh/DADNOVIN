@@ -57,27 +57,29 @@ export interface MarketerLink {
   url: string
 }
 
-export interface WalletView {
-  balance: number
-  pending_commissions: number
-  pending_payouts: number
-  min_payout: number
+export interface MyCommission {
+  id: string
+  request_type: string
+  request_label: string
+  tracking_code: string | null
+  basis_kind: string
+  basis_amount: number
+  percent: number | null
+  amount: number
+  status: string
+  paid_at: string | null
+  created_at: string
+}
+
+export interface CommissionsView {
+  items: MyCommission[]
+  totals: { pending: number; approved: number; paid: number; cancelled: number }
   commission_enabled: boolean
-  entries: { id: string; kind: string; amount: number; memo: string; created_at: string }[]
 }
 
 export interface Referral {
   masked_name: string
   status: string
-  created_at: string
-}
-
-export interface Payout {
-  id: string
-  amount: number
-  status: string
-  iban_masked: string
-  payment_ref: string
   created_at: string
 }
 
@@ -87,12 +89,8 @@ export const STATUS_FA: Record<string, string> = {
   rejected: 'رد شد', completed: 'تکمیل شد', cancelled: 'لغو شد',
 }
 
-export const PAYOUT_FA: Record<string, string> = {
-  pending: 'در انتظار', approved: 'تأییدشده', paid: 'پرداخت‌شده', rejected: 'رد شده',
-}
-
-export const LEDGER_FA: Record<string, string> = {
-  commission_credit: 'کمیسیون', payout_debit: 'برداشت', adjustment: 'تعدیل دستی',
+export const COMMISSION_FA: Record<string, string> = {
+  pending: 'در انتظار', approved: 'تأییدشده', paid: 'پرداخت‌شده', cancelled: 'لغوشده',
 }
 
 export const faDate = (iso: string) =>

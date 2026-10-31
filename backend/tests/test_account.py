@@ -1,4 +1,4 @@
-"""Account/referral/commission system tests — auth, IDOR, anti-fraud, wallet."""
+"""Account/referral/commission system tests — auth, IDOR, anti-fraud, commissions."""
 
 import pytest
 from sqlalchemy import select
@@ -198,48 +198,139 @@ class TestReferral:
         assert row.referrer_id is None
 
 
-class TestCommissionWallet:
-    async def _enable(self, seeded_session):
+class TestCommissionLifecycle:
+    """No-wallet commission flow — pending → approved → paid | cancelled."""
+
+    async def _enable(self, seeded_session, *, kind="fixed", value=500_000):
         row = await seeded_session.get(SiteSetting, "commission")
-        row.value = {**row.value, "commission_enabled": True, "hold_days": 0, "min_payout": 0}
-        seeded_session.add(CommissionRule(kind="fixed", value=500_000, tier_min=0))
+        row.value = {**row.value, "commission_enabled": True}
+        seeded_session.add(CommissionRule(kind=kind, value=value, tier_min=0))
         await seeded_session.commit()
 
-    async def test_commission_on_accept_and_payout(self, client, seeded_session):
-        await self._enable(seeded_session)
-        code = await _make_marketer(client, PHONE_M)
-        row = await _consult_row(seeded_session, client, PHONE_B, ref=code)
-
-        await _admin(client)
+    async def _accepted_case(self, client, seeded_session, ref_code, fee):
+        row = await _consult_row(seeded_session, client, PHONE_B, ref=ref_code)
         await _set_status(client, row.id, "reviewing")
         await _set_status(client, row.id, "consulted")
-        r = await _set_status(client, row.id, "accepted", fee=10_000_000)
-        assert r.status_code == 200
+        r = await _set_status(client, row.id, "accepted", fee=fee)
+        assert r.status_code == 200, r.text
+        return row
+
+    async def test_lifecycle_and_manual_pay(self, client, seeded_session):
+        await self._enable(seeded_session)
+        code = await _make_marketer(client, PHONE_M)
+        await _admin(client)
+        row = await self._accepted_case(client, seeded_session, code, 10_000_000)
 
         comm = (await seeded_session.execute(select(Commission))).scalar_one()
         assert comm.amount == 500_000 and comm.status == "pending"
 
         r = await client.post(f"/api/v1/admin/commissions/{comm.id}/approve")
         assert r.status_code == 200
+        # pay before approve must fail — enforced order
+        assert comm.status == "approved"
 
-        await _login_user(client, PHONE_M)
-        r = await client.get("/api/v1/account/wallet")
-        assert r.status_code == 200
-        assert r.json()["balance"] == 500_000
-
-        r = await client.post("/api/v1/account/payouts", json={"amount": 500_000})
-        assert r.status_code == 201, r.text
-        payout_id = r.json()["id"]
-
-        await _admin(client)
         r = await client.post(
-            f"/api/v1/admin/payouts/{payout_id}/approve",
-            json={"payment_ref": "TRX-123"},
+            f"/api/v1/admin/commissions/{comm.id}/pay",
+            json={"note": "فیش 123456"},
         )
         assert r.status_code == 200
+        await seeded_session.refresh(comm)
+        assert comm.status == "paid" and comm.paid_at is not None
+        assert comm.paid_note == "فیش 123456"
+
+        # marketer sees own commission + totals — nothing wallet-shaped
         await _login_user(client, PHONE_M)
-        r = await client.get("/api/v1/account/wallet")
-        assert r.json()["balance"] == 0
+        r = await client.get("/api/v1/account/commissions")
+        assert r.status_code == 200
+        data = r.json()
+        assert data["totals"]["paid"] == 500_000
+        assert len(data["items"]) == 1
+        assert data["items"][0]["tracking_code"] == row.tracking_code
+
+    async def test_percent_15_of_100m(self, client, seeded_session):
+        """۱۰۰ میلیون × ۱۵٪ = ۱۵ میلیون — spec's canonical example."""
+        await self._enable(seeded_session, kind="percent", value=15)
+        code = await _make_marketer(client, PHONE_M)
+        await _admin(client)
+        await self._accepted_case(client, seeded_session, code, 100_000_000)
+        comm = (await seeded_session.execute(select(Commission))).scalar_one()
+        assert comm.basis_kind == "percent"
+        assert comm.basis_amount == 100_000_000
+        assert comm.amount == 15_000_000
+
+    async def test_rule_snapshot_immutable(self, client, seeded_session):
+        """Editing the rate later never rewrites an existing commission."""
+        await self._enable(seeded_session, kind="percent", value=15)
+        code = await _make_marketer(client, PHONE_M)
+        await _admin(client)
+        await self._accepted_case(client, seeded_session, code, 100_000_000)
+        comm = (await seeded_session.execute(select(Commission))).scalar_one()
+        assert comm.amount == 15_000_000
+
+        # change the global rate to 20% — the snapshot stays 15%
+        seeded_session.add(CommissionRule(kind="percent", value=20, tier_min=1))
+        await seeded_session.commit()
+        await seeded_session.refresh(comm)
+        assert comm.amount == 15_000_000
+        assert '"value": 15' in comm.rule_snapshot
+
+    async def test_cancel_on_rollback(self, client, seeded_session):
+        """Case rolled back from accepted → commission cancelled too."""
+        await self._enable(seeded_session)
+        code = await _make_marketer(client, PHONE_M)
+        await _admin(client)
+        row = await self._accepted_case(client, seeded_session, code, 10_000_000)
+        comm = (await seeded_session.execute(select(Commission))).scalar_one()
+
+        r = await client.post(
+            f"/api/v1/admin/requests/consultation/{row.id}/status",
+            json={"status": "cancelled", "reason": "مراجع انصراف داد"},
+        )
+        assert r.status_code == 200, r.text
+        await seeded_session.refresh(comm)
+        assert comm.status == "cancelled"
+
+    async def test_duplicate_commission_impossible(self, client, seeded_session):
+        from main.services import commissions as comm_svc
+
+        await self._enable(seeded_session)
+        code = await _make_marketer(client, PHONE_M)
+        await _admin(client)
+        row = await self._accepted_case(client, seeded_session, code, 10_000_000)
+        # calling the creation hook again → no second row (unique constraint)
+        again = await comm_svc.on_request_accepted(
+            seeded_session, "consultation", row.id, row
+        )
+        assert again is None
+        count = (
+            await seeded_session.execute(select(Commission))
+        ).scalars().all()
+        assert len(count) == 1
+
+    async def test_pay_requires_approved(self, client, seeded_session):
+        await self._enable(seeded_session)
+        code = await _make_marketer(client, PHONE_M)
+        await _admin(client)
+        await self._accepted_case(client, seeded_session, code, 10_000_000)
+        comm = (await seeded_session.execute(select(Commission))).scalar_one()
+        r = await client.post(
+            f"/api/v1/admin/commissions/{comm.id}/pay", json={"note": ""}
+        )
+        assert r.status_code == 409
+
+    async def test_commissions_idor(self, client, seeded_session):
+        """A marketer only ever sees their own commissions."""
+        await self._enable(seeded_session)
+        code = await _make_marketer(client, PHONE_M)
+        await _admin(client)
+        await self._accepted_case(client, seeded_session, code, 10_000_000)
+
+        # second marketer — no commissions of their own
+        await _make_marketer(client, "09121110004")
+        r = await client.get("/api/v1/account/commissions")
+        assert r.status_code == 200
+        assert r.json()["items"] == []
+        assert r.json()["totals"]["pending"] == 0
 
     async def test_no_commission_when_disabled(self, client, seeded_session):
         # commission_enabled stays False (default) — spec compliance switch
@@ -252,12 +343,6 @@ class TestCommissionWallet:
         assert (
             await seeded_session.execute(select(Commission))
         ).scalar_one_or_none() is None
-
-    async def test_payout_insufficient_rejected(self, client, seeded_session):
-        await self._enable(seeded_session)
-        await _make_marketer(client, PHONE_M)
-        r = await client.post("/api/v1/account/payouts", json={"amount": 10})
-        assert r.status_code == 400
 
     async def test_marketer_privacy_mask(self, client, seeded_session):
         """Marketer sees masked name + coarse status — never case details."""

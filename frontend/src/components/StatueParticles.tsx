@@ -1,4 +1,9 @@
-import { useEffect, useRef } from 'react'
+import { useEffect, useRef, useState } from 'react'
+
+/** iOS 13+ requires a user-gesture permission grant for orientation data. */
+type OrientationCtor = typeof DeviceOrientationEvent & {
+  requestPermission?: () => Promise<'granted' | 'denied'>
+}
 
 /**
  * Particle-reveal for the services statue.
@@ -136,6 +141,9 @@ export function StatueParticles({
   data?: ModelData
 }) {
   const canvasRef = useRef<HTMLCanvasElement>(null)
+  // iOS shows a small "enable motion" chip — tapping it fires requestPermission
+  const [needPerm, setNeedPerm] = useState(false)
+  const grantRef = useRef<() => void>(() => {})
 
   useEffect(() => {
     const canvas = canvasRef.current
@@ -265,8 +273,71 @@ export function StatueParticles({
       const onLeave = () => {
         hovering = false
       }
-      window.addEventListener('pointermove', onMove, { passive: true })
-      head.addEventListener('pointerleave', onLeave)
+
+      /* موبایل: ژیروسکوپ → کرسر مجازی روی مجسمه؛ fallback: لمس/درگ */
+      const coarse = window.matchMedia('(hover: none), (pointer: coarse)').matches
+      let touchUntil = 0
+      let gyroActive = false
+
+      const onTouchMove = (e: PointerEvent) => {
+        const p = localPos(e)
+        mouse.tx = p.x
+        mouse.ty = p.y
+        if (mouse.s < 0.02) {
+          mouse.x = p.x
+          mouse.y = p.y
+        }
+        touchUntil = performance.now() + 900 // linger بعد از رها کردن انگشت
+      }
+      const onTouchEnd = () => {
+        touchUntil = performance.now() + 900
+      }
+
+      const orient = { gx: 0, gy: 0 }
+      const onOrient = (e: DeviceOrientationEvent) => {
+        if (e.gamma == null || e.beta == null) return
+        // gamma: چپ/راست (−90..90)؛ beta: جلو/عقب با نقطهٔ خنثی ~۴۵° حالت طبیعی نگه‌داشتن
+        orient.gx = Math.max(-1, Math.min(1, e.gamma / 28))
+        orient.gy = Math.max(-1, Math.min(1, (e.beta - 45) / 28))
+        gyroActive = true
+      }
+
+      let orientBound = false
+      const bindOrientation = () => {
+        if (orientBound) return
+        orientBound = true
+        window.addEventListener('deviceorientation', onOrient, { passive: true })
+      }
+      const DeviceOrientation = window.DeviceOrientationEvent as
+        | OrientationCtor
+        | undefined
+      if (coarse && DeviceOrientation) {
+        if (typeof DeviceOrientation.requestPermission === 'function') {
+          setNeedPerm(true)
+          grantRef.current = () => {
+            DeviceOrientation.requestPermission!()
+              .then((res) => {
+                if (res === 'granted') {
+                  setNeedPerm(false)
+                  bindOrientation()
+                }
+              })
+              .catch(() => {})
+          }
+        } else {
+          bindOrientation() // اندروید: بدون مجوز جلویی
+        }
+      }
+
+      if (coarse) {
+        head.addEventListener('pointerdown', onTouchMove, { passive: true })
+        head.addEventListener('pointermove', onTouchMove, { passive: true })
+        head.addEventListener('pointerup', onTouchEnd, { passive: true })
+        head.addEventListener('pointercancel', onTouchEnd, { passive: true })
+      } else {
+        window.addEventListener('pointermove', onMove, { passive: true })
+        head.addEventListener('pointerleave', onLeave)
+      }
 
       // ambient: six slow lissajous patches — always gliding over the
       // statue, staggered cycles so several are alive at once
@@ -300,10 +371,19 @@ export function StatueParticles({
         const W = r.width
         const H = r.height
 
+        // موبایل + ژیروسکوپ فعال: کج‌کردن گوشی کرسر مجازی را روی مجسمه جابه‌جا می‌کند
+        if (coarse && gyroActive) {
+          mouse.tx = W * 0.5 + orient.gx * W * 0.4
+          mouse.ty = H * 0.5 + orient.gy * H * 0.34
+        }
+        const engaged = coarse
+          ? gyroActive || now < touchUntil
+          : hovering
+
         // cursor blob — finer radius, damped follow
         mouse.x += (mouse.tx - mouse.x) * 0.14
         mouse.y += (mouse.ty - mouse.y) * 0.14
-        mouse.s += ((hovering ? 1 : 0) - mouse.s) * 0.09
+        mouse.s += ((engaged ? 1 : 0) - mouse.s) * 0.09
         const mouseR = W * 0.26 * (0.55 + 0.45 * mouse.s)
 
         const dampAmb = 1 - 0.85 * mouse.s // interaction wins over ambient
@@ -373,8 +453,17 @@ export function StatueParticles({
         io.disconnect()
         ro.disconnect()
         document.removeEventListener('visibilitychange', onVis)
-        head.removeEventListener('pointerleave', onLeave)
-        window.removeEventListener('pointermove', onMove)
+        if (coarse) {
+          head.removeEventListener('pointerdown', onTouchMove)
+          head.removeEventListener('pointermove', onTouchMove)
+          head.removeEventListener('pointerup', onTouchEnd)
+          head.removeEventListener('pointercancel', onTouchEnd)
+          if (orientBound) window.removeEventListener('deviceorientation', onOrient)
+        } else {
+          head.removeEventListener('pointerleave', onLeave)
+          window.removeEventListener('pointermove', onMove)
+        }
+        grantRef.current = () => {}
         target.classList.remove('is-live')
         geo.dispose()
         mat.dispose()
@@ -388,5 +477,19 @@ export function StatueParticles({
     }
   }, [target])
 
-  return <canvas ref={canvasRef} className={className} aria-hidden="true" />
+  return (
+    <>
+      <canvas ref={canvasRef} className={className} aria-hidden="true" />
+      {needPerm ? (
+        <button
+          type="button"
+          className="statue-motion-btn"
+          onClick={() => grantRef.current()}
+          aria-label="فعال‌سازی واکنش حرکتی با چرخش گوشی"
+        >
+          برای واکنش حرکتی گوشی را تکان دهید
+        </button>
+      ) : null}
+    </>
+  )
 }

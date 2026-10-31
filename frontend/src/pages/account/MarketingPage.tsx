@@ -1,9 +1,10 @@
-/** بازاریابی — نمای کلی · لینک‌ها و ابزارها · ارجاع‌های من · درآمد و کیف پول ·
- *  قوانین و راهنما (۵ تب داخلی، spec §4.6). */
+/** بازاریابی — نمای کلی · لینک‌ها و ابزارها · ارجاع‌های من · کمیسیون‌ها ·
+ *  قوانین و راهنما (۵ تب داخلی، spec §4.6 — بدون کیف پول). */
 
 import { useEffect, useMemo, useState } from 'react'
 import { useSearchParams } from 'react-router-dom'
 import {
+  BadgePercent,
   Clock3,
   Copy,
   Plus,
@@ -11,13 +12,12 @@ import {
   Send,
   Share2,
   Trash2,
-  Wallet,
   XCircle,
 } from 'lucide-react'
 import { api, apiAsset } from '../../services/api'
 import { useAuth } from '../../services/auth'
-import type { MarketerHome, MarketerLink, Payout, Referral, WalletView } from './types'
-import { LEDGER_FA, PAYOUT_FA, STATUS_FA, faDate, rial } from './types'
+import type { CommissionsView, MarketerHome, MarketerLink, Referral } from './types'
+import { COMMISSION_FA, STATUS_FA, faDate, rial } from './types'
 
 const CHANNELS = [
   'اینستاگرام', 'تلگرام', 'واتس‌اپ', 'وب‌سایت / وبلاگ', 'معرفی حضوری', 'سایر',
@@ -27,7 +27,7 @@ const TABS = [
   { key: 'overview', label: 'نمای کلی' },
   { key: 'links', label: 'لینک‌ها و ابزارها' },
   { key: 'referrals', label: 'ارجاع‌های من' },
-  { key: 'wallet', label: 'درآمد و کیف پول' },
+  { key: 'commissions', label: 'کمیسیون‌های من' },
   { key: 'guide', label: 'قوانین و راهنما' },
 ]
 
@@ -84,7 +84,7 @@ export default function MarketingPage() {
       {tab === 'overview' && <OverviewTab home={home} mainUrl={mainUrl} copy={copy} />}
       {tab === 'links' && <LinksTab home={home} base={base} copy={copy} reload={load} />}
       {tab === 'referrals' && <ReferralsTab />}
-      {tab === 'wallet' && <WalletTab />}
+      {tab === 'commissions' && <CommissionsTab />}
       {tab === 'guide' && <GuideTab home={home} />}
     </div>
   )
@@ -220,7 +220,7 @@ function LinksTab({ home, base, copy, reload }: {
         <p className="acc__muted">
           برای هر کانال (مثلاً اینستاگرام، تلگرام، واتس‌اپ) یک لینک جدا بسازید تا آمار هر منبع جدا دیده شود.
         </p>
-        <div className="acc__payout">
+        <div className="acc__inline">
           <input
             dir="ltr"
             placeholder="instagram"
@@ -305,20 +305,20 @@ function ReferralsTab() {
   )
 }
 
-/* ── درآمد و کیف پول ───────────────────────────────────────── */
+/* ── کمیسیون‌های من — جدول وضعیت‌دار + جمع به تفکیک وضعیت ── */
 
-function WalletTab() {
-  const [wallet, setWallet] = useState<WalletView | null>(null)
-  const [payouts, setPayouts] = useState<Payout[]>([])
+function CommissionsTab() {
+  const [view, setView] = useState<CommissionsView | null>(null)
   const [iban, setIban] = useState('')
-  const [amount, setAmount] = useState('')
   const [msg, setMsg] = useState('')
   const [err, setErr] = useState('')
   const [home, setHome] = useState<MarketerHome | null>(null)
 
   const load = () => {
-    api.get<WalletView>('/account/wallet').then(setWallet).catch((e) => setErr(e instanceof Error ? e.message : 'خطا'))
-    api.get<Payout[]>('/account/payouts').then(setPayouts).catch(() => {})
+    api
+      .get<CommissionsView>('/account/commissions')
+      .then(setView)
+      .catch((e) => setErr(e instanceof Error ? e.message : 'خطا'))
     api.get<MarketerHome>('/account/marketer').then(setHome).catch(() => {})
   }
   useEffect(load, []) // eslint-disable-line react-hooks/exhaustive-deps
@@ -333,90 +333,76 @@ function WalletTab() {
       setErr(e instanceof Error ? e.message : 'خطا')
     }
   }
-  const requestPayout = async () => {
-    try {
-      await api.post('/account/payouts', { amount: parseInt(amount.replace(/[,،]/g, ''), 10) })
-      setMsg('درخواست برداشت ثبت شد.')
-      setAmount('')
-      load()
-    } catch (e) {
-      setErr(e instanceof Error ? e.message : 'خطا')
-    }
-  }
 
-  if (err && !wallet) return <p className="acc__err">{err}</p>
-  if (!wallet) return <p className="acc__muted">در حال بارگذاری…</p>
-  if (!wallet.commission_enabled) {
+  if (err && !view) return <p className="acc__err">{err}</p>
+  if (!view) return <p className="acc__muted">در حال بارگذاری…</p>
+  if (!view.commission_enabled) {
     return (
       <div className="acc__card acc__empty">
         <p>سیستم کمیسیون فعلاً غیرفعال است — آمار ارجاع همچنان ثبت می‌شود.</p>
       </div>
     )
   }
+  const t = view.totals
 
   return (
     <>
       {msg && <p className="acc__notice">{msg}</p>}
       {err && <p className="acc__err">{err}</p>}
       <div className="acc__stats">
-        <div className="acc__card acc__stat"><p className="acc__stat-num">{rial(wallet.balance)}</p><p className="acc__muted">قابل برداشت</p></div>
-        <div className="acc__card acc__stat"><p className="acc__stat-num">{rial(wallet.pending_commissions)}</p><p className="acc__muted">کمیسیون در انتظار</p></div>
-        <div className="acc__card acc__stat"><p className="acc__stat-num">{rial(wallet.pending_payouts)}</p><p className="acc__muted">برداشت در صف</p></div>
+        <div className="acc__card acc__stat"><p className="acc__stat-num">{rial(t.pending)}</p><p className="acc__muted">در انتظار</p></div>
+        <div className="acc__card acc__stat"><p className="acc__stat-num">{rial(t.approved)}</p><p className="acc__muted">تأییدشده</p></div>
+        <div className="acc__card acc__stat"><p className="acc__stat-num">{rial(t.paid)}</p><p className="acc__muted">پرداخت‌شده</p></div>
       </div>
 
       <div className="acc__card">
-        <h2><Wallet size={16} /> درخواست برداشت</h2>
-        <div className="acc__payout">
-          <input
-            dir="ltr" inputMode="numeric"
-            placeholder={`حداقل ${fa(wallet.min_payout)} ریال`}
-            value={amount}
-            onChange={(e) => setAmount(e.target.value)}
-          />
-          <button className="btn btn--primary" disabled={!amount} onClick={requestPayout}>
-            درخواست برداشت
-          </button>
-        </div>
-        {!home?.iban_masked && <p className="acc__err">قبل از برداشت، شماره شبا را ثبت کنید.</p>}
+        <h2><BadgePercent size={16} /> کمیسیون‌های من</h2>
+        <p className="acc__muted acc__hint">
+          تسویهٔ کمیسیون توسط مدیریت به‌صورت دستی انجام می‌شود؛ وضعیت هر ردیف همین‌جا به‌روزرسانی می‌شود.
+        </p>
+        {view.items.length === 0 ? (
+          <p className="acc__muted">هنوز کمیسیونی ثبت نشده است — با پذیرش پروندهٔ معرفی‌شده، ردیف کمیسیون این‌جا می‌آید.</p>
+        ) : (
+          <div className="acc__list">
+            <div className="acc__row acc__row--head">
+              <span>پرونده</span>
+              <span>مبلغ پرونده</span>
+              <span>نرخ</span>
+              <span>کمیسیون</span>
+              <span>وضعیت</span>
+              <span>تاریخ</span>
+            </div>
+            {view.items.map((c) => (
+              <div key={c.id} className="acc__row acc__row--comm">
+                <span className="acc__row-topic">
+                  {c.request_label}
+                  {c.tracking_code ? (
+                    <code className="acc__muted" dir="ltr"> {c.tracking_code}</code>
+                  ) : null}
+                </span>
+                <span>{c.basis_amount ? rial(c.basis_amount) : '—'}</span>
+                <span>{c.percent != null ? `٪${fa(c.percent)}` : '—'}</span>
+                <span className="acc__amt is-pos" dir="ltr">{rial(c.amount)}</span>
+                <span className={`acc__badge${c.status === 'paid' ? ' acc__badge--gold' : ''}`}>
+                  {COMMISSION_FA[c.status] ?? c.status}
+                </span>
+                <span className="acc__muted">{faDate(c.created_at)}</span>
+              </div>
+            ))}
+          </div>
+        )}
       </div>
 
       <div className="acc__card">
-        <h2>اطلاعات بانکی</h2>
-        <p className="acc__muted">شبا فعلی: <span dir="ltr">{home?.iban_masked || 'ثبت نشده'}</span></p>
-        <div className="acc__payout">
+        <h2>اطلاعات بانکی برای تسویه</h2>
+        <p className="acc__muted">
+          مدیریت کمیسیون را به این شماره شبا واریز می‌کند.
+          شبا فعلی: <span dir="ltr">{home?.iban_masked || 'ثبت نشده'}</span>
+        </p>
+        <div className="acc__inline">
           <input dir="ltr" placeholder="IR06…" value={iban} onChange={(e) => setIban(e.target.value)} />
           <button className="btn btn--ghost" disabled={!iban} onClick={saveBank}>ذخیره شبا</button>
         </div>
-        {payouts.length > 0 && (
-          <div className="acc__list">
-            <h3 className="acc__h3">تاریخچهٔ برداشت</h3>
-            {payouts.map((p) => (
-              <div key={p.id} className="acc__row">
-                <span>{rial(p.amount)}</span>
-                <span className="acc__badge">{PAYOUT_FA[p.status] ?? p.status}</span>
-                <span className="acc__muted" dir="ltr">{p.payment_ref || '—'}</span>
-                <span className="acc__muted">{faDate(p.created_at)}</span>
-              </div>
-            ))}
-          </div>
-        )}
-      </div>
-
-      <div className="acc__card">
-        <h2>تراکنش‌ها</h2>
-        {wallet.entries.length === 0 ? <p className="acc__muted">تراکنشی نیست.</p> : (
-          <div className="acc__list">
-            {wallet.entries.map((e) => (
-              <div key={e.id} className="acc__row">
-                <span className={`acc__amt ${e.amount >= 0 ? 'is-pos' : 'is-neg'}`} dir="ltr">
-                  {e.amount >= 0 ? '+' : '−'}{rial(Math.abs(e.amount))}
-                </span>
-                <span className="acc__row-topic">{LEDGER_FA[e.kind] ?? e.kind}{e.memo ? ` — ${e.memo}` : ''}</span>
-                <span className="acc__muted">{faDate(e.created_at)}</span>
-              </div>
-            ))}
-          </div>
-        )}
       </div>
     </>
   )
@@ -471,7 +457,7 @@ function GuideTab({ home }: { home: MarketerHome }) {
           <li>لینک اختصاصی خود را در شبکه‌های اجتماعی منتشر کنید.</li>
           <li>بازدیدکننده با لینک شما وارد سایت می‌شود و کوکی ارجاع {fa(home.cookie_days ?? 30)} روزه ثبت می‌گردد.</li>
           <li>اگر در این بازه درخواست مشاوره ثبت کند، ارجاع به شما منسوب و قفل می‌شود.</li>
-          <li>پس از پذیرش پرونده توسط مدیریت، کمیسیون طبق قواعد ثبت و پس از دورهٔ نگهداری قابل برداشت می‌شود.</li>
+          <li>پس از پذیرش پرونده توسط مدیریت، کمیسیون طبق قواعد ثبت می‌شود؛ تسویه توسط مدیریت انجام و در همین پنل «پرداخت‌شده» علامت می‌خورد.</li>
         </ol>
       </div>
     </>

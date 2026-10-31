@@ -126,7 +126,7 @@ export default function App() {
                 <Route path="audit" element={<Navigate to="/system?tab=audit" replace />} />
                 <Route path="pages" element={<Navigate to="/content?tab=pages" replace />} />
                 <Route path="pages/:slug" element={<ParamRedirect to="/content/pages/:slug" />} />
-                <Route path="media" element={<Navigate to="/content?tab=media" replace />} />
+                <Route path="media" element={<Navigate to="/content" replace />} />
                 <Route path="lawyers" element={<Navigate to="/content?tab=lawyers" replace />} />
                 <Route path="lawyers/:id" element={<ParamRedirect to="/content/lawyers/:id" />} />
                 <Route path="consultations" element={<Navigate to="/requests?tab=consultations" replace />} />

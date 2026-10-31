@@ -1,11 +1,10 @@
-/** بازاریابی — قواعد کمیسیون · کمیسیون‌ها · برداشت‌ها و پرداخت‌ها ·
- *  گزارش عملکرد · تنظیمات ارجاع (spec §2 sidebar #4). */
+/** بازاریابی — قواعد کمیسیون · کمیسیون‌ها · گزارش عملکرد ·
+ *  تنظیمات ارجاع (spec §2 sidebar #4 — بدون کیف پول). */
 
 import { useSearchParams } from "react-router-dom";
 import { PageHeader, Tabs } from "../components/ui";
 import {
   CommissionsTab,
-  PayoutsTab,
   ReportTab,
   RulesTab,
   SettingsTab,
@@ -18,7 +17,7 @@ export default function MarketingHubPage() {
     <div>
       <PageHeader
         title="بازاریابی"
-        subtitle="قواعد کمیسیون، تسویه، برداشت، گزارش عملکرد و تنظیمات ارجاع"
+        subtitle="قواعد کمیسیون، تسویهٔ دستی، گزارش عملکرد و تنظیمات ارجاع"
       />
       <Tabs
         active={tab}
@@ -26,7 +25,6 @@ export default function MarketingHubPage() {
         tabs={[
           { key: "rules", label: "قواعد کمیسیون" },
           { key: "commissions", label: "کمیسیون‌ها" },
-          { key: "payouts", label: "برداشت‌ها و پرداخت‌ها" },
           { key: "report", label: "گزارش عملکرد" },
           { key: "settings", label: "تنظیمات ارجاع" },
         ]}
@@ -34,7 +32,6 @@ export default function MarketingHubPage() {
       <div className="pt-4">
         {tab === "rules" && <RulesTab />}
         {tab === "commissions" && <CommissionsTab />}
-        {tab === "payouts" && <PayoutsTab />}
         {tab === "report" && <ReportTab />}
         {tab === "settings" && <SettingsTab />}
       </div>

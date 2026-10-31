@@ -26,9 +26,9 @@
   position: relative;
   overflow: hidden;
   background:
-    radial-gradient(60rem 36rem at 50% -22%, rgb(var(--gold-rgb) / .10), transparent 60%),
-    radial-gradient(40rem 30rem at 88% 108%, rgb(var(--ink-4-rgb) / .5), transparent 60%),
-    var(--color-bg);
+    radial-gradient(58rem 34rem at 50% -20%, rgb(var(--gold-rgb) / .09), transparent 60%),
+    radial-gradient(46rem 32rem at 92% 112%, rgb(20 38 82 / .55), transparent 62%),
+    linear-gradient(168deg, #050B1A, #0A1633 78%);
 }
 /* هالهٔ طلایی خیلی کم‌رنگ پشت کارت */
 .authp::before {
@@ -148,18 +148,26 @@
 .authp__field input[aria-invalid="true"] { border-color: rgb(var(--error-rgb) / .55); }
 
 .authp__pw { position: relative; }
-.authp__pw input { padding-inline-end: 4.5rem; }
+.authp__pw input { padding-inline-end: 3.1rem; }
+/* فیلد OTP دکمهٔ متنی پهن‌تری دارد */
+.authp__pw:has(.authp__otp-btn) input { padding-inline-end: 5rem; }
+/* آیکون بومی مرورگر را پنهان می‌کنیم تا دو چشم روی هم نیاید */
+.authp__pw input::-ms-reveal,
+.authp__pw input::-ms-clear { display: none; }
+.authp__pw input::-webkit-credentials-auto-fill-button { visibility: hidden; display: none !important; position: absolute; inset-inline-end: 0; inline-size: 0; }
 .authp__eye {
   position: absolute;
-  inset-inline-end: .55rem;
+  inset-inline-end: .3rem;
   inset-block-start: 50%;
   translate: 0 -50%;
   display: grid; place-items: center;
-  inline-size: 1.9rem; block-size: 1.9rem;
-  background: none; border: none; border-radius: .45rem;
+  inline-size: 2.5rem; block-size: 2.5rem; /* ناحیهٔ لمسی ≥۴۰px */
+  background: none; border: none; border-radius: .55rem;
   color: var(--color-text-2); cursor: pointer;
+  transition: color .15s, background .15s;
 }
-.authp__eye:hover { color: var(--color-text); }
+.authp__eye:hover { color: var(--color-text); background: rgb(var(--ink-4-rgb) / .3); }
+.authp__eye:focus-visible { outline: 2px solid var(--color-border-gold); outline-offset: -1px; }
 
 .authp__meter { display: grid; gap: .25rem; }
 .authp__meter-fill {
@@ -181,7 +189,7 @@
 .authp__spin-inline { animation: authp-rot .8s linear infinite; }
 .authp__otp-btn {
   position: absolute; inset-inline-end: .35rem; inset-block-start: 50%; translate: 0 -50%;
-  block-size: calc(100% - .7rem);
+  inline-size: auto; block-size: calc(100% - .7rem);
   font-size: .72rem; color: var(--color-gold);
   border-inline-start: 1px solid rgb(var(--border-rgb) / .5);
   padding-inline: .75rem;
@@ -644,7 +652,7 @@ a.acc__stat:hover .acc__stat-ico { color: var(--color-gold-hi); border-color: va
 .acc__reply textarea,
 .acc__apply textarea,
 .acc__apply select,
-.acc__payout input {
+.acc__inline input {
   width: 100%;
   background: rgb(var(--ink-0-rgb) / .5);
   border: 1px solid var(--color-border);
@@ -655,7 +663,7 @@ a.acc__stat:hover .acc__stat-ico { color: var(--color-gold-hi); border-color: va
 }
 .acc__field textarea { resize: vertical; min-height: 7rem; }
 .acc__field input:focus, .acc__field select:focus, .acc__field textarea:focus,
-.acc__reply textarea:focus, .acc__apply textarea:focus, .acc__apply select:focus, .acc__payout input:focus {
+.acc__reply textarea:focus, .acc__apply textarea:focus, .acc__apply select:focus, .acc__inline input:focus {
   outline: none;
   border-color: var(--color-border-gold);
   box-shadow: 0 0 0 2px rgb(var(--gold-rgb) / .15);
@@ -743,8 +751,8 @@ a.acc__stat:hover .acc__stat-ico { color: var(--color-gold-hi); border-color: va
 .acc__state--rejected { border-color: rgb(var(--error-rgb) / .4); background: rgb(var(--error-rgb) / .05); }
 .acc__state--rejected svg { color: var(--color-error); }
 .acc__apply .btn { justify-self: start; }
-.acc__payout { display: flex; gap: .6rem; flex-wrap: wrap; }
-.acc__payout input { flex: 1; min-width: 12rem; }
+.acc__inline { display: flex; gap: .6rem; flex-wrap: wrap; }
+.acc__inline input { flex: 1; min-width: 12rem; }
 .acc__amt.is-pos { color: rgb(var(--online-rgb)); }
 .acc__amt.is-neg { color: var(--color-error); }
 
@@ -828,4 +836,27 @@ a.acc__stat:hover .acc__stat-ico { color: var(--color-gold-hi); border-color: va
 @media (max-width: 40rem) {
   .acc__funnel-row { grid-template-columns: 5.5rem 1fr 3rem; gap: .5rem; }
   .acc__row--link { grid-template-columns: 1fr; }
+}
+
+/* جدول کمیسیون — ۶ ستونه روی دسکتاپ، کارت‌مانند روی موبایل */
+.acc__row--comm,
+.acc__row--head {
+  grid-template-columns: minmax(0, 1.4fr) repeat(4, minmax(0, .9fr)) minmax(0, .8fr);
+  gap: .5rem;
+  font-size: .86rem;
+}
+.acc__row--head {
+  border: none;
+  background: none;
+  padding-block: .15rem;
+  color: var(--color-text-2);
+  font-size: .75rem;
+}
+.acc__row--head:hover { background: none; translate: none; }
+@media (max-width: 52rem) {
+  .acc__row--head { display: none; }
+  .acc__row--comm {
+    grid-template-columns: 1fr 1fr;
+    row-gap: .35rem;
+  }
 }

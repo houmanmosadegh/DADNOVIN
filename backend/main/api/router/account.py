@@ -1,4 +1,4 @@
-"""Public account endpoints — register/login/reset, my requests, marketer, wallet."""
+"""Public account endpoints — register/login/reset, my requests, marketer, commissions."""
 
 import hashlib
 import re
@@ -9,7 +9,7 @@ from typing import Annotated
 
 from fastapi import APIRouter, Depends, HTTPException, Query, Request, Response
 from pydantic import BaseModel, Field
-from sqlalchemy import func, or_, select
+from sqlalchemy import or_, select
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from ...core.config import get_settings
@@ -20,7 +20,6 @@ from ...models.account import (
     MarketerApplication,
     OtpToken,
     PasswordResetToken,
-    PayoutRequest,
     ReferralAttribution,
     Commission,
     CommissionRule,
@@ -38,7 +37,6 @@ from ...schemas.account import (
     MarketerApplyIn,
     OtpRequestIn,
     PasswordChangeIn,
-    PayoutIn,
     ProfilePatchIn,
     RegisterIn,
     ResetIn,
@@ -49,7 +47,6 @@ from ...security.vault import encrypt_field, mask_digits, decrypt_field
 from ...services import commissions as comm_svc
 from ...services import referrals as ref_svc
 from ...services import thread as thread_svc
-from ...services import wallet as wallet_svc
 from ...services.audit import audit
 from ..dependencies.auth import CurrentUser
 
@@ -786,86 +783,74 @@ async def marketer_bank(db: DbDep, user: CurrentUser, payload: BankDetailsIn) ->
     return {"message": "اطلاعات بانکی ذخیره شد.", "iban_masked": _iban_masked(prof)}
 
 
-# ─── wallet & payouts ───────────────────────────────────────────────
+# ─── commissions (no wallet — admins settle payouts outside the system) ───
+
+_REQUEST_TYPE_FA = {
+    "consultation": "درخواست مشاوره",
+    "contact": "فرم تماس",
+    "ticket": "تیکت",
+    "callback": "درخواست تماس",
+}
 
 
-@router.get("/wallet")
-async def wallet_view(db: DbDep, user: CurrentUser) -> dict:
-    prof = await ref_svc.profile_for_user(db, user.id)
-    if prof is None:
-        raise HTTPException(403, {"code": "not_marketer", "message": "حساب بازاریاب نیستید."})
-    cfg = await comm_svc.referral_settings(db)
-    bal = await wallet_svc.balance(db, prof.id)
-    pending_comms = (
-        await db.execute(
-            select(func.coalesce(func.sum(Commission.amount), 0)).where(
-                Commission.marketer_id == prof.id, Commission.status == "pending"
-            )
-        )
-    ).scalar_one()
-    pending_payouts = (
-        await db.execute(
-            select(func.coalesce(func.sum(PayoutRequest.amount), 0)).where(
-                PayoutRequest.marketer_id == prof.id, PayoutRequest.status == "pending"
-            )
-        )
-    ).scalar_one()
-    items = await wallet_svc.entries(db, prof.id)
+def _commission_row(comm: Commission, tracking: str | None) -> dict:
+    snap = {}
+    try:
+        import json
+
+        snap = json.loads(comm.rule_snapshot) if comm.rule_snapshot else {}
+    except (ValueError, TypeError):
+        pass
     return {
-        "balance": bal,
-        "pending_commissions": pending_comms,
-        "pending_payouts": pending_payouts,
-        "min_payout": int(cfg.get("min_payout", 0)),
-        "commission_enabled": bool(cfg.get("commission_enabled")),
-        "entries": [
-            {
-                "id": str(e.id),
-                "kind": e.kind,
-                "amount": e.amount,
-                "memo": e.memo,
-                "created_at": e.created_at.isoformat(),
-            }
-            for e in items
-        ],
+        "id": str(comm.id),
+        "request_type": comm.request_type,
+        "request_label": _REQUEST_TYPE_FA.get(comm.request_type, comm.request_type),
+        "tracking_code": tracking,
+        "basis_kind": comm.basis_kind,
+        "basis_amount": comm.basis_amount,
+        "percent": snap.get("value") if comm.basis_kind == "percent" else None,
+        "amount": comm.amount,
+        "status": comm.status,
+        "paid_at": comm.paid_at.isoformat() if comm.paid_at else None,
+        "created_at": comm.created_at.isoformat(),
     }
 
 
-@router.post("/payouts", status_code=201)
-async def payout_create(db: DbDep, user: CurrentUser, payload: PayoutIn, request: Request) -> dict:
-    limiter.check("payout", client_key(request), get_settings().rate_limit_login_per_minute)
+@router.get("/commissions")
+async def my_commissions(db: DbDep, user: CurrentUser) -> dict:
+    """Own commissions only — marketers never see each other's data."""
     prof = await ref_svc.profile_for_user(db, user.id)
     if prof is None:
         raise HTTPException(403, {"code": "not_marketer", "message": "حساب بازاریاب نیستید."})
-    payout = await comm_svc.request_payout(db, prof, payload.amount)
-    await audit(db, actor=user, action="payout.request", entity="payout_request", entity_id=payout.id,
-                after={"amount": payload.amount}, request=request)
-    await db.commit()
-    return {"id": str(payout.id), "status": payout.status}
-
-
-@router.get("/payouts")
-async def payout_list(db: DbDep, user: CurrentUser) -> list[dict]:
-    prof = await ref_svc.profile_for_user(db, user.id)
-    if prof is None:
-        return []
     rows = (
         await db.execute(
-            select(PayoutRequest)
-            .where(PayoutRequest.marketer_id == prof.id)
-            .order_by(PayoutRequest.created_at.desc())
-            .limit(50)
+            select(Commission)
+            .where(Commission.marketer_id == prof.id)
+            .order_by(Commission.created_at.desc())
+            .limit(200)
         )
     ).scalars().all()
-    return [
-        {
-            "id": str(p.id),
-            "amount": p.amount,
-            "status": p.status,
-            "iban_masked": p.iban_masked,
-            "payment_ref": p.payment_ref,
-            "created_at": p.created_at.isoformat(),
-        }
-        for p in rows
-    ]
+    tracking = {
+        str(c.id): c.tracking_code
+        for c in (
+            await db.execute(
+                select(ConsultationRequest.id, ConsultationRequest.tracking_code).where(
+                    ConsultationRequest.id.in_(
+                        [r.request_id for r in rows] or [uuid.uuid4()]
+                    )
+                )
+            )
+        ).all()
+    }
+    sums = dict.fromkeys(("pending", "approved", "paid", "cancelled"), 0)
+    for r in rows:
+        if r.status in sums:
+            sums[r.status] += r.amount
+    cfg = await comm_svc.referral_settings(db)
+    return {
+        "items": [_commission_row(r, tracking.get(str(r.request_id))) for r in rows],
+        "totals": sums,
+        "commission_enabled": bool(cfg.get("commission_enabled")),
+    }
 
 

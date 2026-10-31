@@ -1,4 +1,4 @@
-"""Account, referral, commission, wallet and payout models.
+"""Account, referral and commission models.
 
 Public-facing `user`/`marketer` accounts share the `users` table with staff —
 one identity model, RBAC decides visibility.
@@ -166,11 +166,16 @@ class Commission(Base):
     basis_kind: Mapped[str] = mapped_column(String(10), default="fixed")
     basis_amount: Mapped[int] = mapped_column(BigInteger, default=0)  # fee set by admin (percent mode)
     amount: Mapped[int] = mapped_column(BigInteger, default=0)
-    # pending → approved(withdrawable) | paid | cancelled
+    # pending → approved → paid | cancelled (manual settlement, no wallet)
     status: Mapped[str] = mapped_column(String(15), default="pending", index=True)
     hold_until: Mapped[datetime | None] = mapped_column(
         DateTime(timezone=True), nullable=True
+    )  # legacy column — new rows leave it NULL
+    paid_at: Mapped[datetime | None] = mapped_column(
+        DateTime(timezone=True), nullable=True
     )
+    paid_note: Mapped[str] = mapped_column(String(300), default="")
+    paid_by: Mapped[uuid.UUID | None] = mapped_column(Uuid, nullable=True)
     # JSON snapshot of the rule applied at creation — later rule edits never
     # rewrite history
     rule_snapshot: Mapped[str] = mapped_column(Text, default="")
@@ -180,47 +185,6 @@ class Commission(Base):
     __table_args__ = (
         UniqueConstraint("request_type", "request_id", name="uq_commission_request"),
     )
-
-
-class WalletEntry(Base):
-    """Append-only ledger — balance is derived, never stored."""
-
-    __tablename__ = "wallet_ledger"
-
-    id: Mapped[uuid.UUID] = uuid_pk()
-    marketer_id: Mapped[uuid.UUID] = mapped_column(
-        Uuid, ForeignKey("marketer_profiles.id"), index=True
-    )
-    # commission_credit | payout_debit | adjustment
-    kind: Mapped[str] = mapped_column(String(20), index=True)
-    amount: Mapped[int] = mapped_column(BigInteger)  # signed rials
-    ref_type: Mapped[str] = mapped_column(String(20), default="")
-    ref_id: Mapped[uuid.UUID | None] = mapped_column(Uuid, nullable=True)
-    memo: Mapped[str] = mapped_column(String(300), default="")
-    actor_id: Mapped[uuid.UUID | None] = mapped_column(Uuid, nullable=True)
-    idempotency_key: Mapped[str] = mapped_column(String(80), unique=True)
-    created_at: Mapped[datetime] = created_at_col()
-
-
-class PayoutRequest(Base):
-    __tablename__ = "payout_requests"
-
-    id: Mapped[uuid.UUID] = uuid_pk()
-    marketer_id: Mapped[uuid.UUID] = mapped_column(
-        Uuid, ForeignKey("marketer_profiles.id"), index=True
-    )
-    amount: Mapped[int] = mapped_column(BigInteger)
-    # pending → approved | paid | rejected
-    status: Mapped[str] = mapped_column(String(15), default="pending", index=True)
-    iban_masked: Mapped[str] = mapped_column(String(40), default="")
-    payment_ref: Mapped[str] = mapped_column(String(80), default="")  # manual bank tracking no.
-    reject_reason: Mapped[str] = mapped_column(String(300), default="")
-    reviewed_by: Mapped[uuid.UUID | None] = mapped_column(Uuid, nullable=True)
-    reviewed_at: Mapped[datetime | None] = mapped_column(
-        DateTime(timezone=True), nullable=True
-    )
-    created_at: Mapped[datetime] = created_at_col()
-    updated_at: Mapped[datetime] = updated_at_col()
 
 
 class InboxNotification(Base):

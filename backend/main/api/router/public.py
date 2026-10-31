@@ -1,16 +1,24 @@
 """Read-only public API — only content flagged `is_public`/`is_visible`."""
 
 from typing import Annotated
+from xml.sax.saxutils import escape
 
-from fastapi import APIRouter, Depends, HTTPException
+from fastapi import APIRouter, Depends, HTTPException, Response
 from sqlalchemy import func, select
 from sqlalchemy.ext.asyncio import AsyncSession
 
+from ...core.config import get_settings
 from ...db.session import get_db
 from ...models.lawyer import Lawyer
+from ...models.request_ops import Article
 from ...repositories.content import get_page_by_slug, list_pages, public_settings_map
 from ...repositories.lawyers import list_lawyers
-from ...schemas.content import PublicPageOut, PublicSectionOut
+from ...schemas.content import (
+    PublicArticleDetailOut,
+    PublicArticleOut,
+    PublicPageOut,
+    PublicSectionOut,
+)
 from ...schemas.lawyer import PublicLawyerOut, public_lawyer
 
 router = APIRouter(prefix="/public", tags=["public"])
@@ -19,7 +27,37 @@ DbDep = Annotated[AsyncSession, Depends(get_db)]
 
 @router.get("/settings")
 async def public_settings(db: DbDep) -> dict[str, dict]:
-    return await public_settings_map(db)
+    settings = await public_settings_map(db)
+    settings["meta"] = {"has_articles": await _has_published_articles(db)}
+    return settings
+
+
+@router.get("/articles")
+async def articles_index(db: DbDep) -> list[PublicArticleOut]:
+    """Published articles only — the public list page renders conditionally."""
+    rows = (
+        await db.execute(
+            select(Article)
+            .where(Article.status == "published")
+            .order_by(Article.published_at.desc().nulls_last(), Article.id)
+        )
+    ).scalars().all()
+    return [_public_article(a) for a in rows]
+
+
+@router.get("/articles/{slug}")
+async def article_by_slug(slug: str, db: DbDep) -> PublicArticleDetailOut:
+    row = (
+        await db.execute(select(Article).where(func.lower(Article.slug) == slug.lower()))
+    ).scalar_one_or_none()
+    if row is None or row.status != "published":
+        raise HTTPException(404, {"code": "not_found", "message": "مقاله یافت نشد."})
+    return PublicArticleDetailOut(
+        **_public_article(row).model_dump(),
+        body=row.body,
+        seo_title=row.seo_title,
+        seo_description=row.seo_description,
+    )
 
 
 @router.get("/pages")
@@ -66,6 +104,60 @@ async def lawyer_by_slug(slug: str, db: DbDep) -> PublicLawyerOut:
     if row is None or not row.is_visible:
         raise HTTPException(404, {"code": "not_found", "message": "وکیل یافت نشد."})
     return public_lawyer(row)
+
+
+_BASE_PATHS = ("/", "/about", "/services", "/consultation", "/contact", "/track")
+
+
+@router.get("/sitemap.xml", include_in_schema=False)
+async def sitemap(db: DbDep) -> Response:
+    """Dynamic sitemap — article URLs appear only while published."""
+    settings_map = await public_settings_map(db)
+    base = (
+        (settings_map.get("brand") or {}).get("siteUrl")
+        or get_settings().public_base_url
+    ).rstrip("/")
+    paths = list(_BASE_PATHS)
+    rows = (
+        await db.execute(
+            select(Article.slug, Article.published_at)
+            .where(Article.status == "published")
+            .order_by(Article.published_at.desc().nulls_last())
+        )
+    ).all()
+    if rows:
+        paths.append("/articles")
+    urls = [f"    <url><loc>{escape(base)}{p}</loc></url>" for p in paths]
+    for slug, published_at in rows:
+        lastmod = (
+            f"<lastmod>{published_at.date().isoformat()}</lastmod>"
+            if published_at
+            else ""
+        )
+        urls.append(
+            f"    <url><loc>{escape(base)}/articles/{escape(slug)}</loc>{lastmod}</url>"
+        )
+    xml = (
+        '<?xml version="1.0" encoding="UTF-8"?>\n'
+        '<urlset xmlns="http://www.sitemaps.org/schemas/sitemap/0.9">\n'
+        + "\n".join(urls)
+        + "\n</urlset>\n"
+    )
+    return Response(content=xml, media_type="application/xml")
+
+
+async def _has_published_articles(db: AsyncSession) -> bool:
+    return (
+        await db.execute(
+            select(func.count(Article.id)).where(Article.status == "published")
+        )
+    ).scalar_one() > 0
+
+
+def _public_article(a: Article) -> PublicArticleOut:
+    return PublicArticleOut(
+        slug=a.slug, title=a.title, excerpt=a.excerpt, published_at=a.published_at
+    )
 
 
 def _public_page(page) -> PublicPageOut:

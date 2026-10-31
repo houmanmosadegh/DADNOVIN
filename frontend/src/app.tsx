@@ -6,6 +6,8 @@ import { Header } from './components/Header'
 import { ScrollManager } from './components/ScrollManager'
 import { SmoothScroll } from './components/SmoothScroll'
 import { AboutPage } from './pages/AboutPage'
+import { ArticlePage } from './pages/ArticlePage'
+import { ArticlesPage } from './pages/ArticlesPage'
 import { ConsultationPage } from './pages/ConsultationPage'
 import { ContactPage } from './pages/ContactPage'
 import { HomePage } from './pages/HomePage'
@@ -67,6 +69,8 @@ export function AppRoutes() {
           <Route path="/services" element={<ServicesPage />} />
           <Route path="/consultation" element={<ConsultationPage />} />
           <Route path="/contact" element={<ContactPage />} />
+          <Route path="/articles" element={<ArticlesPage />} />
+          <Route path="/articles/:slug" element={<ArticlePage />} />
           <Route path="/track" element={<TrackPage />} />
           <Route path="*" element={<NotFoundPage />} />
         </Routes>
