@@ -38,7 +38,7 @@ export function CountUp({ value, suffix = '', duration = 950, className }: Count
           start()
         }
       },
-      { threshold: 0.6 },
+      { threshold: 0.6 }
     )
     io.observe(el)
     return () => {

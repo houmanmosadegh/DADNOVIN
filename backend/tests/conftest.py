@@ -47,10 +47,7 @@ async def seeded_session(db_session):
     await _seed_pages(db_session, c)
     await _seed_lawyers(db_session, c)
 
-    roles = {
-        r.name: r
-        for r in (await db_session.execute(select(Role))).scalars()
-    }
+    roles = {r.name: r for r in (await db_session.execute(select(Role))).scalars()}
     for uname, rname in (
         (ADMIN_USER, "super_admin"),
         (EDITOR_USER, "editor"),

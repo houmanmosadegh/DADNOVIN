@@ -11,6 +11,7 @@ from sqlalchemy import (
     BigInteger,
     Boolean,
     DateTime,
+    CheckConstraint,
     ForeignKey,
     Integer,
     String,
@@ -76,8 +77,16 @@ class MarketerProfile(Base):
     ref_code: Mapped[str] = mapped_column(String(24), unique=True, index=True)
     is_active: Mapped[bool] = mapped_column(Boolean, default=True)
     # bank coordinates stored encrypted at rest; never returned whole to the UI
+    account_name_enc: Mapped[str] = mapped_column(Text, default="")
     iban_enc: Mapped[str] = mapped_column(Text, default="")
     card_enc: Mapped[str] = mapped_column(Text, default="")
+    bank_updated_at: Mapped[datetime | None] = mapped_column(
+        DateTime(timezone=True), nullable=True
+    )
+    # first payout to freshly-changed bank details is held back this long
+    payout_hold_until: Mapped[datetime | None] = mapped_column(
+        DateTime(timezone=True), nullable=True
+    )
     approved_by: Mapped[uuid.UUID | None] = mapped_column(Uuid, nullable=True)
     # admin flag for suspicious activity — shown in the marketers list
     fraud_flag: Mapped[bool] = mapped_column(Boolean, default=False)
@@ -90,6 +99,13 @@ class MarketerProfile(Base):
     )
     created_at: Mapped[datetime] = created_at_col()
     updated_at: Mapped[datetime] = updated_at_col()
+
+    __table_args__ = (
+        CheckConstraint(
+            "custom_rate IS NULL OR (custom_rate >= 0 AND custom_rate <= 100)",
+            name="ck_marketer_custom_rate",
+        ),
+    )
 
 
 class ReferralLink(Base):
@@ -145,41 +161,30 @@ class ReferralAttribution(Base):
     user_agent: Mapped[str] = mapped_column(String(300), default="")
     # '' = clean | 'review' = flagged, no commission until an admin clears it
     flag: Mapped[str] = mapped_column(String(20), default="", index=True)
+    # acquisition channel from the referral link (?s=) — '' = unknown/direct
+    channel: Mapped[str] = mapped_column(String(20), default="")
+    # when the client consented to «نام و وضعیت قرارداد برای معرف نمایش داده
+    # می‌شود» — NULL means no commission accrual and no name exposure
+    consent_at: Mapped[datetime | None] = mapped_column(
+        DateTime(timezone=True), nullable=True
+    )
     created_at: Mapped[datetime] = created_at_col()
 
     __table_args__ = (
-        UniqueConstraint(
-            "request_type", "request_id", name="uq_attrib_request"
-        ),
+        UniqueConstraint("request_type", "request_id", name="uq_attrib_request"),
     )
 
 
-class CommissionRule(Base):
-    """Admin-managed commission rules; rows never deleted, only replaced."""
+class RetiredRefCode(Base):
+    """A marketer's previous ref code — kept so old clicks still resolve."""
 
-    __tablename__ = "commission_rules"
+    __tablename__ = "retired_ref_codes"
 
-    id: Mapped[uuid.UUID] = uuid_pk()
-    # fixed | percent
-    kind: Mapped[str] = mapped_column(String(10), default="fixed")
-    value: Mapped[int] = mapped_column(BigInteger, default=0)  # rials or %
-    # optional tier: min accepted cases this rule applies to (e.g. 0/5/15)
-    tier_min: Mapped[int] = mapped_column(Integer, default=0)
-    marketer_id: Mapped[uuid.UUID | None] = mapped_column(
-        Uuid, nullable=True, index=True
-    )  # per-marketer override; NULL = global
-    # clamps: 0 = unbounded; result is clamped to [min_amount, max_amount]
-    min_amount: Mapped[int] = mapped_column(BigInteger, default=0)
-    max_amount: Mapped[int] = mapped_column(BigInteger, default=0)
-    # validity window — NULL bounds mean open-ended; applies to new commissions only
-    starts_at: Mapped[datetime | None] = mapped_column(
-        DateTime(timezone=True), nullable=True
+    code: Mapped[str] = mapped_column(String(24), primary_key=True)
+    marketer_id: Mapped[uuid.UUID] = mapped_column(
+        Uuid, ForeignKey("marketer_profiles.id", ondelete="CASCADE"), index=True
     )
-    ends_at: Mapped[datetime | None] = mapped_column(
-        DateTime(timezone=True), nullable=True
-    )
-    is_active: Mapped[bool] = mapped_column(Boolean, default=True, index=True)
-    created_at: Mapped[datetime] = created_at_col()
+    retired_at: Mapped[datetime] = created_at_col()
 
 
 class CaseFeeReceipt(Base):
@@ -192,10 +197,12 @@ class CaseFeeReceipt(Base):
     request_id: Mapped[uuid.UUID] = mapped_column(
         Uuid, ForeignKey("consultation_requests.id", ondelete="CASCADE"), index=True
     )
-    amount: Mapped[int] = mapped_column(BigInteger)  # rials received by the office
+    amount: Mapped[int] = mapped_column(BigInteger)  # تومان received by the office
     note: Mapped[str] = mapped_column(String(300), default="")
     created_by: Mapped[uuid.UUID | None] = mapped_column(Uuid, nullable=True)
     created_at: Mapped[datetime] = created_at_col()
+
+    __table_args__ = (CheckConstraint("amount >= 0", name="ck_fee_receipt_amount"),)
 
 
 class Commission(Base):
@@ -217,23 +224,29 @@ class Commission(Base):
     request_id: Mapped[uuid.UUID] = mapped_column(Uuid, index=True)
     # attribution row that linked this case to the marketer (provenance)
     referral_id: Mapped[uuid.UUID | None] = mapped_column(
-        Uuid, ForeignKey("referral_attributions.id", ondelete="SET NULL"),
-        nullable=True, index=True,
+        Uuid,
+        ForeignKey("referral_attributions.id", ondelete="SET NULL"),
+        nullable=True,
+        index=True,
     )
     # accrual | reversal
     entry_type: Mapped[str] = mapped_column(String(10), default="accrual", index=True)
     # for accruals: the receipt this entry was created from (idempotency key)
     receipt_id: Mapped[uuid.UUID | None] = mapped_column(
-        Uuid, ForeignKey("case_fee_receipts.id", ondelete="SET NULL"),
-        nullable=True, unique=True,
+        Uuid,
+        ForeignKey("case_fee_receipts.id", ondelete="SET NULL"),
+        nullable=True,
+        unique=True,
     )
     # for reversals: the accrual being reversed
     parent_id: Mapped[uuid.UUID | None] = mapped_column(Uuid, nullable=True)
     basis_kind: Mapped[str] = mapped_column(String(10), default="percent")
-    basis_amount: Mapped[int] = mapped_column(BigInteger, default=0)  # received fee
+    basis_amount: Mapped[int] = mapped_column(
+        BigInteger, default=0
+    )  # received fee (تومان)
     # commission rate at creation, basis points (1500 = 15%) — snapshotted
     rate_bp: Mapped[int] = mapped_column(Integer, default=0)
-    amount: Mapped[int] = mapped_column(BigInteger, default=0)  # signed rials
+    amount: Mapped[int] = mapped_column(BigInteger, default=0)  # signed تومان
     # pending → approved → paid | cancelled (manual settlement, no wallet)
     status: Mapped[str] = mapped_column(String(15), default="pending", index=True)
     hold_until: Mapped[datetime | None] = mapped_column(
@@ -244,11 +257,41 @@ class Commission(Base):
     )
     paid_note: Mapped[str] = mapped_column(String(300), default="")
     paid_by: Mapped[uuid.UUID | None] = mapped_column(Uuid, nullable=True)
-    # JSON snapshot of the rate source applied at creation
-    rule_snapshot: Mapped[str] = mapped_column(Text, default="")
+    # the settlement batch this entry was paid in
+    payout_id: Mapped[uuid.UUID | None] = mapped_column(Uuid, nullable=True, index=True)
     created_by: Mapped[uuid.UUID | None] = mapped_column(Uuid, nullable=True)
     created_at: Mapped[datetime] = created_at_col()
     updated_at: Mapped[datetime] = updated_at_col()
+
+    __table_args__ = (
+        CheckConstraint("rate_bp >= 0 AND rate_bp <= 10000", name="ck_commission_rate"),
+        CheckConstraint("basis_amount >= 0", name="ck_commission_basis"),
+    )
+
+
+class Payout(Base):
+    """A settlement batch: admin pays a marketer N approved commissions at
+    once and attaches the bank receipt. Linked commissions get payout_id +
+    status=paid."""
+
+    __tablename__ = "payouts"
+
+    id: Mapped[uuid.UUID] = uuid_pk()
+    marketer_id: Mapped[uuid.UUID] = mapped_column(
+        Uuid, ForeignKey("marketer_profiles.id", ondelete="CASCADE"), index=True
+    )
+    amount: Mapped[int] = mapped_column(BigInteger)  # تومان paid to the marketer
+    paid_at: Mapped[datetime] = mapped_column(DateTime(timezone=True))
+    tracking_ref: Mapped[str] = mapped_column(String(120), default="")
+    note: Mapped[str] = mapped_column(String(300), default="")
+    # bank receipt image/pdf — MediaAsset with purpose=receipt
+    file_id: Mapped[uuid.UUID | None] = mapped_column(
+        Uuid, ForeignKey("media_assets.id", ondelete="SET NULL"), nullable=True
+    )
+    created_by: Mapped[uuid.UUID | None] = mapped_column(Uuid, nullable=True)
+    created_at: Mapped[datetime] = created_at_col()
+
+    __table_args__ = (CheckConstraint("amount > 0", name="ck_payout_amount"),)
 
 
 class InboxNotification(Base):

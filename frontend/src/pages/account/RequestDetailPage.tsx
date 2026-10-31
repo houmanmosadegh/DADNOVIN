@@ -5,7 +5,10 @@ import type { RequestDetail } from './types'
 import { CLOSED_STATUSES, STATUS_FA, faDateTime } from './types'
 
 const SENDER_FA: Record<string, string> = {
-  staff: 'کارشناس', assistant: 'دستیار هوشمند', customer: 'شما', system: 'سیستم',
+  staff: 'کارشناس',
+  assistant: 'پاسخ خودکار سیستم',
+  customer: 'شما',
+  system: 'سیستم',
 }
 
 export default function RequestDetailPage() {
@@ -17,7 +20,10 @@ export default function RequestDetailPage() {
 
   const load = useCallback(() => {
     if (!id) return
-    api.get<RequestDetail>(`/account/requests/${id}`).then(setDetail).catch(() => setErr('خطا در بارگذاری'))
+    api
+      .get<RequestDetail>(`/account/requests/${id}`)
+      .then(setDetail)
+      .catch(() => setErr('خطا در بارگذاری'))
   }, [id])
   useEffect(load, [load])
 
@@ -37,17 +43,25 @@ export default function RequestDetailPage() {
 
   return (
     <div className="acc__page">
-      <Link to="/panel/requests" className="acc__back">→ بازگشت به لیست</Link>
+      <Link to="/panel/requests" className="acc__back">
+        → بازگشت به لیست
+      </Link>
       {!detail && !err && <p className="acc__muted">در حال بارگذاری…</p>}
       {err && <p className="acc__err">{err}</p>}
       {detail && (
         <>
           <div className="acc__card">
             <h2>
-              <span dir="ltr" className="acc__code">{detail.tracking_code}</span>{' '}
-              <span className={`acc__badge acc__badge--${detail.status}`}>{STATUS_FA[detail.status] ?? detail.status}</span>
+              <span dir="ltr" className="acc__code">
+                {detail.tracking_code}
+              </span>{' '}
+              <span className={`acc__badge acc__badge--${detail.status}`}>
+                {STATUS_FA[detail.status] ?? detail.status}
+              </span>
             </h2>
-            <p className="acc__muted">{detail.topic} · {faDateTime(detail.created_at)}</p>
+            <p className="acc__muted">
+              {detail.topic} · {faDateTime(detail.created_at)}
+            </p>
           </div>
 
           {detail.events.length > 0 && (
@@ -75,12 +89,16 @@ export default function RequestDetailPage() {
               {detail.messages.map((m) => (
                 <div key={m.id} className={`acc__msg acc__msg--${m.sender_type}`}>
                   <p>{m.body}</p>
-                  <span>{faDateTime(m.created_at)} · {SENDER_FA[m.sender_type] ?? m.sender_type}</span>
+                  <span>
+                    {faDateTime(m.created_at)} · {SENDER_FA[m.sender_type] ?? m.sender_type}
+                  </span>
                 </div>
               ))}
             </div>
             {CLOSED_STATUSES.includes(detail.status) ? (
-              <p className="acc__muted acc__closed">این درخواست بسته شده است. برای پیگیری مجدد می‌توانید درخواست جدیدی ثبت کنید.</p>
+              <p className="acc__muted acc__closed">
+                این درخواست بسته شده است. برای پیگیری مجدد می‌توانید درخواست جدیدی ثبت کنید.
+              </p>
             ) : (
               <div className="acc__reply">
                 <textarea

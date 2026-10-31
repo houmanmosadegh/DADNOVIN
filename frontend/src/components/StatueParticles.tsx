@@ -201,7 +201,7 @@ export function StatueParticles({
             1,
             (data.bounds.x0 + data.bounds.x1) / 2,
             (data.bounds.y0 + data.bounds.y1) / 2,
-            1,
+            1
           ),
         },
         uOff: { value: new THREE.Vector2(FIT.ox, FIT.oy) },
@@ -308,9 +308,7 @@ export function StatueParticles({
         orientBound = true
         window.addEventListener('deviceorientation', onOrient, { passive: true })
       }
-      const DeviceOrientation = window.DeviceOrientationEvent as
-        | OrientationCtor
-        | undefined
+      const DeviceOrientation = window.DeviceOrientationEvent as OrientationCtor | undefined
       if (coarse && DeviceOrientation) {
         if (typeof DeviceOrientation.requestPermission === 'function') {
           setNeedPerm(true)
@@ -376,9 +374,7 @@ export function StatueParticles({
           mouse.tx = W * 0.5 + orient.gx * W * 0.4
           mouse.ty = H * 0.5 + orient.gy * H * 0.34
         }
-        const engaged = coarse
-          ? gyroActive || now < touchUntil
-          : hovering
+        const engaged = coarse ? gyroActive || now < touchUntil : hovering
 
         // cursor blob — finer radius, damped follow
         mouse.x += (mouse.tx - mouse.x) * 0.14
@@ -387,9 +383,7 @@ export function StatueParticles({
         const mouseR = W * 0.26 * (0.55 + 0.45 * mouse.s)
 
         const dampAmb = 1 - 0.85 * mouse.s // interaction wins over ambient
-        const blobs: [number, number, number, number][] = [
-          [mouse.x, mouse.y, mouseR, mouse.s],
-        ]
+        const blobs: [number, number, number, number][] = [[mouse.x, mouse.y, mouseR, mouse.s]]
         // arrival wave — a gold reveal band travels down the statue once
         const ap = arriveT < 0 ? -1 : (now - arriveT) / 2100
         if (ap >= 0 && ap <= 1) {
@@ -398,7 +392,7 @@ export function StatueParticles({
           blobs.push(
             [W * 0.5 + W * 0.1 * Math.sin(ap * 9), H * (0.05 + 0.9 * e), W * 0.18, sEnv],
             [W * 0.5 - W * 0.09 * Math.sin(ap * 7), H * (0.16 + 0.78 * e), W * 0.12, sEnv * 0.75],
-            [W * (0.3 + 0.4 * Math.sin(ap * 13)), H * (0.3 + 0.4 * Math.cos(ap * 11)), W * 0.09, sEnv * 0.6],
+            [W * (0.3 + 0.4 * Math.sin(ap * 13)), H * (0.3 + 0.4 * Math.cos(ap * 11)), W * 0.09, sEnv * 0.6]
           )
         } else {
           for (const a of ambient) {
@@ -441,7 +435,7 @@ export function StatueParticles({
             stop()
           }
         },
-        { rootMargin: '15% 0px' },
+        { rootMargin: '15% 0px' }
       )
       io.observe(head)
       const onVis = () => (document.hidden ? stop() : start())

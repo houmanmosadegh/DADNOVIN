@@ -2,11 +2,7 @@ import { Link } from 'react-router-dom'
 import { Reveal } from '../components/Reveal'
 import { SectionWave } from '../components/SectionWave'
 import { ServicesGallery } from '../components/ServicesGallery'
-import {
-  consultationPage,
-  services,
-  servicesPage,
-} from '../content/lawyers.fa.js'
+import { consultationPage, services, servicesPage } from '../content/lawyers.fa.js'
 import { useSeo } from '../utils/seo'
 import './pages.css'
 
@@ -55,26 +51,17 @@ export function ServicesPage() {
 
                 <footer className="svc__foot">
                   <div className="svc__related">
-                    <span className="svc__label svc__label--inline">
-                      {L.related}
-                    </span>
+                    <span className="svc__label svc__label--inline">{L.related}</span>
                     {service.related.map((slug) => {
                       const rel = services.find((s) => s.slug === slug)
                       return rel ? (
-                        <Link
-                          key={slug}
-                          className="svc__chip"
-                          to={`/services#${slug}`}
-                        >
+                        <Link key={slug} className="svc__chip" to={`/services#${slug}`}>
                           {rel.title}
                         </Link>
                       ) : null
                     })}
                   </div>
-                  <Link
-                    className="btn btn--ghost svc__cta"
-                    to={`/consultation?service=${service.slug}`}
-                  >
+                  <Link className="btn btn--ghost svc__cta" to={`/consultation?service=${service.slug}`}>
                     {servicesPage.detailCta}
                   </Link>
                 </footer>

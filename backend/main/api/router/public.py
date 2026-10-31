@@ -4,7 +4,7 @@ from typing import Annotated
 from xml.sax.saxutils import escape
 
 from fastapi import APIRouter, Depends, HTTPException, Response
-from sqlalchemy import func, select
+from sqlalchemy import and_, func, or_, select
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from ...core.config import get_settings
@@ -50,31 +50,50 @@ async def _marketing_flag(db: AsyncSession) -> bool:
     return bool(cfg.get("marketing_enabled", cfg.get("commission_enabled")))
 
 
+_PUBLISHED = or_(
+    Article.status == "published",
+    and_(
+        Article.status == "scheduled",
+        Article.scheduled_at.is_not(None),
+        Article.scheduled_at <= func.now(),
+    ),
+)
+
+
 @router.get("/articles")
 async def articles_index(db: DbDep) -> list[PublicArticleOut]:
-    """Published articles only — the public list page renders conditionally."""
+    """Published articles only — the public list page renders conditionally.
+    `scheduled` rows whose time has passed are served as published."""
     rows = (
-        await db.execute(
-            select(Article)
-            .where(Article.status == "published")
-            .order_by(Article.published_at.desc().nulls_last(), Article.id)
+        (
+            await db.execute(
+                select(Article)
+                .where(_PUBLISHED)
+                .order_by(Article.published_at.desc().nulls_last(), Article.id)
+            )
         )
-    ).scalars().all()
+        .scalars()
+        .all()
+    )
     return [_public_article(a) for a in rows]
 
 
 @router.get("/articles/{slug}")
 async def article_by_slug(slug: str, db: DbDep) -> PublicArticleDetailOut:
     row = (
-        await db.execute(select(Article).where(func.lower(Article.slug) == slug.lower()))
+        await db.execute(
+            select(Article).where(func.lower(Article.slug) == slug.lower(), _PUBLISHED)
+        )
     ).scalar_one_or_none()
-    if row is None or row.status != "published":
+    if row is None:
         raise HTTPException(404, {"code": "not_found", "message": "مقاله یافت نشد."})
     return PublicArticleDetailOut(
         **_public_article(row).model_dump(),
         body=row.body,
         seo_title=row.seo_title,
         seo_description=row.seo_description,
+        canonical=row.canonical,
+        author_bio=row.author_bio,
     )
 
 
@@ -88,9 +107,7 @@ async def pages_index(db: DbDep) -> list[PublicPageOut]:
 async def page_by_slug(slug: str, db: DbDep) -> PublicPageOut:
     page = await get_page_by_slug(db, slug)
     if page is None or not page.is_published:
-        raise HTTPException(
-            404, {"code": "not_found", "message": "صفحه یافت نشد."}
-        )
+        raise HTTPException(404, {"code": "not_found", "message": "صفحه یافت نشد."})
     return _public_page(page)
 
 
@@ -105,9 +122,7 @@ async def content_bundle(db: DbDep) -> dict:
     so the public site can hydrate everything at once."""
     return {
         "settings": await public_settings_map(db),
-        "pages": [
-            _public_page(p) for p in await list_pages(db) if p.is_published
-        ],
+        "pages": [_public_page(p) for p in await list_pages(db) if p.is_published],
         "lawyers": [
             public_lawyer(lw) for lw in await list_lawyers(db, only_visible=True)
         ],
@@ -139,7 +154,7 @@ async def sitemap(db: DbDep) -> Response:
     rows = (
         await db.execute(
             select(Article.slug, Article.published_at)
-            .where(Article.status == "published")
+            .where(_PUBLISHED)
             .order_by(Article.published_at.desc().nulls_last())
         )
     ).all()
@@ -166,15 +181,21 @@ async def sitemap(db: DbDep) -> Response:
 
 async def _has_published_articles(db: AsyncSession) -> bool:
     return (
-        await db.execute(
-            select(func.count(Article.id)).where(Article.status == "published")
-        )
+        await db.execute(select(func.count(Article.id)).where(_PUBLISHED))
     ).scalar_one() > 0
 
 
 def _public_article(a: Article) -> PublicArticleOut:
     return PublicArticleOut(
-        slug=a.slug, title=a.title, excerpt=a.excerpt, published_at=a.published_at
+        slug=a.slug,
+        title=a.title,
+        excerpt=a.excerpt,
+        category=a.category,
+        tags=a.tags or [],
+        author_name=a.author_name,
+        read_time_min=a.read_time_min,
+        featured_image=str(a.featured_image_id) if a.featured_image_id else "",
+        published_at=a.published_at or a.scheduled_at,
     )
 
 

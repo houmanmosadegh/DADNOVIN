@@ -5,7 +5,6 @@ settings marked private, hidden lawyers, or admin notes.
 """
 
 import hashlib
-import json
 
 from sqlalchemy import select
 from sqlalchemy.ext.asyncio import AsyncSession
@@ -13,6 +12,7 @@ from sqlalchemy.ext.asyncio import AsyncSession
 from ..models.ai import AIKnowledgeSource
 from ..models.content import Page, SiteSetting
 from ..models.lawyer import Lawyer
+from .render import content_to_text
 
 
 def _hash(source_type: str, ref_id: str, payload: str) -> str:
@@ -59,22 +59,25 @@ async def sync_knowledge(db: AsyncSession) -> int:
     brand = settings.get("brand", {})
     contact = settings.get("contact", {})
     if brand:
-        body = json.dumps(
+        body = content_to_text(
             {
                 "نام مجموعه": brand.get("name", "دادنوین"),
                 "نام رسمی": brand.get("legalName", ""),
                 "شهر": brand.get("city", ""),
                 "شعار": brand.get("tagline", ""),
                 "درباره": brand.get("description", ""),
-            },
-            ensure_ascii=False,
+            }
         )
         _, c = await _upsert(
-            db, source_type="brand", ref_id="brand", title="درباره مجموعه دادنوین", body=body
+            db,
+            source_type="brand",
+            ref_id="brand",
+            title="درباره مجموعه دادنوین",
+            body=body,
         )
         changed += c
     if contact:
-        body = json.dumps(
+        body = content_to_text(
             {
                 "تلفن‌ها": contact.get("phones", []),
                 "واتس‌اپ": contact.get("whatsapp", ""),
@@ -82,11 +85,14 @@ async def sync_knowledge(db: AsyncSession) -> int:
                 "آدرس": contact.get("address", ""),
                 "ساعات کاری": contact.get("hours", ""),
                 "شبکه‌های اجتماعی": contact.get("socials", {}),
-            },
-            ensure_ascii=False,
+            }
         )
         _, c = await _upsert(
-            db, source_type="contact", ref_id="contact", title="راه‌های تماس با دادنوین", body=body
+            db,
+            source_type="contact",
+            ref_id="contact",
+            title="راه‌های تماس با دادنوین",
+            body=body,
         )
         changed += c
 
@@ -97,7 +103,9 @@ async def sync_knowledge(db: AsyncSession) -> int:
         parts = [f"عنوان صفحه: {page.title}"]
         for s in sorted(page.sections, key=lambda x: x.sort_order):
             if s.is_enabled and s.content:
-                parts.append(f"[{s.key}] {json.dumps(s.content, ensure_ascii=False)}")
+                text = content_to_text(s.content)
+                if text:
+                    parts.append(text)
         _, c = await _upsert(
             db,
             source_type="page",
@@ -111,17 +119,14 @@ async def sync_knowledge(db: AsyncSession) -> int:
         await db.execute(select(Lawyer).where(Lawyer.is_visible.is_(True)))
     ).scalars()
     for lw in lawyers:
-        body = json.dumps(
+        body = content_to_text(
             {
                 "نام": lw.name,
                 "عنوان": lw.title,
                 "تخصص‌ها": lw.specialties,
                 "بیو": lw.bio,
-                "رزومه": {
-                    k: v for k, v in (lw.resume or {}).items() if k != "notes"
-                },
-            },
-            ensure_ascii=False,
+                "رزومه": {k: v for k, v in (lw.resume or {}).items() if k != "notes"},
+            }
         )
         _, c = await _upsert(
             db,

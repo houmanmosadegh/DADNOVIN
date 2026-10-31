@@ -25,7 +25,10 @@ async def get_current_session(
     if session is None:
         raise HTTPException(
             status_code=401,
-            detail={"code": "unauthenticated", "message": "نشست منقضی شده است؛ دوباره وارد شوید."},
+            detail={
+                "code": "unauthenticated",
+                "message": "نشست منقضی شده است؛ دوباره وارد شوید.",
+            },
         )
     user = await db.get(User, session.user_id)
     if user is None or not user.is_active:

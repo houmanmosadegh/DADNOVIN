@@ -6,9 +6,7 @@ from sqlalchemy.ext.asyncio import AsyncSession
 from ..models.lawyer import Lawyer
 
 
-async def list_lawyers(
-    db: AsyncSession, *, only_visible: bool = False
-) -> list[Lawyer]:
+async def list_lawyers(db: AsyncSession, *, only_visible: bool = False) -> list[Lawyer]:
     q = select(Lawyer).order_by(Lawyer.sort_order, Lawyer.created_at)
     if only_visible:
         q = q.where(Lawyer.is_visible.is_(True))

@@ -37,9 +37,7 @@ def _load() -> dict:
 
 
 async def _seed_roles(db: AsyncSession) -> None:
-    existing = {
-        r.name for r in (await db.execute(select(Role))).scalars()
-    }
+    existing = {r.name for r in (await db.execute(select(Role))).scalars()}
     for name, desc in ROLES:
         if name not in existing:
             db.add(Role(name=name, description=desc))
@@ -59,12 +57,9 @@ async def _seed_setting(
 
 REFERRAL_DEFAULTS = {
     "marketing_enabled": False,
-    "default_rate": 0,
+    "default_rate": 15,
     "cookie_days": 30,
-    "holdback_days": 0,
-    "monthly_cap": 0,
     "reapply_days": 14,
-    "attribution_model": "first_touch",
 }
 
 
@@ -136,11 +131,22 @@ def _page_sections(c: dict) -> dict[str, dict[str, dict]]:
                 "kind": "head",
                 "content": {
                     k: c["aboutPage"][k]
-                    for k in ("title", "lead", "tagline", "membersTitle", "trustTitle", "cardCta", "directLine")
+                    for k in (
+                        "title",
+                        "lead",
+                        "tagline",
+                        "membersTitle",
+                        "trustTitle",
+                        "cardCta",
+                        "directLine",
+                    )
                     if k in c["aboutPage"]
                 },
             },
-            "paragraphs": {"kind": "rich", "content": {"items": c["aboutPage"]["paragraphs"]}},
+            "paragraphs": {
+                "kind": "rich",
+                "content": {"items": c["aboutPage"]["paragraphs"]},
+            },
             "trust": {"kind": "list", "content": {"items": c["aboutPage"]["trust"]}},
         },
         "services": {
@@ -158,12 +164,18 @@ def _page_sections(c: dict) -> dict[str, dict[str, dict]]:
             "for_whom": {"kind": "list", "content": cp["forWhom"]},
             "receive": {"kind": "list", "content": cp["receive"]},
             "prepare": {"kind": "list", "content": cp["prepare"]},
-            "faqs": {"kind": "faq", "content": {"title": cp["faqsTitle"], "items": cp["faqs"]}},
+            "faqs": {
+                "kind": "faq",
+                "content": {"title": cp["faqsTitle"], "items": cp["faqs"]},
+            },
             "steps": {"kind": "steps", "content": {"items": cp["steps"]}},
             "note": {"kind": "text", "content": {"text": cp["note"]}},
         },
         "contact": {
-            "head": {"kind": "head", "content": {k: ctp[k] for k in ctp if k != "form"}},
+            "head": {
+                "kind": "head",
+                "content": {k: ctp[k] for k in ctp if k != "form"},
+            },
         },
     }
 

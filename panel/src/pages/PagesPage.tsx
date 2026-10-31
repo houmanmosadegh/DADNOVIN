@@ -17,18 +17,20 @@ export default function PagesPage() {
     <div className="space-y-5">
       <div>
         <h1 className="text-lg font-semibold">مدیریت صفحات سایت</h1>
-        <p className="mt-0.5 text-[13px] text-ink-1/60">
-          ویرایش متن‌ها، بخش‌ها و متادیتای سئوی هر صفحه
-        </p>
+        <p className="mt-0.5 text-[13px] text-ink-1/60">ویرایش متن‌ها، بخش‌ها و متادیتای سئوی هر صفحه</p>
       </div>
       <Table head={["صفحه", "نامک", "بخش‌ها", "وضعیت", "عملیات"]}>
         {data.map((p) => (
           <tr key={p.id} className="hover:bg-sand-2">
             <td className="px-4 py-3 font-medium">{p.title}</td>
-            <td className="px-4 py-3 text-ink-1/60" dir="ltr">/{p.slug === "home" ? "" : p.slug}</td>
+            <td className="px-4 py-3 text-ink-1/60" dir="ltr">
+              /{p.slug === "home" ? "" : p.slug}
+            </td>
             <td className="px-4 py-3">{p.sections.length.toLocaleString("fa-IR")}</td>
             <td className="px-4 py-3">
-              <span className={`rounded-full px-2.5 py-0.5 text-[12px] ${p.is_published ? "bg-emerald-500/100/10 text-emerald-400" : "bg-sand-1 text-ink-1/60"}`}>
+              <span
+                className={`rounded-full px-2.5 py-0.5 text-[12px] ${p.is_published ? "bg-emerald-500/100/10 text-emerald-400" : "bg-sand-1 text-ink-1/60"}`}
+              >
                 {p.is_published ? "منتشرشده" : "پیش‌نویس"}
               </span>
             </td>

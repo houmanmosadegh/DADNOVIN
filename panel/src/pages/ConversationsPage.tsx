@@ -32,10 +32,10 @@ export default function ConversationsPage() {
                   className="flex w-full items-center gap-3 px-4 py-3 text-right text-sm"
                   onClick={() => setOpenId(openId === c.id ? null : c.id)}
                 >
-                  <span className="font-medium" dir="ltr">{c.session_key}</span>
-                  <span className="text-[12px] text-ink-1/50">
-                    {c.message_count.toLocaleString("fa-IR")} پیام
+                  <span className="font-medium" dir="ltr">
+                    {c.session_key}
                   </span>
+                  <span className="text-[12px] text-ink-1/50">{c.message_count.toLocaleString("fa-IR")} پیام</span>
                   <span className="mr-auto text-[12px] text-ink-1/50">{fmtDate(c.created_at)}</span>
                 </button>
                 {openId === c.id && <ConversationDetail id={c.id} />}
@@ -54,7 +54,12 @@ function ConversationDetail({ id }: { id: string }) {
     queryKey: ["ai-conversation", id],
     queryFn: () => api.get<ConversationOut>(`/admin/ai/conversations/${id}`),
   });
-  if (!data) return <div className="border-t border-sand-1 p-4"><PageSkeleton /></div>;
+  if (!data)
+    return (
+      <div className="border-t border-sand-1 p-4">
+        <PageSkeleton />
+      </div>
+    );
   return (
     <div className="space-y-2 border-t border-sand-1 p-4">
       {data.messages.map((m, i) => (

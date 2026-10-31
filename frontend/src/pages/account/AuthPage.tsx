@@ -4,14 +4,14 @@
 import { useEffect, useMemo, useRef, useState } from 'react'
 import { useLocation, useNavigate, useSearchParams } from 'react-router-dom'
 import { AlertCircle, ArrowLeft, CheckCircle2, Eye, EyeOff, Loader2 } from 'lucide-react'
-import { api } from '../../services/api'
+import { api, apiAsset } from '../../services/api'
 import { useAuth } from '../../services/auth'
 import { readRefCookie } from '../../services/referral'
+import { brand } from '../../content/lawyers.fa.js'
 
 type Mode = 'login' | 'register' | 'forgot' | 'reset'
 
-const faToEn = (s: string) =>
-  s.replace(/[۰-۹]/g, (d) => String('۰۱۲۳۴۵۶۷۸۹'.indexOf(d)))
+const faToEn = (s: string) => s.replace(/[۰-۹]/g, (d) => String('۰۱۲۳۴۵۶۷۸۹'.indexOf(d)))
 
 const STAFF = ['super_admin', 'admin', 'editor', 'support']
 
@@ -36,8 +36,14 @@ export default function AuthPage() {
   const [showRef, setShowRef] = useState(!!readRefCookie())
   const [touched, setTouched] = useState<Record<string, boolean>>({})
   const [f, setF] = useState({
-    name: '', username: '', phone: '', password: '', ref: readRefCookie(),
-    token: '', newPassword: '', otp: '',
+    name: '',
+    username: '',
+    phone: '',
+    password: '',
+    ref: readRefCookie(),
+    token: '',
+    newPassword: '',
+    otp: '',
   })
   const firstRef = useRef<HTMLInputElement>(null)
 
@@ -72,11 +78,7 @@ export default function AuthPage() {
   const next = params.get('next')
   // مسیر محافظت‌دار فعلی هم به‌عنوان مقصد برگشت حساب می‌شود
   const safeNext =
-    next && next.startsWith('/') && !next.startsWith('//')
-      ? next
-      : pathname !== '/panel'
-        ? pathname
-        : null
+    next && next.startsWith('/') && !next.startsWith('//') ? next : pathname !== '/panel' ? pathname : null
 
   const set = (k: keyof typeof f) => (e: React.ChangeEvent<HTMLInputElement>) =>
     setF((p) => ({ ...p, [k]: e.target.type === 'checkbox' ? e.target.checked : e.target.value }))
@@ -108,8 +110,7 @@ export default function AuthPage() {
         out.phone = 'شماره موبایل معتبر نیست (مثل 0912…).'
       }
     }
-    if (mode === 'register' && touched.name && f.name.trim().length < 3)
-      out.name = 'نام کامل را وارد کنید.'
+    if (mode === 'register' && touched.name && f.name.trim().length < 3) out.name = 'نام کامل را وارد کنید.'
     if (mode === 'register' && touched.username) {
       if (!/^[a-z0-9_]{3,24}$/.test(f.username.trim().toLowerCase()))
         out.username = 'حروف لاتین کوچک، عدد یا _ — ۳ تا ۲۴ کاراکتر.'
@@ -137,7 +138,7 @@ export default function AuthPage() {
             password: f.password,
             ref_code: f.ref.trim().toUpperCase(),
             otp: f.otp.trim(),
-          }),
+          })
         )
       } else if (mode === 'forgot') {
         const r = await api.post<{ message: string }>('/account-auth/forgot', { phone })
@@ -164,14 +165,21 @@ export default function AuthPage() {
   return (
     <div className="authp">
       <div className="authp__card">
-        <a className="authp__back" href="/"><ArrowLeft size={14} /> بازگشت به سایت</a>
+        <a className="authp__back" href="/">
+          <ArrowLeft size={14} /> بازگشت به سایت
+        </a>
 
         <header className="authp__head">
-          <img className="authp__logo" src="/images/logo-mark.png" alt="" width={52} height={41} decoding="async" />
+          <img
+            className="authp__logo"
+            src={apiAsset(brand.logoMark)}
+            alt=""
+            width={52}
+            height={41}
+            decoding="async"
+          />
           <h1 className="authp__name">دادنوین</h1>
-          <p className="authp__sub">
-            {mode === 'register' ? 'ساخت حساب کاربری' : 'به پنل کاربری خوش آمدید'}
-          </p>
+          <p className="authp__sub">{mode === 'register' ? 'ساخت حساب کاربری' : 'به پنل کاربری خوش آمدید'}</p>
         </header>
 
         {inTabs && (
@@ -192,8 +200,16 @@ export default function AuthPage() {
         {mode === 'forgot' && <h2 className="authp__title">بازیابی رمز عبور</h2>}
         {mode === 'reset' && <h2 className="authp__title">تعیین رمز جدید</h2>}
 
-        {notice && <p className="authp__notice" role="status"><CheckCircle2 size={15} /> {notice}</p>}
-        {err && <p className="authp__err" role="alert"><AlertCircle size={15} /> {err}</p>}
+        {notice && (
+          <p className="authp__notice" role="status">
+            <CheckCircle2 size={15} /> {notice}
+          </p>
+        )}
+        {err && (
+          <p className="authp__err" role="alert">
+            <AlertCircle size={15} /> {err}
+          </p>
+        )}
 
         <form key={mode} onSubmit={submit} className="authp__form" noValidate>
           {mode === 'register' && (
@@ -221,7 +237,10 @@ export default function AuthPage() {
                   aria-invalid={!!fieldErr.username}
                   aria-describedby="uname-hint"
                 />
-                <em id="uname-hint" className={`authp__hint${uState === 'ok' ? ' authp__hint--ok' : ''}${fieldErr.username ? ' authp__hint--err' : ''}`}>
+                <em
+                  id="uname-hint"
+                  className={`authp__hint${uState === 'ok' ? ' authp__hint--ok' : ''}${fieldErr.username ? ' authp__hint--err' : ''}`}
+                >
                   {uState === 'checking' && <Loader2 size={11} className="authp__spin-inline" />}
                   {fieldErr.username ??
                     (uState === 'checking'
@@ -319,30 +338,44 @@ export default function AuthPage() {
             </div>
           )}
 
-          {mode === 'register' && (
-            showRef ? (
+          {mode === 'register' &&
+            (showRef ? (
               <div className="authp__field">
-                <input
-                  dir="ltr"
-                  placeholder="کد معرف"
-                  value={f.ref}
-                  onChange={set('ref')}
-                />
+                <input dir="ltr" placeholder="کد معرف" value={f.ref} onChange={set('ref')} />
               </div>
             ) : (
-              <button type="button" className="authp__link authp__link--start" onClick={() => setShowRef(true)}>
+              <button
+                type="button"
+                className="authp__link authp__link--start"
+                onClick={() => setShowRef(true)}
+              >
                 کد معرف دارم
               </button>
-            )
-          )}
+            ))}
 
           {mode === 'reset' && (
             <>
               <div className="authp__field">
-                <input ref={firstRef} dir="ltr" placeholder="کد بازیابی ارسال‌شده" value={f.token} onChange={set('token')} required />
+                <input
+                  ref={firstRef}
+                  dir="ltr"
+                  placeholder="کد بازیابی ارسال‌شده"
+                  value={f.token}
+                  onChange={set('token')}
+                  required
+                />
               </div>
               <div className="authp__field">
-                <input dir="ltr" type="password" autoComplete="new-password" placeholder="رمز جدید (حداقل ۸ کاراکتر)" value={f.newPassword} onChange={set('newPassword')} required minLength={8} />
+                <input
+                  dir="ltr"
+                  type="password"
+                  autoComplete="new-password"
+                  placeholder="رمز جدید (حداقل ۸ کاراکتر)"
+                  value={f.newPassword}
+                  onChange={set('newPassword')}
+                  required
+                  minLength={8}
+                />
               </div>
             </>
           )}

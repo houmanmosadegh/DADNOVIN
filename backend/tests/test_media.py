@@ -49,7 +49,13 @@ async def test_rejects_fake_png(admin_client):
 async def test_rejects_executable(admin_client):
     resp = await admin_client.post(
         "/api/v1/admin/media",
-        files={"file": ("run.exe", b"MZ\x90\x00\x03\x00\x00\x00", "application/octet-stream")},
+        files={
+            "file": (
+                "run.exe",
+                b"MZ\x90\x00\x03\x00\x00\x00",
+                "application/octet-stream",
+            )
+        },
     )
     assert resp.status_code == 415
 

@@ -338,8 +338,25 @@ export interface ArticleOut {
   body: string;
   seo_title: string;
   seo_description: string;
+  canonical: string;
+  category: string;
+  tags: string[];
+  author_name: string;
+  author_bio: string;
+  featured_image_id: string | null;
+  read_time_min: number;
   status: string;
+  scheduled_at: string | null;
   published_at: string | null;
   created_at: string;
   updated_at: string;
+}
+
+export interface ArticleRevision {
+  id: string;
+  created_at: string;
+  created_by: string | null;
+  note: string;
+  title: string;
+  status: string;
 }

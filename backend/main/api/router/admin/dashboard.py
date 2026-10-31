@@ -24,9 +24,7 @@ _CLOSED_ALL = ("completed", "resolved", "closed", "cancelled")
 
 
 async def _count(db: AsyncSession, model, *where) -> int:
-    return (
-        await db.execute(select(func.count(model.id)).where(*where))
-    ).scalar_one()
+    return (await db.execute(select(func.count(model.id)).where(*where))).scalar_one()
 
 
 @router.get("/overview")
@@ -45,36 +43,50 @@ async def overview(user: AdminDep, db: DbDep) -> dict:
         "contacts_unanswered": await _count(
             db, ContactRequest, ContactRequest.status == "new"
         ),
-        "tickets_open": await _count(
-            db, Ticket, Ticket.status.in_(_OPEN_TICKET)
-        ),
+        "tickets_open": await _count(db, Ticket, Ticket.status.in_(_OPEN_TICKET)),
         "awaiting_followup": await _count(
-            db, ConsultationRequest,
+            db,
+            ConsultationRequest,
             ConsultationRequest.status.in_(("awaiting_call", "followed_up")),
-        ) + await _count(db, Ticket, Ticket.status == "waiting_reply"),
+        )
+        + await _count(db, Ticket, Ticket.status == "waiting_reply"),
         "consultations_completed": await _count(
             db, ConsultationRequest, ConsultationRequest.status == "completed"
         ),
         "overdue": await _count(
-            db, ConsultationRequest,
+            db,
+            ConsultationRequest,
             ConsultationRequest.sla_due_at < now,
             ConsultationRequest.status.not_in(_CLOSED_ALL),
-        ) + await _count(
-            db, Ticket, Ticket.sla_due_at < now,
+        )
+        + await _count(
+            db,
+            Ticket,
+            Ticket.sla_due_at < now,
             Ticket.status.not_in(_CLOSED_ALL),
-        ) + await _count(
-            db, ContactRequest, ContactRequest.sla_due_at < now,
+        )
+        + await _count(
+            db,
+            ContactRequest,
+            ContactRequest.sla_due_at < now,
             ContactRequest.status.not_in(_CLOSED_ALL),
         ),
         "mine_open": await _count(
-            db, ConsultationRequest,
+            db,
+            ConsultationRequest,
             ConsultationRequest.assigned_to == user.id,
             ConsultationRequest.status.not_in(_CLOSED_ALL),
-        ) + await _count(
-            db, Ticket, Ticket.assigned_to == user.id,
+        )
+        + await _count(
+            db,
+            Ticket,
+            Ticket.assigned_to == user.id,
             Ticket.status.not_in(_CLOSED_ALL),
-        ) + await _count(
-            db, ContactRequest, ContactRequest.assigned_to == user.id,
+        )
+        + await _count(
+            db,
+            ContactRequest,
+            ContactRequest.assigned_to == user.id,
             ContactRequest.status.not_in(_CLOSED_ALL),
         ),
         "lawyers_visible": await _count(db, Lawyer, Lawyer.is_visible.is_(True)),
@@ -103,8 +115,11 @@ async def overview(user: AdminDep, db: DbDep) -> dict:
 
     recent_consultations = [
         {
-            "id": str(r.id), "name": r.full_name, "phone": r.phone,
-            "subject": r.topic or r.service_slug, "status": r.status,
+            "id": str(r.id),
+            "name": r.full_name,
+            "phone": r.phone,
+            "subject": r.topic or r.service_slug,
+            "status": r.status,
             "created_at": r.created_at.isoformat(),
             "tracking_code": r.tracking_code,
         }
@@ -114,13 +129,19 @@ async def overview(user: AdminDep, db: DbDep) -> dict:
                 .order_by(ConsultationRequest.created_at.desc())
                 .limit(8)
             )
-        ).scalars().all()
+        )
+        .scalars()
+        .all()
     ]
 
     attention_tickets = [
         {
-            "id": str(t.id), "ticket_number": t.ticket_number, "subject": t.subject,
-            "client": t.requester_name, "priority": t.priority, "status": t.status,
+            "id": str(t.id),
+            "ticket_number": t.ticket_number,
+            "subject": t.subject,
+            "client": t.requester_name,
+            "priority": t.priority,
+            "status": t.status,
             "sla_due_at": t.sla_due_at.isoformat() if t.sla_due_at else None,
             "updated_at": t.updated_at.isoformat(),
         }
@@ -133,13 +154,18 @@ async def overview(user: AdminDep, db: DbDep) -> dict:
                 )
                 .limit(8)
             )
-        ).scalars().all()
+        )
+        .scalars()
+        .all()
     ]
 
     recent_contacts = [
         {
-            "id": str(c.id), "name": c.full_name, "phone": c.phone,
-            "status": c.status, "tracking_code": c.tracking_code,
+            "id": str(c.id),
+            "name": c.full_name,
+            "phone": c.phone,
+            "status": c.status,
+            "tracking_code": c.tracking_code,
             "created_at": c.created_at.isoformat(),
         }
         for c in (
@@ -148,22 +174,27 @@ async def overview(user: AdminDep, db: DbDep) -> dict:
                 .order_by(ContactRequest.created_at.desc())
                 .limit(6)
             )
-        ).scalars().all()
+        )
+        .scalars()
+        .all()
     ]
 
     activity = [
         {
-            "type": e.request_type, "event": e.event_type,
-            "actor": e.actor_username, "payload": e.payload,
-            "at": e.created_at.isoformat(), "request_id": str(e.request_id),
+            "type": e.request_type,
+            "event": e.event_type,
+            "actor": e.actor_username,
+            "payload": e.payload,
+            "at": e.created_at.isoformat(),
+            "request_id": str(e.request_id),
         }
         for e in (
             await db.execute(
-                select(RequestEvent)
-                .order_by(RequestEvent.created_at.desc())
-                .limit(12)
+                select(RequestEvent).order_by(RequestEvent.created_at.desc()).limit(12)
             )
-        ).scalars().all()
+        )
+        .scalars()
+        .all()
     ]
 
     return {
@@ -184,7 +215,9 @@ async def trends(
     """Daily consultation+contact+ticket volume for the last N days."""
     since = datetime.now(UTC) - timedelta(days=days)
     series: dict[str, dict[str, int]] = {
-        "consultation": {}, "ticket": {}, "contact": {},
+        "consultation": {},
+        "ticket": {},
+        "contact": {},
     }
     for model, key in (
         (ConsultationRequest, "consultation"),

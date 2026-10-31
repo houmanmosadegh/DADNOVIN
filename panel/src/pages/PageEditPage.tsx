@@ -11,12 +11,24 @@ import { Field, PageSkeleton, fmtDate, useToast } from "../components/ui";
 type Json = Record<string, unknown>;
 
 const SECTION_LABELS: Record<string, string> = {
-  head: "سرصفحه", hero: "هیرو", stats: "آمار", about: "معرفی",
-  services_head: "تیتر خدمات", services: "خدمات", items: "موارد",
-  picture: "تصویر", lawyers_head: "تیتر وکلا", cta_band: "نوار دعوت",
-  paragraphs: "پاراگراف‌ها", trust: "اعتماد", for_whom: "برای چه کسانی",
-  receive: "چه دریافت می‌کنید", prepare: "آماده‌سازی", faqs: "پرسش‌های متداول",
-  steps: "مراحل", note: "یادداشت",
+  head: "سرصفحه",
+  hero: "هیرو",
+  stats: "آمار",
+  about: "معرفی",
+  services_head: "تیتر خدمات",
+  services: "خدمات",
+  items: "موارد",
+  picture: "تصویر",
+  lawyers_head: "تیتر وکلا",
+  cta_band: "نوار دعوت",
+  paragraphs: "پاراگراف‌ها",
+  trust: "اعتماد",
+  for_whom: "برای چه کسانی",
+  receive: "چه دریافت می‌کنید",
+  prepare: "آماده‌سازی",
+  faqs: "پرسش‌های متداول",
+  steps: "مراحل",
+  note: "یادداشت",
 };
 
 export default function PageEditPage() {
@@ -39,11 +51,7 @@ export default function PageEditPage() {
         seo_description: page.seo_description,
         is_published: page.is_published,
       });
-      setDrafts(
-        Object.fromEntries(
-          page.sections.map((s) => [s.id, structuredClone(s.content)]),
-        ),
-      );
+      setDrafts(Object.fromEntries(page.sections.map((s) => [s.id, structuredClone(s.content)])));
     }
   }, [page]);
 
@@ -81,15 +89,28 @@ export default function PageEditPage() {
       <div className="card space-y-4 p-5">
         <h2 className="text-sm font-semibold">اطلاعات صفحه و سئو</h2>
         <div className="grid gap-4 sm:grid-cols-2">
-          <Field label="عنوان صفحه"><input value={meta.title} onChange={(e) => setMeta({ ...meta, title: e.target.value })} /></Field>
-          <Field label="عنوان سئو"><input value={meta.seo_title} onChange={(e) => setMeta({ ...meta, seo_title: e.target.value })} /></Field>
+          <Field label="عنوان صفحه">
+            <input value={meta.title} onChange={(e) => setMeta({ ...meta, title: e.target.value })} />
+          </Field>
+          <Field label="عنوان سئو">
+            <input value={meta.seo_title} onChange={(e) => setMeta({ ...meta, seo_title: e.target.value })} />
+          </Field>
         </div>
         <Field label="توضیحات سئو">
-          <textarea rows={2} value={meta.seo_description} onChange={(e) => setMeta({ ...meta, seo_description: e.target.value })} />
+          <textarea
+            rows={2}
+            value={meta.seo_description}
+            onChange={(e) => setMeta({ ...meta, seo_description: e.target.value })}
+          />
         </Field>
         <div className="flex items-center justify-between">
           <label className="flex items-center gap-2 text-sm">
-            <input type="checkbox" className="!w-4" checked={meta.is_published} onChange={(e) => setMeta({ ...meta, is_published: e.target.checked })} />
+            <input
+              type="checkbox"
+              className="!w-4"
+              checked={meta.is_published}
+              onChange={(e) => setMeta({ ...meta, is_published: e.target.checked })}
+            />
             منتشرشده (قابل مشاهده در سایت)
           </label>
           <button className="btn-primary btn-sm" onClick={() => saveMeta.mutate()} disabled={saveMeta.isPending}>
@@ -104,10 +125,10 @@ export default function PageEditPage() {
           <div key={s.id} className="card p-5">
             <div className="mb-3 flex items-center justify-between">
               <div>
-                <span className="text-sm font-semibold">
-                  {SECTION_LABELS[s.key] ?? s.key}
+                <span className="text-sm font-semibold">{SECTION_LABELS[s.key] ?? s.key}</span>
+                <span className="mr-2 rounded bg-sand-0 px-2 py-0.5 text-[11px] text-ink-2" dir="ltr">
+                  {s.key}
                 </span>
-                <span className="mr-2 rounded bg-sand-0 px-2 py-0.5 text-[11px] text-ink-2" dir="ltr">{s.key}</span>
               </div>
               <div className="flex items-center gap-3">
                 <label className="flex items-center gap-1.5 text-[12px] text-ink-2">
@@ -129,10 +150,7 @@ export default function PageEditPage() {
               </div>
             </div>
             {drafts[s.id] !== undefined && (
-              <ContentEditor
-                value={drafts[s.id]}
-                onChange={(v) => setDrafts((p) => ({ ...p, [s.id]: v }))}
-              />
+              <ContentEditor value={drafts[s.id]} onChange={(v) => setDrafts((p) => ({ ...p, [s.id]: v }))} />
             )}
             <SectionHistory sectionId={s.id} />
           </div>
@@ -145,7 +163,9 @@ export default function PageEditPage() {
 // ---------- structured content editor ----------
 
 const isScalarObj = (v: unknown): v is Json =>
-  typeof v === "object" && v !== null && !Array.isArray(v) &&
+  typeof v === "object" &&
+  v !== null &&
+  !Array.isArray(v) &&
   Object.values(v).every((x) => x === null || ["string", "number", "boolean"].includes(typeof x));
 
 function ContentEditor({ value, onChange }: { value: Json; onChange: (v: Json) => void }) {
@@ -153,12 +173,7 @@ function ContentEditor({ value, onChange }: { value: Json; onChange: (v: Json) =
   return (
     <div className="space-y-3">
       {entries.map(([k, v]) => (
-        <ValueEditor
-          key={k}
-          name={k}
-          value={v}
-          onChange={(nv) => onChange({ ...value, [k]: nv })}
-        />
+        <ValueEditor key={k} name={k} value={v} onChange={(nv) => onChange({ ...value, [k]: nv })} />
       ))}
       {entries.length === 0 && <p className="text-[12px] text-ink-3">این بخش محتوایی ندارد.</p>}
     </div>
@@ -170,7 +185,9 @@ function ValueEditor({ name, value, onChange }: { name: string; value: unknown; 
   if (Array.isArray(value) && value.every((x) => typeof x === "string")) {
     return (
       <div>
-        <p className="mb-1.5 text-[12px] font-medium text-ink-2" dir="ltr">{name}</p>
+        <p className="mb-1.5 text-[12px] font-medium text-ink-2" dir="ltr">
+          {name}
+        </p>
         <div className="space-y-1.5">
           {value.map((it, i) => (
             <div key={i} className="flex gap-2">
@@ -179,7 +196,11 @@ function ValueEditor({ name, value, onChange }: { name: string; value: unknown; 
                 value={it}
                 onChange={(e) => onChange(value.map((x, j) => (j === i ? e.target.value : x)))}
               />
-              <button className="rounded-lg p-1.5 text-ink-3 hover:text-red-400" onClick={() => onChange(value.filter((_, j) => j !== i))} aria-label="حذف">
+              <button
+                className="rounded-lg p-1.5 text-ink-3 hover:text-red-400"
+                onClick={() => onChange(value.filter((_, j) => j !== i))}
+                aria-label="حذف"
+              >
                 <Trash2 size={14} />
               </button>
             </div>
@@ -196,27 +217,33 @@ function ValueEditor({ name, value, onChange }: { name: string; value: unknown; 
   if (Array.isArray(value) && value.every(isScalarObj)) {
     return (
       <div>
-        <p className="mb-1.5 text-[12px] font-medium text-ink-2" dir="ltr">{name}</p>
+        <p className="mb-1.5 text-[12px] font-medium text-ink-2" dir="ltr">
+          {name}
+        </p>
         <div className="space-y-2">
           {value.map((it, i) => (
             <div key={i} className="rounded-lg border border-sand-2 p-3">
               <div className="mb-2 flex items-center justify-between">
                 <span className="text-[11px] text-ink-3">مورد {(i + 1).toLocaleString("fa-IR")}</span>
-                <button className="rounded p-1 text-ink-3 hover:text-red-400" onClick={() => onChange(value.filter((_, j) => j !== i))} aria-label="حذف">
+                <button
+                  className="rounded p-1 text-ink-3 hover:text-red-400"
+                  onClick={() => onChange(value.filter((_, j) => j !== i))}
+                  aria-label="حذف"
+                >
                   <Trash2 size={13} />
                 </button>
               </div>
               <div className="grid gap-2 sm:grid-cols-2">
                 {Object.entries(it).map(([k2, v2]) => (
                   <div key={k2} className={String(v2).length > 40 ? "sm:col-span-2" : ""}>
-                    <label className="!mb-1 text-[11px]" dir="ltr">{k2}</label>
+                    <label className="!mb-1 text-[11px]" dir="ltr">
+                      {k2}
+                    </label>
                     <input
                       className="!py-1.5 text-[13px]"
                       dir={typeof v2 === "string" && /[a-zA-Z]/.test(v2) ? "ltr" : "rtl"}
                       value={String(v2 ?? "")}
-                      onChange={(e) =>
-                        onChange(value.map((x, j) => (j === i ? { ...x, [k2]: e.target.value } : x)))
-                      }
+                      onChange={(e) => onChange(value.map((x, j) => (j === i ? { ...x, [k2]: e.target.value } : x)))}
                     />
                   </div>
                 ))}
@@ -245,7 +272,11 @@ function ValueEditor({ name, value, onChange }: { name: string; value: unknown; 
         {long ? (
           <textarea rows={3} value={value} onChange={(e) => onChange(e.target.value)} />
         ) : (
-          <input dir={/[a-zA-Z]{4}/.test(value) ? "ltr" : "rtl"} value={value} onChange={(e) => onChange(e.target.value)} />
+          <input
+            dir={/[a-zA-Z]{4}/.test(value) ? "ltr" : "rtl"}
+            value={value}
+            onChange={(e) => onChange(e.target.value)}
+          />
         )}
       </Field>
     );
@@ -275,7 +306,9 @@ function JsonField({ name, value, onChange }: { name: string; value: unknown; on
   const [err, setErr] = useState("");
   return (
     <div>
-      <p className="mb-1.5 text-[12px] font-medium text-ink-2" dir="ltr">{name} (JSON)</p>
+      <p className="mb-1.5 text-[12px] font-medium text-ink-2" dir="ltr">
+        {name} (JSON)
+      </p>
       <textarea
         dir="ltr"
         rows={Math.min(12, text.split("\n").length + 1)}
@@ -301,9 +334,7 @@ function SectionHistory({ sectionId }: { sectionId: string }) {
   const { data } = useQuery({
     queryKey: ["revisions", "section", sectionId],
     queryFn: () =>
-      api.get<{ id: string; created_at: string; note: string }[]>(
-        `/admin/pages/revisions/section/${sectionId}`,
-      ),
+      api.get<{ id: string; created_at: string; note: string }[]>(`/admin/pages/revisions/section/${sectionId}`),
     enabled: open,
   });
   return (

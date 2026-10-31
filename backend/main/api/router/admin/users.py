@@ -21,16 +21,13 @@ DbDep = Annotated[AsyncSession, Depends(get_db)]
 async def _roles_by_ids(db: AsyncSession, ids: list[int]) -> list[Role]:
     if not ids:
         return []
-    return list(
-        (await db.execute(select(Role).where(Role.id.in_(ids)))).scalars()
-    )
+    return list((await db.execute(select(Role).where(Role.id.in_(ids)))).scalars())
 
 
 @router.get("/roles")
 async def roles(_: SuperAdminDep, db: DbDep) -> list[RoleOut]:
     return [
-        RoleOut.model_validate(r)
-        for r in (await db.execute(select(Role))).scalars()
+        RoleOut.model_validate(r) for r in (await db.execute(select(Role))).scalars()
     ]
 
 
@@ -53,7 +50,8 @@ async def create_user(
     ).scalar_one()
     if exists:
         raise HTTPException(
-            409, {"code": "username_taken", "message": "این نام کاربری قبلاً ثبت شده است."}
+            409,
+            {"code": "username_taken", "message": "این نام کاربری قبلاً ثبت شده است."},
         )
     roles = await _roles_by_ids(db, payload.role_ids)
     user = User(
@@ -65,8 +63,15 @@ async def create_user(
     )
     db.add(user)
     await db.flush()
-    await audit(db, actor=actor, action="user.create", entity="user", entity_id=user.id,
-                detail={"username": payload.username}, request=request)
+    await audit(
+        db,
+        actor=actor,
+        action="user.create",
+        entity="user",
+        entity_id=user.id,
+        detail={"username": payload.username},
+        request=request,
+    )
     await db.commit()
     return UserOut.model_validate(user)
 
@@ -85,19 +90,23 @@ async def update_user(
     data = payload.model_dump(exclude_unset=True)
 
     # guard: never deactivate or demote the last active super_admin
-    demoting = (
-        user.id == actor.id
-        and (
-            ("is_active" in data and not data["is_active"])
-            or ("role_ids" in data and not any(
-                r.name == "super_admin" for r in await _roles_by_ids(db, data["role_ids"])
-            ))
+    demoting = user.id == actor.id and (
+        ("is_active" in data and not data["is_active"])
+        or (
+            "role_ids" in data
+            and not any(
+                r.name == "super_admin"
+                for r in await _roles_by_ids(db, data["role_ids"])
+            )
         )
     )
     if demoting:
         raise HTTPException(
             409,
-            {"code": "self_lockout", "message": "نمی‌توانید دسترسی مدیر ارشد خودتان را حذف کنید."},
+            {
+                "code": "self_lockout",
+                "message": "نمی‌توانید دسترسی مدیر ارشد خودتان را حذف کنید.",
+            },
         )
 
     if "full_name" in data:
@@ -111,7 +120,14 @@ async def update_user(
         user.password_hash = hash_password(data["password"])
     if "role_ids" in data:
         user.roles = await _roles_by_ids(db, data["role_ids"])
-    await audit(db, actor=actor, action="user.update", entity="user", entity_id=user.id,
-                detail={k: v for k, v in data.items() if k != "password"}, request=request)
+    await audit(
+        db,
+        actor=actor,
+        action="user.update",
+        entity="user",
+        entity_id=user.id,
+        detail={k: v for k, v in data.items() if k != "password"},
+        request=request,
+    )
     await db.commit()
     return UserOut.model_validate(user)

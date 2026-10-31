@@ -76,6 +76,14 @@ function applySettings(s: PublicSettings) {
     const rest = { ...s.brand }
     delete rest.siteUrl // siteUrl is a const binding — stays code-level
     mergeObj(c.brand as unknown as Dict, rest)
+    // replaceable logo → favicon follows the CMS logo too
+    const mark = (c.brand as unknown as Dict).logoMark
+    if (typeof mark === 'string' && mark.startsWith('/api/')) {
+      const link = document.querySelector<HTMLLinkElement>('link[rel="icon"][type="image/png"]')
+      if (link) link.href = mark
+      const apple = document.querySelector<HTMLLinkElement>('link[rel="apple-touch-icon"]')
+      if (apple) apple.href = mark
+    }
   }
   if (s.contact) {
     const contact = c.contact as unknown as Dict
@@ -98,8 +106,7 @@ function applySettings(s: PublicSettings) {
   if (s.ai) {
     siteFlags.aiEnabled = s.ai.enabled !== false
     if (typeof s.ai.welcome === 'string') c.aiConsultant.chat.welcome = s.ai.welcome
-    if (typeof s.ai.placeholder === 'string')
-      c.aiConsultant.chat.placeholder = s.ai.placeholder
+    if (typeof s.ai.placeholder === 'string') c.aiConsultant.chat.placeholder = s.ai.placeholder
   }
   if (typeof s.meta?.has_articles === 'boolean') {
     siteFlags.hasArticles = s.meta.has_articles
@@ -118,10 +125,8 @@ function applyPages(pages: PublicPage[]) {
   if (home.has('about')) mergeObj(h.about as Dict, home.get('about')!)
   if (home.has('services_head')) mergeObj(h.services as Dict, home.get('services_head')!)
   if (home.has('picture')) mergeObj(h.picture as Dict, home.get('picture')!)
-  if (home.has('lawyers_head') && h.lawyers)
-    mergeObj(h.lawyers as Dict, home.get('lawyers_head')!)
-  if (home.has('cta_band') && h.ctaBand)
-    mergeObj(h.ctaBand as Dict, home.get('cta_band')!)
+  if (home.has('lawyers_head') && h.lawyers) mergeObj(h.lawyers as Dict, home.get('lawyers_head')!)
+  if (home.has('cta_band') && h.ctaBand) mergeObj(h.ctaBand as Dict, home.get('cta_band')!)
 
   const about = sectionMap(bySlug.get('about'))
   const ap = c.aboutPage as unknown as Dict

@@ -1,14 +1,7 @@
 /** Unified request detail — thread, timeline, reply composer, side actions. */
 
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
-import {
-  Copy,
-  Mail,
-  Phone,
-  RefreshCw,
-  Send,
-  StickyNote,
-} from "lucide-react";
+import { Copy, Mail, Phone, RefreshCw, Send, StickyNote } from "lucide-react";
 import { useEffect, useMemo, useRef, useState, type JSX } from "react";
 import { useNavigate, useParams } from "react-router-dom";
 import { api, ApiError } from "../services/api";
@@ -23,11 +16,7 @@ import {
   TimelineItem,
   useToast,
 } from "../components/ui";
-import type {
-  AssigneeOut,
-  LabelOut,
-  RequestDetail,
-} from "../types/api";
+import type { AssigneeOut, LabelOut, RequestDetail } from "../types/api";
 
 const TYPE_FA: Record<string, string> = {
   consultation: "درخواست مشاوره",
@@ -44,8 +33,14 @@ const EVENT_FA: Record<string, string> = {
   customer_reply: "پاسخ مشتری",
   call_logged: "تماس تلفنی",
   labels_updated: "به‌روزرسانی برچسب",
-  ai_reply: "پاسخ خودکار هوش مصنوعی",
+  referred: "ارجاع بازاریابی",
+  referral_blocked: "ارجاع مسدودشده",
+  fee_received: "دریافت حق‌الوکاله",
+  commission_reversed: "برگشت کمیسیون",
 };
+
+/** events that duplicate an already-rendered thread item — hidden in UI */
+const SILENT_EVENTS = new Set(["ai_reply", "reply_sent", "customer_reply"]);
 
 const TEMPLATES: { label: string; body: string }[] = [
   {
@@ -115,8 +110,7 @@ export default function RequestDetailPage() {
   });
 
   const setStatus = useMutation({
-    mutationFn: (p: { status: string; reason?: string }) =>
-      api.post(`/admin/requests/${type}/${id}/status`, p),
+    mutationFn: (p: { status: string; reason?: string }) => api.post(`/admin/requests/${type}/${id}/status`, p),
     onSuccess: () => {
       toast("success", "وضعیت به‌روز شد.");
       invalidate();
@@ -125,8 +119,7 @@ export default function RequestDetailPage() {
   });
 
   const patch = useMutation({
-    mutationFn: (p: Record<string, unknown>) =>
-      api.patch(`/admin/requests/${type}/${id}`, p),
+    mutationFn: (p: Record<string, unknown>) => api.patch(`/admin/requests/${type}/${id}`, p),
     onSuccess: () => invalidate(),
     onError: (e) => toast("error", e instanceof ApiError ? e.message : "خطا در ویرایش"),
   });
@@ -134,7 +127,15 @@ export default function RequestDetailPage() {
   const receipts = useQuery<{
     fee_amount: number | null;
     receipts: { id: string; amount: number; note: string; created_at: string }[];
-    commissions: { id: string; entry_type: string; basis_amount: number; rate: number; amount: number; status: string; created_at: string }[];
+    commissions: {
+      id: string;
+      entry_type: string;
+      basis_amount: number;
+      rate: number;
+      amount: number;
+      status: string;
+      created_at: string;
+    }[];
   }>({
     queryKey: ["fee-receipts", id],
     queryFn: () => api.get(`/admin/requests/consultation/${id}/fee-receipts`),
@@ -146,14 +147,15 @@ export default function RequestDetailPage() {
   const addReceipt = useMutation({
     mutationFn: (p: { amount: number; note: string }) =>
       api.post<{ commission_id: string | null; commission_amount: number }>(
-        `/admin/requests/consultation/${id}/fee-receipts`, p,
+        `/admin/requests/consultation/${id}/fee-receipts`,
+        p
       ),
     onSuccess: (r: { commission_id: string | null; commission_amount: number }) => {
       toast(
         "success",
         r.commission_id
-          ? `رسید ثبت شد — کمیسیون ${r.commission_amount.toLocaleString("fa-IR")} ریال ایجاد شد.`
-          : "رسید ثبت شد (بدون ارجاع — کمیسیونی ساخته نشد).",
+          ? `رسید ثبت شد — کمیسیون ${r.commission_amount.toLocaleString("fa-IR")} تومان ایجاد شد.`
+          : "رسید ثبت شد (بدون ارجاع — کمیسیونی ساخته نشد)."
       );
       setFeeAmount("");
       setFeeNote("");
@@ -164,8 +166,7 @@ export default function RequestDetailPage() {
   });
 
   const callLog = useMutation({
-    mutationFn: (p: { outcome: string; note: string }) =>
-      api.post(`/admin/requests/${type}/${id}/call-log`, p),
+    mutationFn: (p: { outcome: string; note: string }) => api.post(`/admin/requests/${type}/${id}/call-log`, p),
     onSuccess: () => {
       toast("success", "تماس ثبت شد.");
       setCallNote("");
@@ -175,8 +176,7 @@ export default function RequestDetailPage() {
   });
 
   const retry = useMutation({
-    mutationFn: (deliveryId: string) =>
-      api.post(`/admin/deliveries/${deliveryId}/retry`),
+    mutationFn: (deliveryId: string) => api.post(`/admin/deliveries/${deliveryId}/retry`),
     onSuccess: () => {
       toast("info", "تلاش مجدد انجام شد.");
       invalidate();
@@ -242,7 +242,7 @@ export default function RequestDetailPage() {
                 : m.sender_type === "staff"
                   ? "پاسخ کارشناس"
                   : m.sender_type === "assistant"
-                    ? "پاسخ خودکار هوش مصنوعی"
+                    ? "پاسخ خودکار سیستم"
                     : "پیام مشتری"
             }
             time={fmtDate(m.created_at)}
@@ -253,7 +253,8 @@ export default function RequestDetailPage() {
       });
     }
     for (const e of detail.data.events) {
-      const label = EVENT_FA[e.event_type] ?? e.event_type;
+      if (SILENT_EVENTS.has(e.event_type)) continue;
+      const label = EVENT_FA[e.event_type] ?? "رویداد";
       const extra =
         e.event_type === "status_change"
           ? `${STATUS_FA[String(e.payload?.from)] ?? e.payload?.from} ← ${STATUS_FA[String(e.payload?.to)] ?? e.payload?.to}${e.payload?.reason ? ` — ${e.payload.reason}` : ""}`
@@ -273,9 +274,7 @@ export default function RequestDetailPage() {
               <>
                 {label}
                 {e.actor_username && (
-                  <span className="mr-1 text-[11px] font-normal text-ink-3">
-                    ({e.actor_username})
-                  </span>
+                  <span className="mr-1 text-[11px] font-normal text-ink-3">({e.actor_username})</span>
                 )}
               </>
             }
@@ -286,21 +285,13 @@ export default function RequestDetailPage() {
         ),
       });
     }
-    return items.sort(
-      (a, b) => a.at.localeCompare(b.at) || a.sortKey - b.sortKey,
-    );
+    return items.sort((a, b) => a.at.localeCompare(b.at) || a.sortKey - b.sortKey);
   }, [detail.data]);
 
   // ---------- render ----------
 
   if (detail.isLoading) return <PageSkeleton />;
-  if (detail.isError)
-    return (
-      <ErrorState
-        text="درخواست یافت نشد یا خطایی رخ داد."
-        onRetry={() => navigate("/inbox")}
-      />
-    );
+  if (detail.isError) return <ErrorState text="درخواست یافت نشد یا خطایی رخ داد." onRetry={() => navigate("/inbox")} />;
   const d = detail.data!;
   const r = d.requester;
 
@@ -325,13 +316,18 @@ export default function RequestDetailPage() {
         </button>
         <div>
           <div className="flex flex-wrap items-center gap-2">
-            <h1 className="text-lg font-semibold" dir="ltr">{r.code}</h1>
+            <h1 className="text-lg font-semibold" dir="ltr">
+              {r.code}
+            </h1>
             <StatusBadge value={d.type} />
             <StatusBadge value={d.request.status} />
-            {d.request.sla_due_at && new Date(d.request.sla_due_at) < new Date() &&
+            {d.request.sla_due_at &&
+              new Date(d.request.sla_due_at) < new Date() &&
               !["completed", "resolved", "closed", "cancelled"].includes(d.request.status) && (
-              <span className="rounded-full bg-red-500/10 px-2 py-0.5 text-[11px] font-medium text-red-400">معوق</span>
-            )}
+                <span className="rounded-full bg-red-500/10 px-2 py-0.5 text-[11px] font-medium text-red-400">
+                  معوق
+                </span>
+              )}
           </div>
           <p className="mt-0.5 text-[13px] text-ink-2">{r.subject}</p>
         </div>
@@ -353,11 +349,7 @@ export default function RequestDetailPage() {
                 ...Object.entries(r.extra || {}).map(([k, v]) => ({ label: k, value: v })),
               ]}
             />
-            {r.body && (
-              <div className="mt-4 rounded-lg bg-sand-0 p-3.5 text-[13px] leading-6 text-ink-1">
-                {r.body}
-              </div>
-            )}
+            {r.body && <div className="mt-4 rounded-lg bg-sand-0 p-3.5 text-[13px] leading-6 text-ink-1">{r.body}</div>}
           </div>
 
           {/* timeline */}
@@ -376,20 +368,28 @@ export default function RequestDetailPage() {
               <h2 className="mb-3 text-[14px] font-semibold">وضعیت ارسال</h2>
               <div className="space-y-2">
                 {d.deliveries.map((dv) => (
-                  <div key={dv.id} className="flex items-center justify-between rounded-lg border border-sand-2 px-3 py-2 text-[13px]">
+                  <div
+                    key={dv.id}
+                    className="flex items-center justify-between rounded-lg border border-sand-2 px-3 py-2 text-[13px]"
+                  >
                     <div className="flex items-center gap-3">
-                      <StatusBadge value={dv.channel === "track" ? "consultation" : dv.channel === "email" ? "ticket" : "contact"} />
-                      <span className="text-ink-2">{dv.channel === "track" ? "صفحهٔ پیگیری" : dv.channel === "email" ? "ایمیل" : "پیامک"} — {dv.provider}</span>
-                      {dv.recipient && <span className="text-ink-3" dir="ltr">{dv.recipient}</span>}
+                      <StatusBadge
+                        value={dv.channel === "track" ? "consultation" : dv.channel === "email" ? "ticket" : "contact"}
+                      />
+                      <span className="text-ink-2">
+                        {dv.channel === "track" ? "صفحهٔ پیگیری" : dv.channel === "email" ? "ایمیل" : "پیامک"} —{" "}
+                        {dv.provider}
+                      </span>
+                      {dv.recipient && (
+                        <span className="text-ink-3" dir="ltr">
+                          {dv.recipient}
+                        </span>
+                      )}
                     </div>
                     <div className="flex items-center gap-2">
                       <StatusBadge value={dv.status} />
                       {dv.status === "failed" && (
-                        <button
-                          className="btn-ghost btn-sm"
-                          onClick={() => retry.mutate(dv.id)}
-                          title={dv.last_error}
-                        >
+                        <button className="btn-ghost btn-sm" onClick={() => retry.mutate(dv.id)} title={dv.last_error}>
                           <RefreshCw size={12} /> تلاش مجدد
                         </button>
                       )}
@@ -426,9 +426,7 @@ export default function RequestDetailPage() {
                       className="!w-4"
                       checked={channels.includes(c.key)}
                       onChange={(e) =>
-                        setChannels((ch) =>
-                          e.target.checked ? [...ch, c.key] : ch.filter((x) => x !== c.key),
-                        )
+                        setChannels((ch) => (e.target.checked ? [...ch, c.key] : ch.filter((x) => x !== c.key)))
                       }
                     />
                     {c.label}
@@ -444,7 +442,9 @@ export default function RequestDetailPage() {
                 >
                   <option value="">پاسخ‌های آماده…</option>
                   {TEMPLATES.map((t) => (
-                    <option key={t.label} value={t.label}>{t.label}</option>
+                    <option key={t.label} value={t.label}>
+                      {t.label}
+                    </option>
                   ))}
                 </select>
               </div>
@@ -477,7 +477,12 @@ export default function RequestDetailPage() {
                 {attachments.map((a) => (
                   <span key={a} className="rounded-full bg-sand-0 px-2 py-0.5 text-[11px] text-ink-2">
                     پیوست
-                    <button className="mr-1 text-red-400" onClick={() => setAttachments((x) => x.filter((y) => y !== a))}>×</button>
+                    <button
+                      className="mr-1 text-red-400"
+                      onClick={() => setAttachments((x) => x.filter((y) => y !== a))}
+                    >
+                      ×
+                    </button>
                   </span>
                 ))}
               </div>
@@ -537,14 +542,15 @@ export default function RequestDetailPage() {
           {/* attorney-fee receipts → commission accrual */}
           {type === "consultation" && receipts.data && (
             <div className="card p-4">
-              <p className="mb-2 text-[12px] font-medium text-ink-2">
-                حق‌الوکالهٔ دریافتی دفتر
-              </p>
+              <p className="mb-2 text-[12px] font-medium text-ink-2">حق‌الوکالهٔ دریافتی دفتر</p>
               {receipts.data.receipts.length > 0 && (
                 <ul className="mb-3 space-y-1.5 text-[12px]">
                   {receipts.data.receipts.map((r) => (
-                    <li key={r.id} className="flex items-center justify-between gap-2 rounded-lg border border-line px-2.5 py-1.5">
-                      <span className="font-medium">{r.amount.toLocaleString("fa-IR")} ریال</span>
+                    <li
+                      key={r.id}
+                      className="flex items-center justify-between gap-2 rounded-lg border border-line px-2.5 py-1.5"
+                    >
+                      <span className="font-medium">{r.amount.toLocaleString("fa-IR")} تومان</span>
                       <span className="text-ink-3">{fmtDate(r.created_at)}</span>
                     </li>
                   ))}
@@ -553,10 +559,13 @@ export default function RequestDetailPage() {
               {receipts.data.commissions.length > 0 && (
                 <ul className="mb-3 space-y-1.5 text-[12px]">
                   {receipts.data.commissions.map((c) => (
-                    <li key={c.id} className={`flex items-center justify-between gap-2 rounded-lg border px-2.5 py-1.5 ${c.entry_type === "reversal" ? "border-red-500/30 text-red-300" : "border-line"}`}>
+                    <li
+                      key={c.id}
+                      className={`flex items-center justify-between gap-2 rounded-lg border px-2.5 py-1.5 ${c.entry_type === "reversal" ? "border-red-500/30 text-red-300" : "border-line"}`}
+                    >
                       <span>
                         {c.entry_type === "reversal" ? "برگشت" : `کمیسیون ${c.rate.toLocaleString("fa-IR")}٪`}:{" "}
-                        {c.amount.toLocaleString("fa-IR")} ریال
+                        {c.amount.toLocaleString("fa-IR")} تومان
                       </span>
                       <StatusBadge value={c.status} />
                     </li>
@@ -576,7 +585,7 @@ export default function RequestDetailPage() {
                   <input
                     className="w-full !py-1.5 text-[13px]"
                     inputMode="numeric"
-                    placeholder="مبلغ دریافتی (ریال)"
+                    placeholder="مبلغ دریافتی (تومان)"
                     value={feeAmount}
                     onChange={(e) => setFeeAmount(e.target.value)}
                   />
@@ -586,11 +595,7 @@ export default function RequestDetailPage() {
                     value={feeNote}
                     onChange={(e) => setFeeNote(e.target.value)}
                   />
-                  <button
-                    className="btn-sm w-full"
-                    type="submit"
-                    disabled={addReceipt.isPending || !feeAmount.trim()}
-                  >
+                  <button className="btn-sm w-full" type="submit" disabled={addReceipt.isPending || !feeAmount.trim()}>
                     {addReceipt.isPending ? "در حال ثبت…" : "ثبت دریافتی"}
                   </button>
                   <p className="text-[11px] leading-4 text-ink-3">
@@ -612,7 +617,9 @@ export default function RequestDetailPage() {
               >
                 <option value="">ارجاع نشده</option>
                 {(assignees.data ?? []).map((a) => (
-                  <option key={a.id} value={a.id}>{a.name}</option>
+                  <option key={a.id} value={a.id}>
+                    {a.name}
+                  </option>
                 ))}
               </select>
             </div>
@@ -624,7 +631,9 @@ export default function RequestDetailPage() {
                 onChange={(e) => patch.mutate({ priority: e.target.value })}
               >
                 {["low", "normal", "high", "urgent"].map((p) => (
-                  <option key={p} value={p}>{STATUS_FA[p]}</option>
+                  <option key={p} value={p}>
+                    {STATUS_FA[p]}
+                  </option>
                 ))}
               </select>
             </div>

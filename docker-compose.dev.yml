@@ -1,0 +1,24 @@
+# Development overrides — applied on top of docker-compose.yml:
+#   docker compose -f docker-compose.yml -f docker-compose.dev.yml up --build
+#
+# What changes vs the base file:
+#   - api runs uvicorn --reload with the backend source bind-mounted
+#   - Postgres is exposed on localhost:5433 for local tooling (psql, alembic)
+#   - SEED_ON_BOOT stays on so the CMS gets real content on first boot
+# Frontend hot-reload: run `npm run dev` in ./frontend or ./panel locally —
+# the API is reachable through the gateway on :8080.
+services:
+  api:
+    volumes:
+      - ./backend/main:/app/main:ro
+      - ./backend/alembic:/app/alembic:ro
+      - ./backend/alembic.ini:/app/alembic.ini:ro
+      - ./backend/seed:/app/seed:ro
+      - media:/app/storage
+    environment:
+      UVICORN_RELOAD: "1"
+      SEED_ON_BOOT: "true"
+
+  db:
+    ports:
+      - "5433:5432"

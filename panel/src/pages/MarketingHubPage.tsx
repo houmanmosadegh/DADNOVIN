@@ -12,6 +12,7 @@ import {
   ProfilesTab,
   ReferralsTab,
   ReportTab,
+  RulesTab,
   SettingsTab,
   TermsTab,
   useApplications,
@@ -31,20 +32,15 @@ export default function MarketingHubPage() {
     queryFn: () => api.get<{ value: Record<string, unknown> }>("/admin/settings/commission"),
     retry: 1,
   });
-  const enabled = Boolean(
-    flag.data?.value.marketing_enabled ?? flag.data?.value.commission_enabled,
-  );
+  const enabled = Boolean(flag.data?.value.marketing_enabled ?? flag.data?.value.commission_enabled);
 
   return (
     <div>
-      <PageHeader
-        title="بازاریابی"
-        subtitle="همکاری، ارجاع‌ها، دفتر کمیسیون و قوانین — بدون کیف پول؛ تسویه دستی"
-      />
+      <PageHeader title="بازاریابی" subtitle="همکاری، ارجاع‌ها، دفتر کمیسیون و قوانین — بدون کیف پول؛ تسویه دستی" />
       {!enabled && (
         <div className="mb-4 rounded-xl border border-amber-500/30 bg-amber-500/5 px-4 py-3 text-[13px] text-amber-300">
-          سوئیچ «بازاریابی و ارجاع» خاموش است — همهٔ لینک‌ها و APIهای مربوط ۴۰۴ می‌دهند.
-          برای فعال‌سازی به تب «تنظیمات» بروید.
+          سوئیچ «بازاریابی و ارجاع» خاموش است — همهٔ لینک‌ها و APIهای مربوط ۴۰۴ می‌دهند. برای فعال‌سازی به تب «تنظیمات»
+          بروید.
         </div>
       )}
       <Tabs
@@ -56,6 +52,7 @@ export default function MarketingHubPage() {
           { key: "referrals", label: "ارجاع‌ها" },
           { key: "commissions", label: "کمیسیون‌ها" },
           { key: "terms", label: "قوانین همکاری" },
+          { key: "rules", label: "قواعد کمیسیون" },
           { key: "report", label: "گزارش‌ها" },
           { key: "settings", label: "تنظیمات" },
         ]}
@@ -66,6 +63,7 @@ export default function MarketingHubPage() {
         {tab === "referrals" && <ReferralsTab />}
         {tab === "commissions" && <CommissionsTab />}
         {tab === "terms" && <TermsTab />}
+        {tab === "rules" && <RulesTab />}
         {tab === "report" && <ReportTab />}
         {tab === "settings" && <SettingsTab />}
       </div>

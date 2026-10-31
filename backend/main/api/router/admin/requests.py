@@ -61,6 +61,7 @@ class CallLogIn(BaseModel):
 class FeeReceiptIn(BaseModel):
     """Office's received attorney fee on the case — whole or an installment.
     Each receipt accrues one commission entry for the referring marketer."""
+
     amount: int = Field(gt=0, le=10_000_000_000_000)  # rials
     note: str = Field(default="", max_length=300)
 
@@ -114,7 +115,9 @@ async def list_inbox(
     priority: Annotated[str | None, Query()] = None,
     assignee: Annotated[uuid.UUID | None, Query()] = None,
     q: Annotated[str | None, Query(max_length=100)] = None,
-    sort: Annotated[str, Query(pattern="^(updated_desc|updated_asc)$")] = "updated_desc",
+    sort: Annotated[
+        str, Query(pattern="^(updated_desc|updated_asc)$")
+    ] = "updated_desc",
 ) -> Page[InboxRowOut]:
     types = [type_] if type_ in REQUEST_TYPES else None
     rows, total = await inbox_svc.inbox(
@@ -169,16 +172,20 @@ async def request_detail(
     await thread_svc.migrate_legacy_thread(db, rtype, request_id)
     thread = await thread_svc.list_thread(db, rtype, request_id)
     deliveries = (
-        await db.execute(
-            select(OutboundDelivery)
-            .join(RequestMessage, RequestMessage.id == OutboundDelivery.message_id)
-            .where(
-                RequestMessage.request_type == rtype,
-                RequestMessage.request_id == request_id,
+        (
+            await db.execute(
+                select(OutboundDelivery)
+                .join(RequestMessage, RequestMessage.id == OutboundDelivery.message_id)
+                .where(
+                    RequestMessage.request_type == rtype,
+                    RequestMessage.request_id == request_id,
+                )
+                .order_by(OutboundDelivery.created_at)
             )
-            .order_by(OutboundDelivery.created_at)
         )
-    ).scalars().all()
+        .scalars()
+        .all()
+    )
     labels = (
         await db.execute(
             select(Label.id, Label.name, Label.color)
@@ -196,8 +203,7 @@ async def request_detail(
         events=[EventOut.model_validate(e) for e in thread["events"]],
         deliveries=[DeliveryOut.model_validate(d) for d in deliveries],
         labels=[
-            {"id": str(lbl.id), "name": lbl.name, "color": lbl.color}
-            for lbl in labels
+            {"id": str(lbl.id), "name": lbl.name, "color": lbl.color} for lbl in labels
         ],
         allowed_transitions=sorted(TRANSITIONS[rtype].get(row.status, frozenset())),
         requester=_requester_dict(row),
@@ -216,12 +222,16 @@ async def add_message(
     row = await thread_svc.load_request(db, rtype, request_id)
     if payload.attachment_ids:
         found = (
-            await db.execute(
-                select(MediaAsset.id).where(
-                    MediaAsset.id.in_(payload.attachment_ids)
+            (
+                await db.execute(
+                    select(MediaAsset.id).where(
+                        MediaAsset.id.in_(payload.attachment_ids)
+                    )
                 )
             )
-        ).scalars().all()
+            .scalars()
+            .all()
+        )
         if len(found) != len(set(payload.attachment_ids)):
             raise HTTPException(
                 422, {"code": "bad_attachment", "message": "پیوست نامعتبر است."}
@@ -241,13 +251,19 @@ async def add_message(
     if not payload.is_note:
         deliveries = await dispatch_reply(db, msg, row, channels=payload.channels)
         await notify_svc.notify(
-            db, getattr(row, "user_id", None),
+            db,
+            getattr(row, "user_id", None),
             title=f"پاسخ جدید برای درخواست {row.tracking_code}",
-            body=payload.body[:300], kind="reply",
+            body=payload.body[:300],
+            kind="reply",
             link="/panel/requests",
         )
         await thread_svc.add_event(
-            db, rtype, request_id, "reply_sent", actor=user,
+            db,
+            rtype,
+            request_id,
+            "reply_sent",
+            actor=user,
             payload={
                 "channels": payload.channels,
                 "deliveries": [
@@ -256,7 +272,10 @@ async def add_message(
             },
         )
     await audit(
-        db, actor=user, action="request.message", entity=rtype,
+        db,
+        actor=user,
+        action="request.message",
+        entity=rtype,
         entity_id=request_id,
         detail={"is_note": payload.is_note, "channels": payload.channels},
         request=request,
@@ -288,23 +307,37 @@ async def change_status(
         )
         if n:
             await thread_svc.add_event(
-                db, rtype, request_id, "commission_reversed",
-                actor=user, payload={"count": n},
+                db,
+                rtype,
+                request_id,
+                "commission_reversed",
+                actor=user,
+                payload={"count": n},
             )
     STATUS_FA = {
-        "new": "جدید", "reviewing": "در حال بررسی", "awaiting_call": "در انتظار تماس",
-        "followed_up": "پیگیری شد", "consulted": "مشاوره انجام شد",
-        "accepted": "پرونده پذیرفته شد", "rejected": "رد شد",
-        "completed": "تکمیل شد", "cancelled": "لغو شد",
+        "new": "جدید",
+        "reviewing": "در حال بررسی",
+        "awaiting_call": "در انتظار تماس",
+        "followed_up": "پیگیری شد",
+        "consulted": "مشاوره انجام شد",
+        "accepted": "پرونده پذیرفته شد",
+        "rejected": "رد شد",
+        "completed": "تکمیل شد",
+        "cancelled": "لغو شد",
     }
     await notify_svc.notify(
-        db, getattr(row, "user_id", None),
+        db,
+        getattr(row, "user_id", None),
         title=f"وضعیت درخواست {row.tracking_code} تغییر کرد",
         body=f"وضعیت جدید: {STATUS_FA.get(payload.status, payload.status)}",
-        kind="status", link="/panel/requests",
+        kind="status",
+        link="/panel/requests",
     )
     await audit(
-        db, actor=user, action="request.status", entity=rtype,
+        db,
+        actor=user,
+        action="request.status",
+        entity=rtype,
         entity_id=request_id,
         before={"status": before},
         after={"status": payload.status, "reason": payload.reason},
@@ -313,9 +346,7 @@ async def change_status(
     await db.commit()
     return {
         "status": row.status,
-        "allowed_transitions": sorted(
-            TRANSITIONS[rtype].get(row.status, frozenset())
-        ),
+        "allowed_transitions": sorted(TRANSITIONS[rtype].get(row.status, frozenset())),
     }
 
 
@@ -341,7 +372,11 @@ async def patch_request(
                 )
             row.assigned_to = payload.assigned_to
             await thread_svc.add_event(
-                db, rtype, request_id, "assigned", actor=user,
+                db,
+                rtype,
+                request_id,
+                "assigned",
+                actor=user,
                 payload={"to": target.username},
             )
         else:
@@ -362,11 +397,18 @@ async def patch_request(
             )
         await db.flush()
         await thread_svc.add_event(
-            db, rtype, request_id, "labels_updated", actor=user,
+            db,
+            rtype,
+            request_id,
+            "labels_updated",
+            actor=user,
             payload={"count": len(payload.label_ids)},
         )
     await audit(
-        db, actor=user, action="request.update", entity=rtype,
+        db,
+        actor=user,
+        action="request.update",
+        entity=rtype,
         entity_id=request_id,
         before=before,
         after={
@@ -391,18 +433,31 @@ async def log_call(
     """Manual call log — real telephony needs a provider; honest manual entry."""
     await thread_svc.load_request(db, rtype, request_id)
     ev = await thread_svc.add_event(
-        db, rtype, request_id, "call_logged", actor=user,
+        db,
+        rtype,
+        request_id,
+        "call_logged",
+        actor=user,
         payload={"outcome": payload.outcome, "note": payload.note},
     )
     if payload.note.strip():
         await thread_svc.add_message(
-            db, rtype, request_id, sender_type="staff", sender_id=user.id,
+            db,
+            rtype,
+            request_id,
+            sender_type="staff",
+            sender_id=user.id,
             body=f"تماس تلفنی — {payload.outcome}: {payload.note.strip()}",
             is_note=True,
         )
     await audit(
-        db, actor=user, action="request.call_logged", entity=rtype,
-        entity_id=request_id, detail={"outcome": payload.outcome}, request=request,
+        db,
+        actor=user,
+        action="request.call_logged",
+        entity=rtype,
+        entity_id=request_id,
+        detail={"outcome": payload.outcome},
+        request=request,
     )
     await db.commit()
     return EventOut.model_validate(ev)
@@ -420,8 +475,12 @@ async def redeliver(
     except KeyError:
         raise HTTPException(404, {"code": "not_found", "message": "ارسال یافت نشد."})
     await audit(
-        db, actor=user, action="delivery.retry", entity="delivery",
-        entity_id=delivery_id, request=request,
+        db,
+        actor=user,
+        action="delivery.retry",
+        entity="delivery",
+        entity_id=delivery_id,
+        request=request,
     )
     await db.commit()
     return DeliveryOut.model_validate(d)
@@ -430,39 +489,51 @@ async def redeliver(
 @router.get("/assignees")
 async def assignees(_: SupportDep, db: DbDep) -> list[dict]:
     rows = (
-        await db.execute(
-            select(User).where(User.is_active.is_(True)).order_by(User.full_name)
+        (
+            await db.execute(
+                select(User).where(User.is_active.is_(True)).order_by(User.full_name)
+            )
         )
-    ).scalars().all()
-    return [{"id": str(u.id), "name": u.full_name, "username": u.username} for u in rows]
+        .scalars()
+        .all()
+    )
+    return [
+        {"id": str(u.id), "name": u.full_name, "username": u.username} for u in rows
+    ]
 
 
 # ─── attorney-fee receipts (commission accrual trigger) ─────────────
 
 
 @router.get("/requests/consultation/{request_id}/fee-receipts")
-async def fee_receipts(
-    request_id: uuid.UUID, _: SupportDep, db: DbDep
-) -> dict:
+async def fee_receipts(request_id: uuid.UUID, _: SupportDep, db: DbDep) -> dict:
     """Received attorney-fee payments on this case + resulting commissions."""
     row = await thread_svc.load_request(db, "consultation", request_id)
     receipts = (
-        await db.execute(
-            select(CaseFeeReceipt)
-            .where(CaseFeeReceipt.request_id == row.id)
-            .order_by(CaseFeeReceipt.created_at)
-        )
-    ).scalars().all()
-    comms = (
-        await db.execute(
-            select(Commission)
-            .where(
-                Commission.request_id == row.id,
-                Commission.request_type == "consultation",
+        (
+            await db.execute(
+                select(CaseFeeReceipt)
+                .where(CaseFeeReceipt.request_id == row.id)
+                .order_by(CaseFeeReceipt.created_at)
             )
-            .order_by(Commission.created_at)
         )
-    ).scalars().all()
+        .scalars()
+        .all()
+    )
+    comms = (
+        (
+            await db.execute(
+                select(Commission)
+                .where(
+                    Commission.request_id == row.id,
+                    Commission.request_type == "consultation",
+                )
+                .order_by(Commission.created_at)
+            )
+        )
+        .scalars()
+        .all()
+    )
     return {
         "fee_amount": row.fee_amount,
         "receipts": [
@@ -510,7 +581,10 @@ async def add_fee_receipt(
     await db.flush()
     comm = await commissions_svc.accrue_for_receipt(db, receipt, user.id)
     await thread_svc.add_event(
-        db, "consultation", request_id, "fee_received",
+        db,
+        "consultation",
+        request_id,
+        "fee_received",
         actor=user,
         payload={
             "receipt_id": str(receipt.id),
@@ -520,7 +594,10 @@ async def add_fee_receipt(
         },
     )
     await audit(
-        db, actor=user, action="fee_receipt.create", entity="consultation",
+        db,
+        actor=user,
+        action="fee_receipt.create",
+        entity="consultation",
         entity_id=request_id,
         detail={"amount": payload.amount, "note": payload.note},
         request=request,

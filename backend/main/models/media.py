@@ -20,5 +20,7 @@ class MediaAsset(Base):
     width: Mapped[int] = mapped_column(Integer, default=0)
     height: Mapped[int] = mapped_column(Integer, default=0)
     alt: Mapped[str] = mapped_column(String(255), default="")
+    # public (site/article assets) | receipt (payout proof — auth-gated) | logo
+    purpose: Mapped[str] = mapped_column(String(20), default="public", index=True)
     uploaded_by: Mapped[uuid.UUID | None] = mapped_column(Uuid, nullable=True)
     created_at: Mapped[datetime] = created_at_col()

@@ -9,12 +9,7 @@ interface ButtonProps {
 }
 
 /** Link styled as a button — real navigation, no dead controls. */
-export function Button({
-  to,
-  children,
-  variant = 'primary',
-  className = '',
-}: ButtonProps) {
+export function Button({ to, children, variant = 'primary', className = '' }: ButtonProps) {
   return (
     <Link to={to} className={`btn btn--${variant}${className ? ` ${className}` : ''}`}>
       {children}

@@ -42,9 +42,7 @@ async def create_session(
 
 async def get_valid_session(db: AsyncSession, token: str) -> Session | None:
     session = (
-        await db.execute(
-            select(Session).where(Session.token_hash == _hash(token))
-        )
+        await db.execute(select(Session).where(Session.token_hash == _hash(token)))
     ).scalar_one_or_none()
     if session is None or not session.is_valid:
         return None

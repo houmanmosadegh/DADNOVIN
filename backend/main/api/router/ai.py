@@ -18,7 +18,9 @@ DbDep = Annotated[AsyncSession, Depends(get_db)]
 @router.post("/chat")
 async def chat(payload: ChatIn, request: Request, db: DbDep) -> ChatOut:
     """Answer using approved site knowledge only (rate-limited)."""
-    limiter.check("ai_chat", client_key(request), get_settings().rate_limit_ai_per_minute)
+    limiter.check(
+        "ai_chat", client_key(request), get_settings().rate_limit_ai_per_minute
+    )
     result = await answer(db, payload)
     await db.commit()
     return result

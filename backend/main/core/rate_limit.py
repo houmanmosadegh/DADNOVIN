@@ -24,7 +24,10 @@ class RateLimiter:
         if len(q) >= limit:
             raise HTTPException(
                 status_code=429,
-                detail={"code": "rate_limited", "message": "تعداد درخواست‌ها بیش از حد است؛ کمی بعد دوباره تلاش کنید."},
+                detail={
+                    "code": "rate_limited",
+                    "message": "تعداد درخواست‌ها بیش از حد است؛ کمی بعد دوباره تلاش کنید.",
+                },
             )
         q.append(now)
 
@@ -39,8 +42,12 @@ def client_key(request: Request) -> str:
     return request.client.host if request.client else "unknown"
 
 
-def rate_limit(bucket: str, limit_getter: Callable[[], int]) -> Callable[[Request], None]:
+def rate_limit(
+    bucket: str, limit_getter: Callable[[], int]
+) -> Callable[[Request], None]:
     """Dependency factory — usage: dependencies=[rate_limit('login', lambda: s.rate_limit_login_per_minute)]."""
+
     def _dep(request: Request) -> None:
         limiter.check(bucket, client_key(request), limit_getter())
+
     return _dep

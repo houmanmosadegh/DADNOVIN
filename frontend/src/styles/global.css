@@ -225,7 +225,7 @@ img {
   --color-text-2: var(--lt-text-muted);
   --color-border: var(--lt-border-strong);
   --color-border-gold: rgb(125 95 26 / 0.4);
-  --gold-rgb: 125 95 26;   /* --lt-accent */
+  --gold-rgb: 125 95 26; /* --lt-accent */
   --gold-hi-rgb: 142 108 31; /* --lt-accent-hi */
   --gold-soft-rgb: 158 126 62;
   --gold-deep-rgb: 95 74 18; /* --lt-accent-deep */
@@ -234,10 +234,19 @@ img {
 /* dark panels inside a light band keep the dark-panel palette.
    `color` must be set too — descendants that only INHERIT it
    (no explicit var) would otherwise pick up the band's dark text. */
-:is(.band--white, .band--gray, .band--cream) :is(
-  .sg-card, .svc, .rcard, .trust__item, .how-strip__item,
-  .consult-point, .consult-aside, .contact-panel, .cform, .cform__result
-) {
+:is(.band--white, .band--gray, .band--cream)
+  :is(
+    .sg-card,
+    .svc,
+    .rcard,
+    .trust__item,
+    .how-strip__item,
+    .consult-point,
+    .consult-aside,
+    .contact-panel,
+    .cform,
+    .cform__result
+  ) {
   --color-text: var(--text);
   --color-text-2: var(--text-muted);
   --gold-rgb: 202 148 46;
@@ -251,9 +260,7 @@ img {
 }
 /* translucent ink panels blend into muddy gray over light bands —
    force them solid so they read as true dark cards */
-:is(.band--white, .band--gray, .band--cream) :is(
-  .trust__item, .consult-point, .how-strip__item
-) {
+:is(.band--white, .band--gray, .band--cream) :is(.trust__item, .consult-point, .how-strip__item) {
   background: linear-gradient(180deg, rgb(var(--ink-3-rgb)), rgb(var(--ink-2-rgb)));
 }
 :is(.band--white, .band--gray, .band--cream) .svc {
@@ -379,12 +386,7 @@ img {
   content: '';
   position: absolute;
   inset: 0;
-  background: linear-gradient(
-    115deg,
-    transparent 35%,
-    rgb(255 255 255 / 0.35) 50%,
-    transparent 65%
-  );
+  background: linear-gradient(115deg, transparent 35%, rgb(255 255 255 / 0.35) 50%, transparent 65%);
   transform: translateX(120%);
   transition: transform 0.6s ease;
   pointer-events: none;
@@ -439,7 +441,8 @@ img {
 /* molten gold — only inside dark bands / dark cards, never on bone
    (:not(.hero-panel *) — the hero's bone panel is a light island
    inside the band--ink hero; its buttons stay navy/ghost) */
-:is(.band--ink, .band--navy, .band--goldblack, .band--goldwhite, .acc) .btn--primary:not(.btn-navy):not(.hero-panel *),
+:is(.band--ink, .band--navy, .band--goldblack, .band--goldwhite, .acc)
+  .btn--primary:not(.btn-navy):not(.hero-panel *),
 :is(.dark-panel, .contact-card, .svc, .sg-card, .rcard) .btn--primary:not(.btn-navy) {
   color: #1a1408;
   background: linear-gradient(180deg, #f6e3a1 0%, #d4a84b 50%, #b88a32 100%);
@@ -451,7 +454,8 @@ img {
     0 14px 24px rgb(0 0 0 / 0.35),
     0 0 24px rgb(212 168 75 / 0.25);
 }
-:is(.band--ink, .band--navy, .band--goldblack, .band--goldwhite, .acc) .btn--primary:not(.btn-navy):not(.hero-panel *):hover,
+:is(.band--ink, .band--navy, .band--goldblack, .band--goldwhite, .acc)
+  .btn--primary:not(.btn-navy):not(.hero-panel *):hover,
 :is(.dark-panel, .contact-card, .svc, .sg-card, .rcard) .btn--primary:not(.btn-navy):hover {
   box-shadow:
     inset 0 1px 0 rgb(255 255 255 / 0.5),
@@ -459,7 +463,8 @@ img {
     0 18px 30px rgb(0 0 0 / 0.4),
     0 0 32px rgb(212 168 75 / 0.4);
 }
-:is(.band--ink, .band--navy, .band--goldblack, .band--goldwhite, .acc) .btn--primary:not(.btn-navy):not(.hero-panel *):active,
+:is(.band--ink, .band--navy, .band--goldblack, .band--goldwhite, .acc)
+  .btn--primary:not(.btn-navy):not(.hero-panel *):active,
 :is(.dark-panel, .contact-card, .svc, .sg-card, .rcard) .btn--primary:not(.btn-navy):active {
   box-shadow:
     inset 0 2px 4px rgb(0 0 0 / 0.25),

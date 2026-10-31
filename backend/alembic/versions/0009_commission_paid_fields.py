@@ -29,7 +29,9 @@ def upgrade() -> None:
     )
     _add_col(
         "commissions",
-        sa.Column("paid_note", sa.String(length=300), nullable=False, server_default=""),
+        sa.Column(
+            "paid_note", sa.String(length=300), nullable=False, server_default=""
+        ),
     )
     _add_col("commissions", sa.Column("paid_by", sa.Uuid(), nullable=True))
 

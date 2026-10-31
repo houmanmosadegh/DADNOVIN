@@ -9,7 +9,14 @@ from sqlalchemy.orm import Mapped, mapped_column, relationship
 from ..db.base import Base, created_at_col, updated_at_col, uuid_pk
 
 # جدید ← در حال بررسی ← در انتظار پاسخ ← حل شده ← بسته شده (+لغو)
-TICKET_STATUSES = ("new", "reviewing", "waiting_reply", "resolved", "closed", "cancelled")
+TICKET_STATUSES = (
+    "new",
+    "reviewing",
+    "waiting_reply",
+    "resolved",
+    "closed",
+    "cancelled",
+)
 PRIORITIES = ("low", "normal", "high", "urgent")
 SENDER_TYPES = ("customer", "staff", "note")
 
@@ -18,9 +25,7 @@ class Ticket(Base):
     __tablename__ = "tickets"
 
     id: Mapped[uuid.UUID] = uuid_pk()
-    ticket_number: Mapped[str] = mapped_column(
-        String(20), unique=True, index=True
-    )
+    ticket_number: Mapped[str] = mapped_column(String(20), unique=True, index=True)
     # customers look tickets up with this code — only its hash is stored
     access_code_hash: Mapped[str] = mapped_column(String(128), default="")
     requester_name: Mapped[str] = mapped_column(String(120))

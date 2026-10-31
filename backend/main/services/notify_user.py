@@ -19,7 +19,11 @@ async def notify(
     if user_id is None:
         return None
     n = InboxNotification(
-        user_id=user_id, title=title[:200], body=body[:2000], kind=kind[:30], link=link[:200]
+        user_id=user_id,
+        title=title[:200],
+        body=body[:2000],
+        kind=kind[:30],
+        link=link[:200],
     )
     db.add(n)
     await db.flush()

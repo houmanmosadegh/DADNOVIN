@@ -34,7 +34,9 @@ async def submit_contact(
     payload: ContactIn, request: Request, db: DbDep
 ) -> ContactCreatedOut:
     limiter.check(
-        "public_post", client_key(request), get_settings().rate_limit_public_post_per_minute
+        "public_post",
+        client_key(request),
+        get_settings().rate_limit_public_post_per_minute,
     )
     if payload.website.strip():  # honeypot — silent accept, store nothing
         return ContactCreatedOut(tracking_code="DN-0000-0000", access_code="00000000")
@@ -53,7 +55,9 @@ async def submit_contact(
     db.add(row)
     await db.flush()
     await thread_svc.stamp_sla(db, "contact", row)
-    await thread_svc.add_event(db, "contact", row.id, "created", payload={"source": row.source_page})
+    await thread_svc.add_event(
+        db, "contact", row.id, "created", payload={"source": row.source_page}
+    )
     await db.commit()
     return ContactCreatedOut(tracking_code=row.tracking_code, access_code=code_str)
 
@@ -66,9 +70,7 @@ async def _find_request(db: AsyncSession, code: str):
         (ConsultationRequest, ConsultationRequest.tracking_code, "consultation"),
         (ContactRequest, ContactRequest.tracking_code, "contact"),
     ):
-        row = (
-            await db.execute(select(model).where(col == code))
-        ).scalar_one_or_none()
+        row = (await db.execute(select(model).where(col == code))).scalar_one_or_none()
         if row is not None:
             return rtype, row
     return None, None
@@ -88,38 +90,56 @@ def _credential_ok(row, credential: str) -> bool:
 @router.post("/public/track")
 async def track(payload: TrackIn, request: Request, db: DbDep) -> TrackPublicOut:
     limiter.check(
-        "public_post", client_key(request), get_settings().rate_limit_public_post_per_minute
+        "public_post",
+        client_key(request),
+        get_settings().rate_limit_public_post_per_minute,
     )
     rtype, row = await _find_request(db, payload.code)
     if row is None or not _credential_ok(row, payload.credential):
         # generic — don't reveal whether the code exists
-        raise HTTPException(404, {"code": "not_found", "message": "درخواستی با این مشخصات یافت نشد."})
-    msgs = (
-        await db.execute(
-            select(RequestMessage)
-            .where(
-                RequestMessage.request_type == rtype,
-                RequestMessage.request_id == row.id,
-                RequestMessage.is_note.is_(False),
-            )
-            .order_by(RequestMessage.created_at)
+        raise HTTPException(
+            404, {"code": "not_found", "message": "درخواستی با این مشخصات یافت نشد."}
         )
-    ).scalars().all()
+    msgs = (
+        (
+            await db.execute(
+                select(RequestMessage)
+                .where(
+                    RequestMessage.request_type == rtype,
+                    RequestMessage.request_id == row.id,
+                    RequestMessage.is_note.is_(False),
+                )
+                .order_by(RequestMessage.created_at)
+            )
+        )
+        .scalars()
+        .all()
+    )
     # legacy ticket thread may still hold messages
     if rtype == "ticket" and not msgs:
         from ...models.ticket import TicketMessage
+
         legacy = (
-            await db.execute(
-                select(TicketMessage).where(TicketMessage.ticket_id == row.id)
+            (
+                await db.execute(
+                    select(TicketMessage).where(TicketMessage.ticket_id == row.id)
+                )
             )
-        ).scalars().all()
+            .scalars()
+            .all()
+        )
         msgs = [
             RequestMessage(
-                request_type="ticket", request_id=row.id, sender_type=m.sender_type,
-                sender_id=m.sender_id, body=m.body, is_note=False,
+                request_type="ticket",
+                request_id=row.id,
+                sender_type=m.sender_type,
+                sender_id=m.sender_id,
+                body=m.body,
+                is_note=False,
                 created_at=m.created_at,
             )
-            for m in legacy if m.sender_type != "note"
+            for m in legacy
+            if m.sender_type != "note"
         ]
     return TrackPublicOut(
         type=rtype,
@@ -134,11 +154,15 @@ async def track(payload: TrackIn, request: Request, db: DbDep) -> TrackPublicOut
 @router.post("/public/track/reply", status_code=status.HTTP_201_CREATED)
 async def track_reply(payload: TrackReplyIn, request: Request, db: DbDep) -> MessageOut:
     limiter.check(
-        "public_post", client_key(request), get_settings().rate_limit_public_post_per_minute
+        "public_post",
+        client_key(request),
+        get_settings().rate_limit_public_post_per_minute,
     )
     rtype, row = await _find_request(db, payload.code)
     if row is None or not _credential_ok(row, payload.credential):
-        raise HTTPException(404, {"code": "not_found", "message": "درخواستی با این مشخصات یافت نشد."})
+        raise HTTPException(
+            404, {"code": "not_found", "message": "درخواستی با این مشخصات یافت نشد."}
+        )
     if row.status in ("closed", "cancelled", "completed"):
         raise HTTPException(
             409,

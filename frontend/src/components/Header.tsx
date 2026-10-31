@@ -5,6 +5,7 @@ import { brand } from '../content/lawyers.fa.js'
 import { publicNav } from '../content/remote'
 import { useScrolled } from '../utils/useScrolled'
 import { useAuth } from '../services/auth'
+import { apiAsset } from '../services/api'
 import './Header.css'
 
 export function Header() {
@@ -37,10 +38,7 @@ export function Header() {
         return
       }
       if (e.key !== 'Tab' || !nav || !toggle) return
-      const els = [
-        ...nav.querySelectorAll<HTMLElement>('a[href]'),
-        toggle,
-      ]
+      const els = [...nav.querySelectorAll<HTMLElement>('a[href]'), toggle]
       const idx = els.indexOf(document.activeElement as HTMLElement)
       if (e.shiftKey && idx <= 0) {
         els[els.length - 1].focus()
@@ -107,15 +105,13 @@ export function Header() {
   }, [pathname])
 
   return (
-    <header
-      className={`site-header${scrolled ? ' is-scrolled' : ''}${open ? ' is-open' : ''}`}
-    >
+    <header className={`site-header${scrolled ? ' is-scrolled' : ''}${open ? ' is-open' : ''}`}>
       {/* backdrop-filter روی این لایه است تا فرزندان fixed هدر (کشو/بک‌دراپ) به viewport نسبت شوند */}
       <div className="site-header__bg" aria-hidden="true" />
       <div className="container site-header__inner">
         <Link to="/" className="brand" aria-label={`${brand.legalName} — صفحه اصلی`}>
           <span className="brand__seal">
-            <img src={brand.logoMark} alt="" width="42" height="33" decoding="async" />
+            <img src={apiAsset(brand.logoMark)} alt="" width="42" height="33" decoding="async" />
           </span>
           <span className="brand__text">
             <span className="brand__name">{brand.name}</span>
@@ -125,22 +121,14 @@ export function Header() {
           </span>
         </Link>
 
-        <nav
-          id="site-nav"
-          className="site-nav"
-          aria-label="ناوبری اصلی"
-          data-open={open}
-          ref={navRef}
-        >
+        <nav id="site-nav" className="site-nav" aria-label="ناوبری اصلی" data-open={open} ref={navRef}>
           <ul className="site-nav__list" role="list" ref={listRef}>
             {publicNav().map((item) => (
               <li key={item.to}>
                 <NavLink
                   to={item.to}
                   end={item.to === '/'}
-                  className={({ isActive }) =>
-                    `site-nav__link${isActive ? ' is-active' : ''}`
-                  }
+                  className={({ isActive }) => `site-nav__link${isActive ? ' is-active' : ''}`}
                 >
                   {item.label}
                 </NavLink>
@@ -190,12 +178,7 @@ export function Header() {
       </div>
 
       {/* زمینهٔ پشت کشو — کلیک روی آن منو را می‌بندد */}
-      <div
-        className="nav-backdrop"
-        data-open={open}
-        aria-hidden="true"
-        onClick={() => setOpen(false)}
-      />
+      <div className="nav-backdrop" data-open={open} aria-hidden="true" onClick={() => setOpen(false)} />
 
       {/* خط پیشرفت اسکرول */}
       <span className="site-header__progress" ref={progressRef} aria-hidden="true" />

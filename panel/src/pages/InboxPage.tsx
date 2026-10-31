@@ -28,8 +28,16 @@ const TABS = [
 ] as const;
 
 const STATUS_OPTIONS = [
-  "new", "reviewing", "awaiting_call", "followed_up", "waiting_reply",
-  "contacted", "completed", "resolved", "closed", "cancelled",
+  "new",
+  "reviewing",
+  "awaiting_call",
+  "followed_up",
+  "waiting_reply",
+  "contacted",
+  "completed",
+  "resolved",
+  "closed",
+  "cancelled",
 ];
 
 export default function InboxPage({
@@ -46,9 +54,7 @@ export default function InboxPage({
   const [params, setParams] = useSearchParams();
   // `?tab=` is owned by the hub when embedded — only read known values
   const initTab = params.get("tab") ?? "all";
-  const [tab, setTab] = useState<string>(
-    TABS.some((t) => t.key === initTab) ? initTab : "all",
-  );
+  const [tab, setTab] = useState<string>(TABS.some((t) => t.key === initTab) ? initTab : "all");
   const [status, setStatus] = useState(params.get("status") ?? "");
   const [type, setType] = useState(params.get("type") ?? "");
   const [page, setPage] = useState(1);
@@ -90,7 +96,7 @@ export default function InboxPage({
         [...selected].map((key) => {
           const [rtype, id] = key.split(":");
           return api.patch(`/admin/requests/${rtype}/${id}`, { assigned_to: target });
-        }),
+        })
       );
     },
     onSuccess: () => {
@@ -98,8 +104,7 @@ export default function InboxPage({
       setSelected(new Set());
       qc.invalidateQueries({ queryKey: ["inbox"] });
     },
-    onError: (e) =>
-      toast("error", e instanceof ApiError ? e.message : "خطا در ارجاع گروهی"),
+    onError: (e) => toast("error", e instanceof ApiError ? e.message : "خطا در ارجاع گروهی"),
   });
 
   const exportCsv = async () => {
@@ -118,9 +123,7 @@ export default function InboxPage({
   };
 
   const toggleAll = (rows: InboxRow[]) => {
-    setSelected((s) =>
-      s.size === rows.length ? new Set() : new Set(rows.map((r) => `${r.type}:${r.id}`)),
-    );
+    setSelected((s) => (s.size === rows.length ? new Set() : new Set(rows.map((r) => `${r.type}:${r.id}`))));
   };
 
   const row = (r: InboxRow) => (
@@ -143,19 +146,28 @@ export default function InboxPage({
         />
       </td>
       <td className="td">
-        <Link
-          to={`/requests/${r.type}/${r.id}`}
-          className="font-medium text-ink-0 hover:text-gold-1"
-        >
+        <Link to={`/requests/${r.type}/${r.id}`} className="font-medium text-ink-0 hover:text-gold-1">
           {r.name}
         </Link>
-        <p className="mt-0.5 text-[11px] text-ink-3" dir="ltr">{r.tracking_code}</p>
+        <p className="mt-0.5 text-[11px] text-ink-3" dir="ltr">
+          {r.tracking_code}
+        </p>
       </td>
-      {!fixedType && <td className="td"><StatusBadge value={r.type} /></td>}
+      {!fixedType && (
+        <td className="td">
+          <StatusBadge value={r.type} />
+        </td>
+      )}
       <td className="td max-w-[220px] truncate">{r.subject}</td>
-      <td className="td" dir="ltr">{r.phone}</td>
-      <td className="td"><StatusBadge value={r.status} /></td>
-      <td className="td"><StatusBadge value={r.priority} /></td>
+      <td className="td" dir="ltr">
+        {r.phone}
+      </td>
+      <td className="td">
+        <StatusBadge value={r.status} />
+      </td>
+      <td className="td">
+        <StatusBadge value={r.priority} />
+      </td>
       <td className="td text-[12px] text-ink-1">{r.assignee_name || "—"}</td>
       <td className="td text-[12px] text-ink-2" title={new Date(r.updated_at).toLocaleString("fa-IR")}>
         {fmtRelative(r.updated_at)}
@@ -191,7 +203,10 @@ export default function InboxPage({
           <button
             key={t.key}
             className={`chip ${tab === t.key ? "chip-active" : ""}`}
-            onClick={() => { setTab(t.key); setPage(1); }}
+            onClick={() => {
+              setTab(t.key);
+              setPage(1);
+            }}
           >
             {t.label}
           </button>
@@ -204,7 +219,11 @@ export default function InboxPage({
           className="relative min-w-[200px] flex-1"
           onSubmit={(e) => {
             e.preventDefault();
-            setParams((p) => { const n = new URLSearchParams(p); qInput ? n.set("q", qInput) : n.delete("q"); return n; });
+            setParams((p) => {
+              const n = new URLSearchParams(p);
+              qInput ? n.set("q", qInput) : n.delete("q");
+              return n;
+            });
             setPage(1);
           }}
         >
@@ -220,7 +239,10 @@ export default function InboxPage({
           <select
             className="!w-32"
             value={type}
-            onChange={(e) => { setType(e.target.value); setPage(1); }}
+            onChange={(e) => {
+              setType(e.target.value);
+              setPage(1);
+            }}
           >
             <option value="">همهٔ انواع</option>
             <option value="consultation">مشاوره</option>
@@ -231,11 +253,16 @@ export default function InboxPage({
         <select
           className="!w-36"
           value={status}
-          onChange={(e) => { setStatus(e.target.value); setPage(1); }}
+          onChange={(e) => {
+            setStatus(e.target.value);
+            setPage(1);
+          }}
         >
           <option value="">همهٔ وضعیت‌ها</option>
           {STATUS_OPTIONS.map((s) => (
-            <option key={s} value={s}>{STATUS_FA[s] ?? s}</option>
+            <option key={s} value={s}>
+              {STATUS_FA[s] ?? s}
+            </option>
           ))}
         </select>
         <button
@@ -247,21 +274,21 @@ export default function InboxPage({
 
         {selected.size > 0 && (
           <div className="mr-auto flex items-center gap-2">
-            <span className="text-[12px] text-ink-2">
-              {selected.size.toLocaleString("fa-IR")} انتخاب‌شده
-            </span>
+            <span className="text-[12px] text-ink-2">{selected.size.toLocaleString("fa-IR")} انتخاب‌شده</span>
             <select
               className="!w-40"
               value=""
               onChange={(e) => {
                 if (!e.target.value) return;
-                bulkAssign.mutate(e.target.value === "me" ? user?.id ?? null : e.target.value || null);
+                bulkAssign.mutate(e.target.value === "me" ? (user?.id ?? null) : e.target.value || null);
               }}
             >
               <option value="">ارجاع به…</option>
               <option value="me">خودم</option>
               {(assignees.data ?? []).map((a) => (
-                <option key={a.id} value={a.id}>{a.name}</option>
+                <option key={a.id} value={a.id}>
+                  {a.name}
+                </option>
               ))}
               <option value="">— برداشتن ارجاع —</option>
             </select>
@@ -271,11 +298,13 @@ export default function InboxPage({
 
       {/* body */}
       {list.isLoading && (
-        <div className="space-y-2">{[0, 1, 2, 3].map((i) => <Skeleton key={i} className="h-14" />)}</div>
+        <div className="space-y-2">
+          {[0, 1, 2, 3].map((i) => (
+            <Skeleton key={i} className="h-14" />
+          ))}
+        </div>
       )}
-      {list.isError && (
-        <ErrorState text="بارگذاری صندوق ورودی ناموفق بود." onRetry={() => list.refetch()} />
-      )}
+      {list.isError && <ErrorState text="بارگذاری صندوق ورودی ناموفق بود." onRetry={() => list.refetch()} />}
       {list.data && list.data.items.length === 0 && (
         <EmptyState
           text="درخواستی یافت نشد"
@@ -310,10 +339,14 @@ export default function InboxPage({
               </thead>
               <tbody>
                 {list.data.items.map((r) => (
-                  <tr key={`${r.type}:${r.id}`} className="tr-hover cursor-pointer" onClick={(e) => {
-                    if ((e.target as HTMLElement).closest("input,a,button")) return;
-                    navigate(`/requests/${r.type}/${r.id}`);
-                  }}>
+                  <tr
+                    key={`${r.type}:${r.id}`}
+                    className="tr-hover cursor-pointer"
+                    onClick={(e) => {
+                      if ((e.target as HTMLElement).closest("input,a,button")) return;
+                      navigate(`/requests/${r.type}/${r.id}`);
+                    }}
+                  >
                     {row(r)}
                   </tr>
                 ))}
@@ -324,15 +357,13 @@ export default function InboxPage({
           {/* mobile cards */}
           <div className="space-y-2 lg:hidden">
             {list.data.items.map((r) => (
-              <Link
-                key={`${r.type}:${r.id}`}
-                to={`/requests/${r.type}/${r.id}`}
-                className="card block p-3.5"
-              >
+              <Link key={`${r.type}:${r.id}`} to={`/requests/${r.type}/${r.id}`} className="card block p-3.5">
                 <div className="flex items-start justify-between gap-2">
                   <div>
                     <p className="text-[14px] font-medium text-ink-0">{r.name}</p>
-                    <p className="mt-0.5 text-[11px] text-ink-3" dir="ltr">{r.tracking_code}</p>
+                    <p className="mt-0.5 text-[11px] text-ink-3" dir="ltr">
+                      {r.tracking_code}
+                    </p>
                   </div>
                   <div className="flex gap-1.5">
                     <StatusBadge value={r.type} />
@@ -342,18 +373,16 @@ export default function InboxPage({
                 <p className="mt-2 truncate text-[13px] text-ink-1">{r.subject}</p>
                 <div className="mt-2 flex items-center justify-between text-[11px] text-ink-2">
                   <span dir="ltr">{r.phone}</span>
-                  <span>{fmtRelative(r.updated_at)}{r.overdue ? " · معوق" : ""}</span>
+                  <span>
+                    {fmtRelative(r.updated_at)}
+                    {r.overdue ? " · معوق" : ""}
+                  </span>
                 </div>
               </Link>
             ))}
           </div>
 
-          <Pagination
-            page={list.data.page}
-            total={list.data.total}
-            pageSize={list.data.page_size}
-            onPage={setPage}
-          />
+          <Pagination page={list.data.page} total={list.data.total} pageSize={list.data.page_size} onPage={setPage} />
         </>
       )}
     </div>

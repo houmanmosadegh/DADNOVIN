@@ -27,7 +27,9 @@ def upgrade() -> None:
     if not _has_col("marketer_applications", "accepted_terms"):
         op.add_column(
             "marketer_applications",
-            sa.Column("accepted_terms", sa.Boolean(), nullable=False, server_default=sa.true()),
+            sa.Column(
+                "accepted_terms", sa.Boolean(), nullable=False, server_default=sa.true()
+            ),
         )
 
 

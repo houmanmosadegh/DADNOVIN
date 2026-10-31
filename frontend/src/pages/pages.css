@@ -608,18 +608,10 @@
   flex: none;
   width: min(9rem, 22vw);
   height: 1px;
-  background: linear-gradient(
-    to left,
-    rgb(var(--gold-rgb) / 0.55),
-    transparent
-  );
+  background: linear-gradient(to left, rgb(var(--gold-rgb) / 0.55), transparent);
 }
 .about-hero__rule:last-child {
-  background: linear-gradient(
-    to right,
-    rgb(var(--gold-rgb) / 0.55),
-    transparent
-  );
+  background: linear-gradient(to right, rgb(var(--gold-rgb) / 0.55), transparent);
 }
 .members-grid {
   display: grid;

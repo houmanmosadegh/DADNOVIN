@@ -24,7 +24,9 @@ class LawyerIn(BaseModel):
 
 
 class LawyerUpdateIn(BaseModel):
-    slug: str | None = Field(default=None, min_length=2, max_length=80, pattern=r"^[a-z0-9-]+$")
+    slug: str | None = Field(
+        default=None, min_length=2, max_length=80, pattern=r"^[a-z0-9-]+$"
+    )
     name: str | None = Field(default=None, min_length=2, max_length=120)
     title: str | None = Field(default=None, max_length=120)
     bio: str | None = Field(default=None, max_length=5000)

@@ -12,9 +12,7 @@ class Settings(BaseSettings):
     )
 
     environment: str = "development"
-    database_url: str = (
-        "postgresql+asyncpg://dadnovin:dadnovin@localhost:5432/dadnovin"
-    )
+    database_url: str = "postgresql+asyncpg://dadnovin:dadnovin@localhost:5432/dadnovin"
 
     # session cookie — signed random value; REQUIRED in production
     secret_key: str = "dev-only-insecure-secret-change-me"
@@ -25,7 +23,9 @@ class Settings(BaseSettings):
     cookie_samesite: str = "lax"
 
     # comma-separated list of origins allowed to call the API
-    cors_origins: str = "http://localhost:5173,http://localhost:5174,http://localhost:8080"
+    cors_origins: str = (
+        "http://localhost:5173,http://localhost:5174,http://localhost:8080"
+    )
 
     # absolute site origin — referral links / QR codes embed this
     public_base_url: str = "http://localhost:8080"

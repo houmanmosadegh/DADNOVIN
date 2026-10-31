@@ -7,11 +7,7 @@ const { picture } = home
 
 export function PictureSection() {
   return (
-    <section
-      className="section picture band band--navy"
-      id="approach"
-      aria-labelledby="picture-title"
-    >
+    <section className="section picture band band--navy" id="approach" aria-labelledby="picture-title">
       <div className="container picture__grid">
         {/* media column — در دسکتاپ سمت راست، از سمت راست وارد می‌شود */}
         <Reveal variant="x-start" className="picture__media">

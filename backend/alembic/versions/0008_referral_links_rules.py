@@ -48,7 +48,9 @@ def upgrade() -> None:
             sa.UniqueConstraint("marketer_id", "label", name="uq_ref_link_label"),
         )
     if not _has_index("referral_links", "ix_referral_links_marketer_id"):
-        op.create_index("ix_referral_links_marketer_id", "referral_links", ["marketer_id"])
+        op.create_index(
+            "ix_referral_links_marketer_id", "referral_links", ["marketer_id"]
+        )
 
     # ── referral_clicks — source label, visitor hash, fraud flags ────
     _add_col(
@@ -61,11 +63,15 @@ def upgrade() -> None:
     )
     _add_col(
         "referral_clicks",
-        sa.Column("suspicious", sa.Boolean(), nullable=False, server_default=sa.false()),
+        sa.Column(
+            "suspicious", sa.Boolean(), nullable=False, server_default=sa.false()
+        ),
     )
     _add_col(
         "referral_clicks",
-        sa.Column("suspicious_reason", sa.String(200), nullable=False, server_default=""),
+        sa.Column(
+            "suspicious_reason", sa.String(200), nullable=False, server_default=""
+        ),
     )
     for ix, cols in (
         ("ix_referral_clicks_link_label", ["link_label"]),
@@ -84,8 +90,14 @@ def upgrade() -> None:
         "commission_rules",
         sa.Column("max_amount", sa.BigInteger(), nullable=False, server_default="0"),
     )
-    _add_col("commission_rules", sa.Column("starts_at", sa.DateTime(timezone=True), nullable=True))
-    _add_col("commission_rules", sa.Column("ends_at", sa.DateTime(timezone=True), nullable=True))
+    _add_col(
+        "commission_rules",
+        sa.Column("starts_at", sa.DateTime(timezone=True), nullable=True),
+    )
+    _add_col(
+        "commission_rules",
+        sa.Column("ends_at", sa.DateTime(timezone=True), nullable=True),
+    )
 
     # ── commissions — snapshot of the rule that produced the row ─────
     _add_col(
@@ -100,7 +112,9 @@ def upgrade() -> None:
             sa.Column("id", sa.Uuid(), primary_key=True),
             sa.Column("phone", sa.String(20), nullable=False),
             sa.Column("code_hash", sa.String(64), nullable=False),
-            sa.Column("purpose", sa.String(20), nullable=False, server_default="register"),
+            sa.Column(
+                "purpose", sa.String(20), nullable=False, server_default="register"
+            ),
             sa.Column("attempts", sa.Integer(), nullable=False, server_default="0"),
             sa.Column("expires_at", sa.DateTime(timezone=True), nullable=False),
             sa.Column("used_at", sa.DateTime(timezone=True), nullable=True),

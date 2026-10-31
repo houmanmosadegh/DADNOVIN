@@ -1,10 +1,5 @@
 import { useQuery, useQueryClient } from "@tanstack/react-query";
-import {
-  createContext,
-  useCallback,
-  useContext,
-  type ReactNode,
-} from "react";
+import { createContext, useCallback, useContext, type ReactNode } from "react";
 import { api, ApiError } from "../services/api";
 import type { MeOut } from "../types/api";
 
@@ -39,7 +34,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
       const me = await api.post<MeOut>("/auth/login", { username, password });
       qc.setQueryData(["me"], me);
     },
-    [qc],
+    [qc]
   );
 
   const logout = useCallback(async () => {
@@ -51,16 +46,10 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     }
   }, [qc]);
 
-  const hasRole = useCallback(
-    (...names: string[]) =>
-      !!data?.roles.some((r) => names.includes(r.name)),
-    [data],
-  );
+  const hasRole = useCallback((...names: string[]) => !!data?.roles.some((r) => names.includes(r.name)), [data]);
 
   return (
-    <AuthCtx.Provider
-      value={{ user: data ?? null, loading: isLoading, login, logout, hasRole }}
-    >
+    <AuthCtx.Provider value={{ user: data ?? null, loading: isLoading, login, logout, hasRole }}>
       {children}
     </AuthCtx.Provider>
   );

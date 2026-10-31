@@ -99,7 +99,9 @@ async def test_consultation_gets_ai_first_reply(client, seeded_session, db_sessi
     msgs = (
         (
             await db_session.execute(
-                select(RequestMessage).where(RequestMessage.request_id == uuid.UUID(rid))
+                select(RequestMessage).where(
+                    RequestMessage.request_id == uuid.UUID(rid)
+                )
             )
         )
         .scalars()
@@ -112,13 +114,18 @@ async def test_consultation_gets_ai_first_reply(client, seeded_session, db_sessi
     # status untouched — still waiting for a real specialist
     track = await client.post(
         "/api/v1/public/track",
-        json={"code": resp.json()["tracking_code"], "credential": resp.json()["access_code"]},
+        json={
+            "code": resp.json()["tracking_code"],
+            "credential": resp.json()["access_code"],
+        },
     )
     assert track.status_code == 200
     assert track.json()["status"] == "new"
 
 
-async def test_consultation_ai_reply_disabled_setting(client, seeded_session, db_session):
+async def test_consultation_ai_reply_disabled_setting(
+    client, seeded_session, db_session
+):
     """ai.auto_reply=false → no assistant message, submission still succeeds."""
     from sqlalchemy import select
 
@@ -148,7 +155,9 @@ async def test_consultation_ai_reply_disabled_setting(client, seeded_session, db
     msgs = (
         (
             await db_session.execute(
-                select(RequestMessage).where(RequestMessage.request_id == uuid.UUID(resp.json()["id"]))
+                select(RequestMessage).where(
+                    RequestMessage.request_id == uuid.UUID(resp.json()["id"])
+                )
             )
         )
         .scalars()

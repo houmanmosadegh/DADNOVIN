@@ -51,8 +51,7 @@ export default function UsersPage() {
   });
 
   const patch = useMutation({
-    mutationFn: ({ id, body }: { id: string; body: object }) =>
-      api.patch(`/admin/users/${id}`, body),
+    mutationFn: ({ id, body }: { id: string; body: object }) => api.patch(`/admin/users/${id}`, body),
     onSuccess: () => {
       setDeactivate(null);
       qc.invalidateQueries({ queryKey: ["admin-users"] });
@@ -78,16 +77,42 @@ export default function UsersPage() {
       {adding && (
         <div className="card space-y-4 p-5">
           <div className="grid gap-4 sm:grid-cols-2 xl:grid-cols-4">
-            <Field label="نام کاربری"><input dir="ltr" autoComplete="off" value={form.username} onChange={(e) => setForm({ ...form, username: e.target.value })} /></Field>
-            <Field label="ایمیل (اختیاری)"><input dir="ltr" type="email" value={form.email} onChange={(e) => setForm({ ...form, email: e.target.value })} /></Field>
-            <Field label="نام کامل"><input value={form.full_name} onChange={(e) => setForm({ ...form, full_name: e.target.value })} /></Field>
-            <Field label="رمز عبور (حداقل ۱۰ کاراکتر، حرف+عدد)"><input dir="ltr" type="password" value={form.password} onChange={(e) => setForm({ ...form, password: e.target.value })} /></Field>
+            <Field label="نام کاربری">
+              <input
+                dir="ltr"
+                autoComplete="off"
+                value={form.username}
+                onChange={(e) => setForm({ ...form, username: e.target.value })}
+              />
+            </Field>
+            <Field label="ایمیل (اختیاری)">
+              <input
+                dir="ltr"
+                type="email"
+                value={form.email}
+                onChange={(e) => setForm({ ...form, email: e.target.value })}
+              />
+            </Field>
+            <Field label="نام کامل">
+              <input value={form.full_name} onChange={(e) => setForm({ ...form, full_name: e.target.value })} />
+            </Field>
+            <Field label="رمز عبور (حداقل ۱۰ کاراکتر، حرف+عدد)">
+              <input
+                dir="ltr"
+                type="password"
+                value={form.password}
+                onChange={(e) => setForm({ ...form, password: e.target.value })}
+              />
+            </Field>
           </div>
           <div>
             <label>نقش‌ها</label>
             <div className="flex flex-wrap gap-2">
               {roles?.map((r) => (
-                <label key={r.id} className="flex items-center gap-1.5 rounded-lg border border-sand-2 px-3 py-1.5 text-[13px]">
+                <label
+                  key={r.id}
+                  className="flex items-center gap-1.5 rounded-lg border border-sand-2 px-3 py-1.5 text-[13px]"
+                >
                   <input
                     type="checkbox"
                     className="!w-3.5"
@@ -105,10 +130,14 @@ export default function UsersPage() {
             </div>
           </div>
           <div className="flex justify-end gap-2">
-            <button className="btn-ghost btn-sm" onClick={() => setAdding(false)}>انصراف</button>
+            <button className="btn-ghost btn-sm" onClick={() => setAdding(false)}>
+              انصراف
+            </button>
             <button
               className="btn-primary btn-sm"
-              disabled={form.username.length < 3 || form.password.length < 10 || form.roles.length === 0 || create.isPending}
+              disabled={
+                form.username.length < 3 || form.password.length < 10 || form.roles.length === 0 || create.isPending
+              }
               onClick={() => create.mutate()}
             >
               ایجاد کاربر
@@ -122,7 +151,10 @@ export default function UsersPage() {
           <tr key={u.id} className="hover:bg-sand-2">
             <td className="px-4 py-3">
               <p className="font-medium">{u.full_name || "—"}</p>
-              <p className="text-[12px] text-ink-1/50" dir="ltr">@{u.username}{u.email ? ` · ${u.email}` : ""}</p>
+              <p className="text-[12px] text-ink-1/50" dir="ltr">
+                @{u.username}
+                {u.email ? ` · ${u.email}` : ""}
+              </p>
             </td>
             <td className="px-4 py-3">
               <div className="flex flex-wrap gap-1">
@@ -147,7 +179,15 @@ export default function UsersPage() {
                     u.is_active ? setDeactivate(u) : patch.mutate({ id: u.id, body: { is_active: true } })
                   }
                 >
-                  {u.is_active ? <><UserX size={13} /> غیرفعال</> : <><UserCheck size={13} /> فعال</>}
+                  {u.is_active ? (
+                    <>
+                      <UserX size={13} /> غیرفعال
+                    </>
+                  ) : (
+                    <>
+                      <UserCheck size={13} /> فعال
+                    </>
+                  )}
                 </button>
               )}
             </td>

@@ -48,14 +48,15 @@ export default function AuditPage() {
             {data.items.map((r) => (
               <tr key={r.id} className="hover:bg-sand-2">
                 <td className="whitespace-nowrap px-4 py-3 text-[12px] text-ink-1/50">{fmtDate(r.created_at)}</td>
-                <td className="px-4 py-3 text-[13px]" dir="ltr">{r.actor_username || "—"}</td>
+                <td className="px-4 py-3 text-[13px]" dir="ltr">
+                  {r.actor_username || "—"}
+                </td>
                 <td className="px-4 py-3">
-                  <span className="rounded bg-sand-1 px-2 py-0.5 text-[12px]">
-                    {ACTION_FA[r.action] ?? r.action}
-                  </span>
+                  <span className="rounded bg-sand-1 px-2 py-0.5 text-[12px]">{ACTION_FA[r.action] ?? r.action}</span>
                 </td>
                 <td className="px-4 py-3 text-[12px] text-ink-1/60" dir="ltr">
-                  {r.entity}{r.entity_id ? `#${String(r.entity_id).slice(0, 8)}` : ""}
+                  {r.entity}
+                  {r.entity_id ? `#${String(r.entity_id).slice(0, 8)}` : ""}
                 </td>
                 <td className="max-w-56 truncate px-4 py-3 text-[12px] text-ink-1/50" dir="ltr">
                   {Object.keys(r.detail ?? {}).length ? JSON.stringify(r.detail) : "—"}

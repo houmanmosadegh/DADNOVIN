@@ -129,9 +129,7 @@ def _to_row(model, row, names, labels, now: datetime) -> dict:
         else (row.topic or row.service_slug or "درخواست مشاوره")
     )
     overdue = bool(
-        row.sla_due_at
-        and aware(row.sla_due_at) < now
-        and row.status not in _CLOSED
+        row.sla_due_at and aware(row.sla_due_at) < now and row.status not in _CLOSED
     )
     return {
         "type": {
@@ -208,12 +206,31 @@ async def inbox(
 def inbox_csv(rows: list[dict]) -> str:
     buf = io.StringIO()
     w = csv.writer(buf)
-    w.writerow(["type", "tracking_code", "name", "phone", "subject", "status",
-                "priority", "assignee", "created_at"])
+    w.writerow(
+        [
+            "type",
+            "tracking_code",
+            "name",
+            "phone",
+            "subject",
+            "status",
+            "priority",
+            "assignee",
+            "created_at",
+        ]
+    )
     for r in rows:
-        w.writerow([
-            r["type"], r["tracking_code"], r["name"], r["phone"], r["subject"],
-            r["status"], r["priority"], r["assignee_name"],
-            r["created_at"].isoformat() if r["created_at"] else "",
-        ])
+        w.writerow(
+            [
+                r["type"],
+                r["tracking_code"],
+                r["name"],
+                r["phone"],
+                r["subject"],
+                r["status"],
+                r["priority"],
+                r["assignee_name"],
+                r["created_at"].isoformat() if r["created_at"] else "",
+            ]
+        )
     return buf.getvalue()

@@ -43,14 +43,27 @@ async def update_page(
     if row is None:
         raise HTTPException(404, {"code": "not_found", "message": "صفحه یافت نشد."})
     await snapshot_revision(
-        db, "page", slug,
-        {"title": row.title, "seo_title": row.seo_title,
-         "seo_description": row.seo_description, "is_published": row.is_published},
+        db,
+        "page",
+        slug,
+        {
+            "title": row.title,
+            "seo_title": row.seo_title,
+            "seo_description": row.seo_description,
+            "is_published": row.is_published,
+        },
         user.id,
     )
     for field, value in payload.model_dump(exclude_unset=True).items():
         setattr(row, field, value)
-    await audit(db, actor=user, action="page.update", entity="page", entity_id=slug, request=request)
+    await audit(
+        db,
+        actor=user,
+        action="page.update",
+        entity="page",
+        entity_id=slug,
+        request=request,
+    )
     await db.commit()
     return PageOut.model_validate(row)
 
@@ -67,13 +80,26 @@ async def update_section(
     if row is None:
         raise HTTPException(404, {"code": "not_found", "message": "بخش یافت نشد."})
     await snapshot_revision(
-        db, "section", str(section_id),
-        {"content": row.content, "is_enabled": row.is_enabled, "sort_order": row.sort_order},
+        db,
+        "section",
+        str(section_id),
+        {
+            "content": row.content,
+            "is_enabled": row.is_enabled,
+            "sort_order": row.sort_order,
+        },
         user.id,
     )
     for field, value in payload.model_dump(exclude_unset=True).items():
         setattr(row, field, value)
-    await audit(db, actor=user, action="section.update", entity="section", entity_id=section_id, request=request)
+    await audit(
+        db,
+        actor=user,
+        action="section.update",
+        entity="section",
+        entity_id=section_id,
+        request=request,
+    )
     await db.commit()
     return SectionOut.model_validate(row)
 

@@ -64,7 +64,7 @@ export function TrackPage() {
       setError(
         e instanceof Error && 'status' in e && (e as { status: number }).status === 404
           ? T.form.notFound
-          : T.form.error,
+          : T.form.error
       )
       setResult(null)
     } finally {
@@ -110,10 +110,8 @@ export function TrackPage() {
     }
   }
 
-  const statusLabel =
-    (T.detail.status as Record<string, string>)[result?.status ?? ''] ?? result?.status
-  const typeLabel =
-    (T.detail.type as Record<string, string>)[result?.type ?? ''] ?? result?.type
+  const statusLabel = (T.detail.status as Record<string, string>)[result?.status ?? ''] ?? result?.status
+  const typeLabel = (T.detail.type as Record<string, string>)[result?.type ?? ''] ?? result?.type
   const closed = result ? CLOSED.includes(result.status) : false
 
   return (

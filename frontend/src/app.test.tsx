@@ -18,9 +18,7 @@ describe('Header', () => {
       expect(screen.getAllByText(item.label).length).toBeGreaterThan(0)
     }
     // nav stays clean links-only — consultation is reached via the مشاوره link
-    expect(
-      container.querySelectorAll('.site-nav .btn').length,
-    ).toBe(0)
+    expect(container.querySelectorAll('.site-nav .btn').length).toBe(0)
   })
 
   it('links every nav item to its real route', () => {
@@ -81,7 +79,7 @@ describe('HomePage', () => {
       screen.getByRole('heading', {
         level: 1,
         name: 'پروندهٔ شما، مسئولیتِ ماست',
-      }),
+      })
     ).toBeTruthy()
     for (const s of services) {
       expect(screen.getAllByText(s.title).length).toBeGreaterThan(0)
@@ -106,9 +104,7 @@ describe('HomePage', () => {
     const cards = container.querySelectorAll('a.sg-card')
     expect(cards.length).toBe(services.length)
     for (const s of services) {
-      expect(
-        container.querySelector(`a.sg-card[href="/services#${s.slug}"]`),
-      ).not.toBeNull()
+      expect(container.querySelector(`a.sg-card[href="/services#${s.slug}"]`)).not.toBeNull()
     }
     // nothing FAQ-like may remain in the services section itself
     expect(container.querySelector('#services [aria-expanded]')).toBeNull()
@@ -159,9 +155,7 @@ describe('HomePage', () => {
 
   it('renders the picture section with descriptive alt and fixed dimensions', () => {
     const { container } = withRouter(<HomePage />)
-    const img = container.querySelector<HTMLImageElement>(
-      '.picture__frame img',
-    )
+    const img = container.querySelector<HTMLImageElement>('.picture__frame img')
     expect(img).not.toBeNull()
     expect(img!.getAttribute('alt')!.length).toBeGreaterThan(20)
     expect(img!.getAttribute('width')).toBe('1079')
@@ -190,9 +184,7 @@ describe('HomePage', () => {
 describe('Footer', () => {
   it('shows the current year dynamically and real links only', () => {
     withRouter(<Footer />)
-    const year = new Intl.DateTimeFormat('fa-IR', { year: 'numeric' }).format(
-      new Date(),
-    )
+    const year = new Intl.DateTimeFormat('fa-IR', { year: 'numeric' }).format(new Date())
     expect(screen.getByText(new RegExp(year))).toBeTruthy()
   })
 })
@@ -204,9 +196,7 @@ describe('ConsultationForm', () => {
     withRouter(<ConsultationPage />)
     await user.click(screen.getByRole('button', { name: 'آماده‌سازی درخواست' }))
     expect(screen.getByText('لطفاً نام خود را وارد کنید.')).toBeTruthy()
-    expect(
-      screen.getByText('شماره تماس معتبر وارد کنید (مثلاً 09123456789).'),
-    ).toBeTruthy()
+    expect(screen.getByText('شماره تماس معتبر وارد کنید (مثلاً 09123456789).')).toBeTruthy()
   })
 
   it('produces a request summary after valid input', async () => {
@@ -215,16 +205,11 @@ describe('ConsultationForm', () => {
     withRouter(<ConsultationPage />)
     await user.type(screen.getByLabelText('نام و نام خانوادگی'), 'علی رضایی')
     await user.type(screen.getByLabelText('شماره تماس'), '09123456789')
-    await user.selectOptions(
-      screen.getByLabelText('موضوع حقوقی'),
-      services[0].slug,
-    )
+    await user.selectOptions(screen.getByLabelText('موضوع حقوقی'), services[0].slug)
     await user.click(screen.getByRole('button', { name: 'آماده‌سازی درخواست' }))
     expect(screen.getByText('خلاصهٔ درخواست شما آماده شد')).toBeTruthy()
     expect(screen.getByText(/علی رضایی/)).toBeTruthy()
-    expect(
-      screen.getByRole('button', { name: 'ویرایش' }),
-    ).toBeTruthy()
+    expect(screen.getByRole('button', { name: 'ویرایش' })).toBeTruthy()
   })
 
   it('lays out the consultation steps as a numbered timeline', async () => {
@@ -267,20 +252,14 @@ describe('ServicesPage', () => {
   it('lists every service once with detail anchors and contextual CTAs', async () => {
     const { ServicesPage } = await import('./pages/ServicesPage')
     const { container } = withRouter(<ServicesPage />)
-    expect(container.querySelectorAll('.sg-card').length).toBe(
-      services.length,
-    )
+    expect(container.querySelectorAll('.sg-card').length).toBe(services.length)
     // every service has a detail article (the #slug anchor) and its own CTA —
     // no extra gallery-level button on this page
     for (const s of services) {
       expect(container.querySelector(`article#${s.slug}`)).not.toBeNull()
-      expect(
-        container.querySelector(`a[href="/consultation?service=${s.slug}"]`),
-      ).not.toBeNull()
+      expect(container.querySelector(`a[href="/consultation?service=${s.slug}"]`)).not.toBeNull()
     }
-    expect(
-      container.querySelectorAll('a[href^="/consultation"]').length,
-    ).toBe(services.length)
+    expect(container.querySelectorAll('a[href^="/consultation"]').length).toBe(services.length)
   })
 })
 
@@ -291,7 +270,7 @@ describe('App', () => {
       screen.getByRole('heading', {
         level: 1,
         name: 'پروندهٔ شما، مسئولیتِ ماست',
-      }),
+      })
     ).toBeTruthy()
   })
 })

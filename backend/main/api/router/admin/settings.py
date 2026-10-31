@@ -20,8 +20,15 @@ router = APIRouter(prefix="/settings", tags=["admin-settings"])
 DbDep = Annotated[AsyncSession, Depends(get_db)]
 
 ALLOWED_KEYS = {
-    "brand", "contact", "seo", "footer", "socials", "ai",
-    "referral", "commission", "legal_topics",
+    "brand",
+    "contact",
+    "seo",
+    "footer",
+    "socials",
+    "ai",
+    "referral",
+    "commission",
+    "legal_topics",
 }
 
 
@@ -45,17 +52,33 @@ async def update_setting(
     if key not in ALLOWED_KEYS:
         raise HTTPException(
             400,
-            {"code": "unknown_key", "message": f"کلید باید یکی از {', '.join(sorted(ALLOWED_KEYS))} باشد."},
+            {
+                "code": "unknown_key",
+                "message": f"کلید باید یکی از {', '.join(sorted(ALLOWED_KEYS))} باشد.",
+            },
         )
     existing = await get_setting(db, key)
     if existing is not None:
         await snapshot_revision(
-            db, "setting", key, {"value": existing.value, "is_public": existing.is_public}, user.id
+            db,
+            "setting",
+            key,
+            {"value": existing.value, "is_public": existing.is_public},
+            user.id,
         )
     is_public = existing.is_public if payload.is_public is None else payload.is_public
     if existing is None and payload.is_public is None:
         is_public = key in {"brand", "contact", "seo", "footer", "socials"}
     row = await upsert_setting(db, key, payload.value, is_public, user.id)
-    await audit(db, actor=user, action="setting.update", entity="setting", entity_id=key, request=request)
+    await audit(
+        db,
+        actor=user,
+        action="setting.update",
+        entity="setting",
+        entity_id=key,
+        before={"value": existing.value if existing else {}},
+        after={"value": row.value},
+        request=request,
+    )
     await db.commit()
     return SettingOut.model_validate(row)

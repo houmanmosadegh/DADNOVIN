@@ -26,9 +26,7 @@ def aware(dt: datetime) -> datetime:
 
 
 def created_at_col() -> Mapped[datetime]:
-    return mapped_column(
-        DateTime(timezone=True), default=utcnow, nullable=False
-    )
+    return mapped_column(DateTime(timezone=True), default=utcnow, nullable=False)
 
 
 def updated_at_col() -> Mapped[datetime]:

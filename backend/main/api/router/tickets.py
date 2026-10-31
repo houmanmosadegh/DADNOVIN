@@ -32,7 +32,9 @@ async def _authenticate_ticket(
 ) -> Ticket:
     """Lookup by number + verify access code — generic failure message."""
     limiter.check(
-        "ticket_lookup", client_key(request), get_settings().rate_limit_public_post_per_minute
+        "ticket_lookup",
+        client_key(request),
+        get_settings().rate_limit_public_post_per_minute,
     )
     ticket = (
         await db.execute(
@@ -41,7 +43,8 @@ async def _authenticate_ticket(
     ).scalar_one_or_none()
     if ticket is None or not verify_password(code, ticket.access_code_hash):
         raise HTTPException(
-            404, {"code": "not_found", "message": "تیکت یافت نشد یا کد پیگیری اشتباه است."}
+            404,
+            {"code": "not_found", "message": "تیکت یافت نشد یا کد پیگیری اشتباه است."},
         )
     return ticket
 
@@ -49,16 +52,20 @@ async def _authenticate_ticket(
 async def _public_view(db: AsyncSession, ticket: Ticket) -> TicketPublicOut:
     """Public thread — unified messages preferred, legacy rows merged in."""
     unified = (
-        await db.execute(
-            select(RequestMessage)
-            .where(
-                RequestMessage.request_type == "ticket",
-                RequestMessage.request_id == ticket.id,
-                RequestMessage.is_note.is_(False),
+        (
+            await db.execute(
+                select(RequestMessage)
+                .where(
+                    RequestMessage.request_type == "ticket",
+                    RequestMessage.request_id == ticket.id,
+                    RequestMessage.is_note.is_(False),
+                )
+                .order_by(RequestMessage.created_at)
             )
-            .order_by(RequestMessage.created_at)
         )
-    ).scalars().all()
+        .scalars()
+        .all()
+    )
     # once unified messages exist they already include migrated legacy rows
     msgs = (
         list(unified)
@@ -77,9 +84,13 @@ async def _public_view(db: AsyncSession, ticket: Ticket) -> TicketPublicOut:
 
 
 @router.post("", status_code=status.HTTP_201_CREATED)
-async def create_ticket(payload: TicketCreateIn, request: Request, db: DbDep) -> TicketCreatedOut:
+async def create_ticket(
+    payload: TicketCreateIn, request: Request, db: DbDep
+) -> TicketCreatedOut:
     limiter.check(
-        "ticket_create", client_key(request), get_settings().rate_limit_public_post_per_minute
+        "ticket_create",
+        client_key(request),
+        get_settings().rate_limit_public_post_per_minute,
     )
     if payload.website:  # honeypot
         return TicketCreatedOut(ticket_number="DN-00000", access_code="00000000")
@@ -97,31 +108,47 @@ async def create_ticket(payload: TicketCreateIn, request: Request, db: DbDep) ->
     db.add(ticket)
     await db.flush()
     await thread_svc.stamp_sla(db, "ticket", ticket)
-    await thread_svc.add_event(db, "ticket", ticket.id, "created", payload={"category": ticket.category})
+    await thread_svc.add_event(
+        db, "ticket", ticket.id, "created", payload={"category": ticket.category}
+    )
     await thread_svc.add_message(
-        db, "ticket", ticket.id,
-        sender_type="customer", sender_id=None, body=payload.body,
+        db,
+        "ticket",
+        ticket.id,
+        sender_type="customer",
+        sender_id=None,
+        body=payload.body,
     )
     await db.commit()
     return TicketCreatedOut(ticket_number=number, access_code=code)
 
 
 @router.post("/track")
-async def track_ticket(payload: TicketTrackIn, request: Request, db: DbDep) -> TicketPublicOut:
-    ticket = await _authenticate_ticket(db, request, payload.ticket_number, payload.access_code)
+async def track_ticket(
+    payload: TicketTrackIn, request: Request, db: DbDep
+) -> TicketPublicOut:
+    ticket = await _authenticate_ticket(
+        db, request, payload.ticket_number, payload.access_code
+    )
     return await _public_view(db, ticket)
 
 
 @router.post("/reply", status_code=status.HTTP_201_CREATED)
 async def customer_reply(payload: TicketReplyIn, request: Request, db: DbDep):
-    ticket = await _authenticate_ticket(db, request, payload.ticket_number, payload.access_code)
+    ticket = await _authenticate_ticket(
+        db, request, payload.ticket_number, payload.access_code
+    )
     if ticket.status in ("closed", "cancelled"):
         raise HTTPException(
             409, {"code": "closed", "message": "این تیکت بسته شده است."}
         )
     await thread_svc.add_message(
-        db, "ticket", ticket.id,
-        sender_type="customer", sender_id=None, body=payload.body,
+        db,
+        "ticket",
+        ticket.id,
+        sender_type="customer",
+        sender_id=None,
+        body=payload.body,
     )
     if ticket.status in ("resolved", "waiting_reply"):
         ticket.status = "reviewing"

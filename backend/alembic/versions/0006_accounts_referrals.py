@@ -28,7 +28,9 @@ def _has_index(table: str, name: str) -> bool:
 
 
 def _has_fk(table: str, name: str) -> bool:
-    return name in {f["name"] for f in sa.inspect(op.get_bind()).get_foreign_keys(table)}
+    return name in {
+        f["name"] for f in sa.inspect(op.get_bind()).get_foreign_keys(table)
+    }
 
 
 def upgrade() -> None:
@@ -53,7 +55,9 @@ def upgrade() -> None:
     if not _has_col("users", "referred_code"):
         op.add_column(
             "users",
-            sa.Column("referred_code", sa.String(24), nullable=False, server_default=""),
+            sa.Column(
+                "referred_code", sa.String(24), nullable=False, server_default=""
+            ),
         )
 
     # ── consultations: ownership + referral snapshot ───────────────
@@ -96,28 +100,32 @@ def upgrade() -> None:
     if not _has_col("consultation_requests", "fee_amount"):
         op.add_column(
             "consultation_requests",
-            sa.Column("fee_amount", sa.BigInteger(), nullable=False, server_default="0"),
+            sa.Column(
+                "fee_amount", sa.BigInteger(), nullable=False, server_default="0"
+            ),
         )
 
     # ── marketer applications & profiles ───────────────────────────
     if not _has_table("marketer_applications"):
         op.create_table(
-        "marketer_applications",
-        sa.Column("id", sa.Uuid(), primary_key=True),
-        sa.Column(
-            "user_id",
-            sa.Uuid(),
-            sa.ForeignKey("users.id", ondelete="CASCADE"),
-            index=True,
-            nullable=False,
-        ),
-        sa.Column("note", sa.Text(), server_default="", nullable=False),
-        sa.Column("status", sa.String(20), server_default="pending", nullable=False),
-        sa.Column("reviewed_by", sa.Uuid(), nullable=True),
-        sa.Column("reviewed_at", sa.DateTime(timezone=True), nullable=True),
-        sa.Column("review_note", sa.Text(), server_default="", nullable=False),
-        sa.Column("created_at", sa.DateTime(timezone=True), nullable=False),
-    )
+            "marketer_applications",
+            sa.Column("id", sa.Uuid(), primary_key=True),
+            sa.Column(
+                "user_id",
+                sa.Uuid(),
+                sa.ForeignKey("users.id", ondelete="CASCADE"),
+                index=True,
+                nullable=False,
+            ),
+            sa.Column("note", sa.Text(), server_default="", nullable=False),
+            sa.Column(
+                "status", sa.String(20), server_default="pending", nullable=False
+            ),
+            sa.Column("reviewed_by", sa.Uuid(), nullable=True),
+            sa.Column("reviewed_at", sa.DateTime(timezone=True), nullable=True),
+            sa.Column("review_note", sa.Text(), server_default="", nullable=False),
+            sa.Column("created_at", sa.DateTime(timezone=True), nullable=False),
+        )
     if not _has_index("marketer_applications", "ix_marketer_applications_status"):
         op.create_index(
             "ix_marketer_applications_status", "marketer_applications", ["status"]
@@ -126,25 +134,27 @@ def upgrade() -> None:
 
     if not _has_table("marketer_profiles"):
         op.create_table(
-        "marketer_profiles",
-        sa.Column("id", sa.Uuid(), primary_key=True),
-        sa.Column(
-            "user_id",
-            sa.Uuid(),
-            sa.ForeignKey("users.id", ondelete="CASCADE"),
-            nullable=False,
-        ),
-        sa.Column("ref_code", sa.String(24), nullable=False),
-        sa.Column("is_active", sa.Boolean(), server_default="true", nullable=False),
-        sa.Column("iban_enc", sa.Text(), server_default="", nullable=False),
-        sa.Column("card_enc", sa.Text(), server_default="", nullable=False),
-        sa.Column("approved_by", sa.Uuid(), nullable=True),
-        sa.Column("fraud_flag", sa.Boolean(), server_default="false", nullable=False),
-        sa.Column("created_at", sa.DateTime(timezone=True), nullable=False),
-        sa.Column("updated_at", sa.DateTime(timezone=True), nullable=False),
-        sa.UniqueConstraint("user_id", name="uq_marketer_user"),
-        sa.UniqueConstraint("ref_code", name="uq_marketer_refcode"),
-    )
+            "marketer_profiles",
+            sa.Column("id", sa.Uuid(), primary_key=True),
+            sa.Column(
+                "user_id",
+                sa.Uuid(),
+                sa.ForeignKey("users.id", ondelete="CASCADE"),
+                nullable=False,
+            ),
+            sa.Column("ref_code", sa.String(24), nullable=False),
+            sa.Column("is_active", sa.Boolean(), server_default="true", nullable=False),
+            sa.Column("iban_enc", sa.Text(), server_default="", nullable=False),
+            sa.Column("card_enc", sa.Text(), server_default="", nullable=False),
+            sa.Column("approved_by", sa.Uuid(), nullable=True),
+            sa.Column(
+                "fraud_flag", sa.Boolean(), server_default="false", nullable=False
+            ),
+            sa.Column("created_at", sa.DateTime(timezone=True), nullable=False),
+            sa.Column("updated_at", sa.DateTime(timezone=True), nullable=False),
+            sa.UniqueConstraint("user_id", name="uq_marketer_user"),
+            sa.UniqueConstraint("ref_code", name="uq_marketer_refcode"),
+        )
     if not _has_index("marketer_profiles", "ix_marketer_profiles_ref_code"):
         op.create_index(
             "ix_marketer_profiles_ref_code", "marketer_profiles", ["ref_code"]
@@ -152,159 +162,171 @@ def upgrade() -> None:
 
     if not _has_table("referral_clicks"):
         op.create_table(
-        "referral_clicks",
-        sa.Column("id", sa.Uuid(), primary_key=True),
-        sa.Column("ref_code", sa.String(24), index=True, nullable=False),
-        sa.Column("ip", sa.String(45), server_default="", nullable=False),
-        sa.Column("user_agent", sa.String(300), server_default="", nullable=False),
-        sa.Column("landing_path", sa.String(200), server_default="/", nullable=False),
-        sa.Column("created_at", sa.DateTime(timezone=True), nullable=False),
-    )
+            "referral_clicks",
+            sa.Column("id", sa.Uuid(), primary_key=True),
+            sa.Column("ref_code", sa.String(24), index=True, nullable=False),
+            sa.Column("ip", sa.String(45), server_default="", nullable=False),
+            sa.Column("user_agent", sa.String(300), server_default="", nullable=False),
+            sa.Column(
+                "landing_path", sa.String(200), server_default="/", nullable=False
+            ),
+            sa.Column("created_at", sa.DateTime(timezone=True), nullable=False),
+        )
 
     if not _has_table("referral_attributions"):
         op.create_table(
-        "referral_attributions",
-        sa.Column("id", sa.Uuid(), primary_key=True),
-        sa.Column(
-            "marketer_id",
-            sa.Uuid(),
-            sa.ForeignKey("marketer_profiles.id"),
-            index=True,
-            nullable=False,
-        ),
-        sa.Column("request_type", sa.String(20), nullable=False),
-        sa.Column("request_id", sa.Uuid(), index=True, nullable=False),
-        sa.Column("ref_code", sa.String(24), nullable=False),
-        sa.Column("ip", sa.String(45), server_default="", nullable=False),
-        sa.Column("user_agent", sa.String(300), server_default="", nullable=False),
-        sa.Column("created_at", sa.DateTime(timezone=True), nullable=False),
-        sa.UniqueConstraint("request_type", "request_id", name="uq_attrib_request"),
-    )
+            "referral_attributions",
+            sa.Column("id", sa.Uuid(), primary_key=True),
+            sa.Column(
+                "marketer_id",
+                sa.Uuid(),
+                sa.ForeignKey("marketer_profiles.id"),
+                index=True,
+                nullable=False,
+            ),
+            sa.Column("request_type", sa.String(20), nullable=False),
+            sa.Column("request_id", sa.Uuid(), index=True, nullable=False),
+            sa.Column("ref_code", sa.String(24), nullable=False),
+            sa.Column("ip", sa.String(45), server_default="", nullable=False),
+            sa.Column("user_agent", sa.String(300), server_default="", nullable=False),
+            sa.Column("created_at", sa.DateTime(timezone=True), nullable=False),
+            sa.UniqueConstraint("request_type", "request_id", name="uq_attrib_request"),
+        )
 
     # ── commissions ────────────────────────────────────────────────
     if not _has_table("commission_rules"):
         op.create_table(
-        "commission_rules",
-        sa.Column("id", sa.Uuid(), primary_key=True),
-        sa.Column("kind", sa.String(10), server_default="fixed", nullable=False),
-        sa.Column("value", sa.BigInteger(), server_default="0", nullable=False),
-        sa.Column("tier_min", sa.Integer(), server_default="0", nullable=False),
-        sa.Column("marketer_id", sa.Uuid(), index=True, nullable=True),
-        sa.Column("is_active", sa.Boolean(), server_default="true", nullable=False),
-        sa.Column("created_at", sa.DateTime(timezone=True), nullable=False),
-    )
+            "commission_rules",
+            sa.Column("id", sa.Uuid(), primary_key=True),
+            sa.Column("kind", sa.String(10), server_default="fixed", nullable=False),
+            sa.Column("value", sa.BigInteger(), server_default="0", nullable=False),
+            sa.Column("tier_min", sa.Integer(), server_default="0", nullable=False),
+            sa.Column("marketer_id", sa.Uuid(), index=True, nullable=True),
+            sa.Column("is_active", sa.Boolean(), server_default="true", nullable=False),
+            sa.Column("created_at", sa.DateTime(timezone=True), nullable=False),
+        )
 
     if not _has_table("commissions"):
         op.create_table(
-        "commissions",
-        sa.Column("id", sa.Uuid(), primary_key=True),
-        sa.Column(
-            "marketer_id",
-            sa.Uuid(),
-            sa.ForeignKey("marketer_profiles.id"),
-            index=True,
-            nullable=False,
-        ),
-        sa.Column("request_type", sa.String(20), nullable=False),
-        sa.Column("request_id", sa.Uuid(), index=True, nullable=False),
-        sa.Column("basis_kind", sa.String(10), server_default="fixed", nullable=False),
-        sa.Column("basis_amount", sa.BigInteger(), server_default="0", nullable=False),
-        sa.Column("amount", sa.BigInteger(), server_default="0", nullable=False),
-        sa.Column("status", sa.String(15), server_default="pending", nullable=False),
-        sa.Column("hold_until", sa.DateTime(timezone=True), nullable=True),
-        sa.Column("created_at", sa.DateTime(timezone=True), nullable=False),
-        sa.Column("updated_at", sa.DateTime(timezone=True), nullable=False),
-        sa.UniqueConstraint(
-            "request_type", "request_id", name="uq_commission_request"
-        ),
-    )
+            "commissions",
+            sa.Column("id", sa.Uuid(), primary_key=True),
+            sa.Column(
+                "marketer_id",
+                sa.Uuid(),
+                sa.ForeignKey("marketer_profiles.id"),
+                index=True,
+                nullable=False,
+            ),
+            sa.Column("request_type", sa.String(20), nullable=False),
+            sa.Column("request_id", sa.Uuid(), index=True, nullable=False),
+            sa.Column(
+                "basis_kind", sa.String(10), server_default="fixed", nullable=False
+            ),
+            sa.Column(
+                "basis_amount", sa.BigInteger(), server_default="0", nullable=False
+            ),
+            sa.Column("amount", sa.BigInteger(), server_default="0", nullable=False),
+            sa.Column(
+                "status", sa.String(15), server_default="pending", nullable=False
+            ),
+            sa.Column("hold_until", sa.DateTime(timezone=True), nullable=True),
+            sa.Column("created_at", sa.DateTime(timezone=True), nullable=False),
+            sa.Column("updated_at", sa.DateTime(timezone=True), nullable=False),
+            sa.UniqueConstraint(
+                "request_type", "request_id", name="uq_commission_request"
+            ),
+        )
     if not _has_index("commissions", "ix_commissions_status"):
         op.create_index("ix_commissions_status", "commissions", ["status"])
 
     # ── wallet ledger & payouts ────────────────────────────────────
     if not _has_table("wallet_ledger"):
         op.create_table(
-        "wallet_ledger",
-        sa.Column("id", sa.Uuid(), primary_key=True),
-        sa.Column(
-            "marketer_id",
-            sa.Uuid(),
-            sa.ForeignKey("marketer_profiles.id"),
-            index=True,
-            nullable=False,
-        ),
-        sa.Column("kind", sa.String(20), index=True, nullable=False),
-        sa.Column("amount", sa.BigInteger(), nullable=False),
-        sa.Column("ref_type", sa.String(20), server_default="", nullable=False),
-        sa.Column("ref_id", sa.Uuid(), nullable=True),
-        sa.Column("memo", sa.String(300), server_default="", nullable=False),
-        sa.Column("actor_id", sa.Uuid(), nullable=True),
-        sa.Column("idempotency_key", sa.String(80), nullable=False),
-        sa.Column("created_at", sa.DateTime(timezone=True), nullable=False),
-        sa.UniqueConstraint("idempotency_key", name="uq_ledger_idem"),
-    )
+            "wallet_ledger",
+            sa.Column("id", sa.Uuid(), primary_key=True),
+            sa.Column(
+                "marketer_id",
+                sa.Uuid(),
+                sa.ForeignKey("marketer_profiles.id"),
+                index=True,
+                nullable=False,
+            ),
+            sa.Column("kind", sa.String(20), index=True, nullable=False),
+            sa.Column("amount", sa.BigInteger(), nullable=False),
+            sa.Column("ref_type", sa.String(20), server_default="", nullable=False),
+            sa.Column("ref_id", sa.Uuid(), nullable=True),
+            sa.Column("memo", sa.String(300), server_default="", nullable=False),
+            sa.Column("actor_id", sa.Uuid(), nullable=True),
+            sa.Column("idempotency_key", sa.String(80), nullable=False),
+            sa.Column("created_at", sa.DateTime(timezone=True), nullable=False),
+            sa.UniqueConstraint("idempotency_key", name="uq_ledger_idem"),
+        )
 
     if not _has_table("payout_requests"):
         op.create_table(
-        "payout_requests",
-        sa.Column("id", sa.Uuid(), primary_key=True),
-        sa.Column(
-            "marketer_id",
-            sa.Uuid(),
-            sa.ForeignKey("marketer_profiles.id"),
-            index=True,
-            nullable=False,
-        ),
-        sa.Column("amount", sa.BigInteger(), nullable=False),
-        sa.Column("status", sa.String(15), server_default="pending", nullable=False),
-        sa.Column("iban_masked", sa.String(40), server_default="", nullable=False),
-        sa.Column("payment_ref", sa.String(80), server_default="", nullable=False),
-        sa.Column("reject_reason", sa.String(300), server_default="", nullable=False),
-        sa.Column("reviewed_by", sa.Uuid(), nullable=True),
-        sa.Column("reviewed_at", sa.DateTime(timezone=True), nullable=True),
-        sa.Column("created_at", sa.DateTime(timezone=True), nullable=False),
-        sa.Column("updated_at", sa.DateTime(timezone=True), nullable=False),
-    )
+            "payout_requests",
+            sa.Column("id", sa.Uuid(), primary_key=True),
+            sa.Column(
+                "marketer_id",
+                sa.Uuid(),
+                sa.ForeignKey("marketer_profiles.id"),
+                index=True,
+                nullable=False,
+            ),
+            sa.Column("amount", sa.BigInteger(), nullable=False),
+            sa.Column(
+                "status", sa.String(15), server_default="pending", nullable=False
+            ),
+            sa.Column("iban_masked", sa.String(40), server_default="", nullable=False),
+            sa.Column("payment_ref", sa.String(80), server_default="", nullable=False),
+            sa.Column(
+                "reject_reason", sa.String(300), server_default="", nullable=False
+            ),
+            sa.Column("reviewed_by", sa.Uuid(), nullable=True),
+            sa.Column("reviewed_at", sa.DateTime(timezone=True), nullable=True),
+            sa.Column("created_at", sa.DateTime(timezone=True), nullable=False),
+            sa.Column("updated_at", sa.DateTime(timezone=True), nullable=False),
+        )
     if not _has_index("payout_requests", "ix_payout_requests_status"):
         op.create_index("ix_payout_requests_status", "payout_requests", ["status"])
 
     # ── notifications & password reset ─────────────────────────────
     if not _has_table("inbox_notifications"):
         op.create_table(
-        "inbox_notifications",
-        sa.Column("id", sa.Uuid(), primary_key=True),
-        sa.Column(
-            "user_id",
-            sa.Uuid(),
-            sa.ForeignKey("users.id", ondelete="CASCADE"),
-            index=True,
-            nullable=False,
-        ),
-        sa.Column("title", sa.String(200), nullable=False),
-        sa.Column("body", sa.Text(), server_default="", nullable=False),
-        sa.Column("kind", sa.String(30), server_default="info", nullable=False),
-        sa.Column("link", sa.String(200), server_default="", nullable=False),
-        sa.Column("read_at", sa.DateTime(timezone=True), nullable=True),
-        sa.Column("created_at", sa.DateTime(timezone=True), nullable=False),
-    )
+            "inbox_notifications",
+            sa.Column("id", sa.Uuid(), primary_key=True),
+            sa.Column(
+                "user_id",
+                sa.Uuid(),
+                sa.ForeignKey("users.id", ondelete="CASCADE"),
+                index=True,
+                nullable=False,
+            ),
+            sa.Column("title", sa.String(200), nullable=False),
+            sa.Column("body", sa.Text(), server_default="", nullable=False),
+            sa.Column("kind", sa.String(30), server_default="info", nullable=False),
+            sa.Column("link", sa.String(200), server_default="", nullable=False),
+            sa.Column("read_at", sa.DateTime(timezone=True), nullable=True),
+            sa.Column("created_at", sa.DateTime(timezone=True), nullable=False),
+        )
 
     if not _has_table("password_reset_tokens"):
         op.create_table(
-        "password_reset_tokens",
-        sa.Column("id", sa.Uuid(), primary_key=True),
-        sa.Column(
-            "user_id",
-            sa.Uuid(),
-            sa.ForeignKey("users.id", ondelete="CASCADE"),
-            index=True,
-            nullable=False,
-        ),
-        sa.Column("token_hash", sa.String(64), nullable=False),
-        sa.Column("expires_at", sa.DateTime(timezone=True), nullable=False),
-        sa.Column("used_at", sa.DateTime(timezone=True), nullable=True),
-        sa.Column("created_at", sa.DateTime(timezone=True), nullable=False),
-        sa.UniqueConstraint("token_hash", name="uq_reset_token"),
-    )
+            "password_reset_tokens",
+            sa.Column("id", sa.Uuid(), primary_key=True),
+            sa.Column(
+                "user_id",
+                sa.Uuid(),
+                sa.ForeignKey("users.id", ondelete="CASCADE"),
+                index=True,
+                nullable=False,
+            ),
+            sa.Column("token_hash", sa.String(64), nullable=False),
+            sa.Column("expires_at", sa.DateTime(timezone=True), nullable=False),
+            sa.Column("used_at", sa.DateTime(timezone=True), nullable=True),
+            sa.Column("created_at", sa.DateTime(timezone=True), nullable=False),
+            sa.UniqueConstraint("token_hash", name="uq_reset_token"),
+        )
     if not _has_index("password_reset_tokens", "ix_password_reset_tokens_token_hash"):
         op.create_index(
             "ix_password_reset_tokens_token_hash",

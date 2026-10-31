@@ -127,7 +127,9 @@
   background: transparent;
   color: var(--color-text-2);
   cursor: pointer;
-  transition: color var(--dur-fast) ease, border-color var(--dur-fast) ease;
+  transition:
+    color var(--dur-fast) ease,
+    border-color var(--dur-fast) ease;
 }
 .ai-chat__close:hover {
   color: var(--color-gold-hi);
@@ -172,7 +174,9 @@
   font-size: 0.78rem;
   font-weight: 600;
   color: var(--color-gold);
-  transition: border-color var(--dur-fast) ease, background-color var(--dur-fast) ease;
+  transition:
+    border-color var(--dur-fast) ease,
+    background-color var(--dur-fast) ease;
 }
 .ai-chat__cta:hover {
   border-color: var(--color-gold);

@@ -1,0 +1,8 @@
+# Default owner for everything — add team handles as the team grows.
+*                                   @houmanmosadegh
+
+# Domain owners (suggested split once team > 1)
+/backend/                           @houmanmosadegh
+/frontend/                          @houmanmosadegh
+/panel/                             @houmanmosadegh
+/infrastructure/                    @houmanmosadegh

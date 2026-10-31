@@ -36,8 +36,13 @@ async def create_label(
     db.add(row)
     await db.flush()
     await audit(
-        db, actor=user, action="label.create", entity="label",
-        entity_id=row.id, detail={"name": row.name}, request=request,
+        db,
+        actor=user,
+        action="label.create",
+        entity="label",
+        entity_id=row.id,
+        detail={"name": row.name},
+        request=request,
     )
     await db.commit()
     return LabelOut.model_validate(row)
@@ -50,10 +55,17 @@ async def delete_label(
     row = await db.get(Label, label_id)
     if row is None:
         raise HTTPException(404, {"code": "not_found", "message": "برچسب یافت نشد."})
-    await db.execute(RequestLabel.__table__.delete().where(RequestLabel.label_id == label_id))
+    await db.execute(
+        RequestLabel.__table__.delete().where(RequestLabel.label_id == label_id)
+    )
     await db.delete(row)
     await audit(
-        db, actor=user, action="label.delete", entity="label",
-        entity_id=label_id, detail={"name": row.name}, request=request,
+        db,
+        actor=user,
+        action="label.delete",
+        entity="label",
+        entity_id=label_id,
+        detail={"name": row.name},
+        request=request,
     )
     await db.commit()

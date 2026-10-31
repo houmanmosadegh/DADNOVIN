@@ -1,21 +1,7 @@
 /** Shared primitives — toast, badges, skeletons, empty states, dialogs. */
 
-import {
-  AlertTriangle,
-  CheckCircle2,
-  Info,
-  Inbox,
-  X,
-  XCircle,
-} from "lucide-react";
-import {
-  createContext,
-  useCallback,
-  useContext,
-  useEffect,
-  useState,
-  type ReactNode,
-} from "react";
+import { AlertTriangle, CheckCircle2, Info, Inbox, X, XCircle } from "lucide-react";
+import { createContext, useCallback, useContext, useEffect, useState, type ReactNode } from "react";
 
 // ---------- toast ----------
 
@@ -51,10 +37,7 @@ export function ToastProvider({ children }: { children: ReactNode }) {
       {children}
       <div className="fixed bottom-4 left-4 z-50 flex flex-col gap-2" role="status">
         {toasts.map((t) => (
-          <div
-            key={t.id}
-            className="card flex items-center gap-2 px-3.5 py-2.5 text-sm shadow-lg"
-          >
+          <div key={t.id} className="card flex items-center gap-2 px-3.5 py-2.5 text-sm shadow-lg">
             {icons[t.kind]}
             <span>{t.text}</span>
           </div>
@@ -95,7 +78,23 @@ export const STATUS_FA: Record<string, string> = {
   failed: "ناموفق",
   // articles
   draft: "پیش‌نویس",
+  scheduled: "زمان‌بندی‌شده",
   published: "منتشرشده",
+  archived: "آرشیو",
+  // commissions / referrals
+  pending: "در انتظار",
+  approved: "تأییدشده",
+  paid: "پرداخت‌شده",
+  reversed: "برگشت‌خورده",
+  registered: "ثبت‌شده",
+  under_review: "در حال بررسی",
+  contracted: "قرارداد بسته شد",
+  not_contracted: "قرارداد نشد",
+  referral_cancelled: "لغو",
+  // marketer
+  active: "فعال",
+  suspended: "تعلیق‌شده",
+  rejected: "ردشده",
 };
 
 const STATUS_TONE: Record<string, string> = {
@@ -120,7 +119,20 @@ const STATUS_TONE: Record<string, string> = {
   sent: "bg-emerald-500/10 text-emerald-300 border-emerald-500/30",
   failed: "bg-red-500/10 text-red-300 border-red-500/30",
   draft: "bg-sand-0 text-ink-2 border-sand-2",
+  scheduled: "bg-amber-500/10 text-amber-300 border-amber-500/30",
   published: "bg-emerald-500/10 text-emerald-300 border-emerald-500/30",
+  archived: "bg-sand-0 text-ink-3 border-sand-2",
+  pending: "bg-amber-500/10 text-amber-300 border-amber-500/30",
+  approved: "bg-sky-500/10 text-sky-300 border-sky-500/30",
+  paid: "bg-emerald-500/10 text-emerald-300 border-emerald-500/30",
+  reversed: "bg-red-500/10 text-red-300 border-red-500/30",
+  registered: "bg-sky-500/10 text-sky-300 border-sky-500/30",
+  under_review: "bg-amber-500/10 text-amber-300 border-amber-500/30",
+  contracted: "bg-emerald-500/10 text-emerald-300 border-emerald-500/30",
+  not_contracted: "bg-sand-0 text-ink-2 border-sand-2",
+  active: "bg-emerald-500/10 text-emerald-300 border-emerald-500/30",
+  suspended: "bg-red-500/10 text-red-300 border-red-500/30",
+  rejected: "bg-red-500/10 text-red-300 border-red-500/30",
 };
 
 export function StatusBadge({ value }: { value: string }) {
@@ -135,15 +147,7 @@ export function StatusBadge({ value }: { value: string }) {
 
 // ---------- page header ----------
 
-export function PageHeader({
-  title,
-  subtitle,
-  actions,
-}: {
-  title: string;
-  subtitle?: string;
-  actions?: ReactNode;
-}) {
+export function PageHeader({ title, subtitle, actions }: { title: string; subtitle?: string; actions?: ReactNode }) {
   return (
     <div className="mb-5 flex flex-wrap items-start justify-between gap-3">
       <div>
@@ -157,13 +161,7 @@ export function PageHeader({
 
 // ---------- table ----------
 
-export function Table({
-  head,
-  children,
-}: {
-  head: string[];
-  children: ReactNode;
-}) {
+export function Table({ head, children }: { head: string[]; children: ReactNode }) {
   return (
     <div className="card overflow-x-auto">
       <table className="w-full min-w-[640px] text-sm">
@@ -182,15 +180,7 @@ export function Table({
   );
 }
 
-export function EmptyState({
-  text,
-  hint,
-  action,
-}: {
-  text: string;
-  hint?: string;
-  action?: ReactNode;
-}) {
+export function EmptyState({ text, hint, action }: { text: string; hint?: string; action?: ReactNode }) {
   return (
     <div className="card flex flex-col items-center justify-center gap-1.5 px-6 py-14 text-center">
       <Inbox size={24} className="text-ink-3" />
@@ -268,11 +258,7 @@ export function ConfirmDialog({
           <button className="btn-ghost btn-sm" onClick={onCancel}>
             انصراف
           </button>
-          <button
-            className={`${danger ? "btn-danger" : "btn-primary"} btn-sm`}
-            onClick={onConfirm}
-            autoFocus
-          >
+          <button className={`${danger ? "btn-danger" : "btn-primary"} btn-sm`} onClick={onConfirm} autoFocus>
             تأیید
           </button>
         </div>
@@ -450,11 +436,7 @@ export function Pagination({
       <span className="text-ink-2">
         صفحه {page.toLocaleString("fa-IR")} از {pages.toLocaleString("fa-IR")}
       </span>
-      <button
-        className="btn-ghost btn-sm"
-        disabled={page >= pages}
-        onClick={() => onPage(page + 1)}
-      >
+      <button className="btn-ghost btn-sm" disabled={page >= pages} onClick={() => onPage(page + 1)}>
         بعدی
       </button>
     </div>
@@ -467,7 +449,7 @@ export function Field({
   hint,
   children,
 }: {
-  label: string;
+  label: ReactNode;
   error?: string;
   hint?: string;
   children: ReactNode;

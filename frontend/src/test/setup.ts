@@ -11,10 +11,7 @@ class MockIntersectionObserver implements IntersectionObserver {
   readonly thresholds = []
   constructor(private cb: IntersectionObserverCallback) {}
   observe(target: Element) {
-    this.cb(
-      [{ isIntersecting: true, target } as IntersectionObserverEntry],
-      this,
-    )
+    this.cb([{ isIntersecting: true, target } as IntersectionObserverEntry], this)
   }
   unobserve() {}
   disconnect() {}

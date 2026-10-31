@@ -27,6 +27,8 @@ body {
   background: var(--color-sand-0);
   color: var(--color-ink-0);
   -webkit-font-smoothing: antialiased;
+  font-size: 14px; /* spec: body/table ≥14px, Persian needs the extra px */
+  line-height: 1.7;
 }
 
 /* thin scrollbars */
@@ -57,7 +59,7 @@ input[type="date"],
 input[type="datetime-local"],
 textarea,
 select {
-  @apply w-full rounded-lg border border-line bg-sand-0 px-3 py-2 text-sm text-ink-0 outline-none transition placeholder:text-ink-3 hover:border-ink-3 focus:border-gold-2 focus:ring-2 focus:ring-gold-2/20 disabled:opacity-60;
+  @apply w-full rounded-lg border border-line bg-sand-0 px-3 py-2 text-base text-ink-0 outline-none transition placeholder:text-ink-3 hover:border-ink-3 focus:border-gold-2 focus:ring-2 focus:ring-gold-2/20 disabled:opacity-60;
 }
 
 select option {
@@ -133,10 +135,10 @@ label {
 
 /* data table header cells */
 .th {
-  @apply px-4 py-3 text-right text-[12px] font-medium text-ink-2;
+  @apply px-4 py-3 text-right text-[13px] font-medium text-ink-2;
 }
 .td {
-  @apply px-4 py-3 align-middle text-[13px];
+  @apply px-4 py-3 align-middle text-[14px];
 }
 .tr-hover {
   @apply border-b border-sand-2 transition last:border-0 hover:bg-sand-2/30;
@@ -183,10 +185,76 @@ kbd {
   @apply rounded border border-line bg-sand-2 px-1.5 py-0.5 text-[11px] text-ink-2;
 }
 
+/* TipTap article editor */
+.rte {
+  @apply overflow-hidden rounded-lg border border-line bg-sand-0;
+}
+.rte-bar {
+  @apply flex flex-wrap items-center gap-0.5 border-b border-line bg-sand-1 px-2 py-1.5;
+}
+.rte-btn {
+  @apply inline-flex h-8 w-8 items-center justify-center rounded-md text-ink-2 transition hover:bg-sand-2 hover:text-ink-0 disabled:opacity-40;
+}
+.rte-btn--on {
+  @apply bg-gold-3/60 text-gold-1;
+}
+.rte-sep {
+  @apply mx-1 h-5 w-px bg-line;
+}
+.rte-body {
+  @apply min-h-[320px] px-4 py-3 text-[15px] leading-[1.9] text-ink-0 outline-none;
+}
+.rte-body p.is-editor-empty:first-child::before {
+  content: attr(data-placeholder);
+  @apply pointer-events-none float-right h-0 text-ink-3;
+}
+.rte-body h2 {
+  @apply mt-6 mb-2 text-xl font-semibold;
+}
+.rte-body h3 {
+  @apply mt-5 mb-2 text-lg font-semibold;
+}
+.rte-body h4 {
+  @apply mt-4 mb-1.5 text-base font-semibold;
+}
+.rte-body ul {
+  @apply my-3 list-disc pr-6;
+}
+.rte-body ol {
+  @apply my-3 list-decimal pr-6;
+}
+.rte-body blockquote {
+  @apply my-4 border-r-2 border-gold-2 pr-4 text-ink-1;
+}
+.rte-body hr {
+  @apply my-6 border-sand-2;
+}
+.rte-body a {
+  @apply text-gold-1 underline underline-offset-4;
+}
+.rte-body img {
+  @apply my-4 max-w-full rounded-lg;
+}
+.rte-body table {
+  @apply my-4 w-full border-collapse text-sm;
+}
+.rte-body th,
+.rte-body td {
+  @apply border border-line px-3 py-2 text-right;
+}
+.rte-body th {
+  @apply bg-sand-1 font-medium;
+}
+.rte-body .selectedCell {
+  @apply bg-gold-3/40;
+}
+
 @media (prefers-reduced-motion: reduce) {
-  *, *::before, *::after {
-    animation-duration: .01ms !important;
+  *,
+  *::before,
+  *::after {
+    animation-duration: 0.01ms !important;
     animation-iteration-count: 1 !important;
-    transition-duration: .01ms !important;
+    transition-duration: 0.01ms !important;
   }
 }

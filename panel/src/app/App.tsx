@@ -29,7 +29,12 @@ const STAFF_ROLES = ["super_admin", "admin", "editor", "support"];
 
 function Protected({ children }: { children: ReactNode }) {
   const { user, loading, hasRole } = useAuth();
-  if (loading) return <div className="p-8"><PageSkeleton /></div>;
+  if (loading)
+    return (
+      <div className="p-8">
+        <PageSkeleton />
+      </div>
+    );
   if (!user) return <Navigate to="/login" replace />;
   // کاربر عادی اینجا جایی ندارد — به پنل کاربری برمی‌گردد
   if (!hasRole(...STAFF_ROLES)) {
@@ -42,11 +47,7 @@ function Protected({ children }: { children: ReactNode }) {
 function RoleGate({ roles, children }: { roles: string[]; children: ReactNode }) {
   const { hasRole } = useAuth();
   if (!hasRole(...roles)) {
-    return (
-      <div className="card p-10 text-center text-sm text-ink-1/70">
-        دسترسی کافی برای این بخش ندارید.
-      </div>
-    );
+    return <div className="card p-10 text-center text-sm text-ink-1/70">دسترسی کافی برای این بخش ندارید.</div>;
   }
   return <>{children}</>;
 }
@@ -81,35 +82,67 @@ export default function App() {
                 {/* ۶ آیتم سایدبار — همهٔ محتوا داخل تب‌های هر هاب */}
                 <Route
                   path="requests"
-                  element={<RoleGate roles={REQUEST_ROLES}><RequestsHubPage /></RoleGate>}
+                  element={
+                    <RoleGate roles={REQUEST_ROLES}>
+                      <RequestsHubPage />
+                    </RoleGate>
+                  }
                 />
                 <Route
                   path="requests/:type/:id"
-                  element={<RoleGate roles={REQUEST_ROLES}><RequestDetailPage /></RoleGate>}
+                  element={
+                    <RoleGate roles={REQUEST_ROLES}>
+                      <RequestDetailPage />
+                    </RoleGate>
+                  }
                 />
                 <Route
                   path="users"
-                  element={<RoleGate roles={["super_admin"]}><UsersHubPage /></RoleGate>}
+                  element={
+                    <RoleGate roles={["super_admin"]}>
+                      <UsersHubPage />
+                    </RoleGate>
+                  }
                 />
                 <Route
                   path="marketing"
-                  element={<RoleGate roles={["super_admin"]}><MarketingHubPage /></RoleGate>}
+                  element={
+                    <RoleGate roles={["super_admin"]}>
+                      <MarketingHubPage />
+                    </RoleGate>
+                  }
                 />
                 <Route
                   path="content"
-                  element={<RoleGate roles={["super_admin", "admin", "editor"]}><ContentHubPage /></RoleGate>}
+                  element={
+                    <RoleGate roles={["super_admin", "admin", "editor"]}>
+                      <ContentHubPage />
+                    </RoleGate>
+                  }
                 />
                 <Route
                   path="content/pages/:slug"
-                  element={<RoleGate roles={["super_admin", "admin", "editor"]}><PageEditPage /></RoleGate>}
+                  element={
+                    <RoleGate roles={["super_admin", "admin", "editor"]}>
+                      <PageEditPage />
+                    </RoleGate>
+                  }
                 />
                 <Route
                   path="content/lawyers/:id"
-                  element={<RoleGate roles={["super_admin", "admin", "editor"]}><LawyerEditPage /></RoleGate>}
+                  element={
+                    <RoleGate roles={["super_admin", "admin", "editor"]}>
+                      <LawyerEditPage />
+                    </RoleGate>
+                  }
                 />
                 <Route
                   path="system"
-                  element={<RoleGate roles={["super_admin", "admin"]}><SystemHubPage /></RoleGate>}
+                  element={
+                    <RoleGate roles={["super_admin", "admin"]}>
+                      <SystemHubPage />
+                    </RoleGate>
+                  }
                 />
 
                 {/* legacy redirects → hub tabs */}

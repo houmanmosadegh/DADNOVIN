@@ -84,16 +84,20 @@ async def contact_detail(
         raise HTTPException(404, {"code": "not_found", "message": "تماس یافت نشد."})
     thread = await thread_svc.list_thread(db, "contact", contact_id)
     deliveries = (
-        await db.execute(
-            select(OutboundDelivery)
-            .join(RequestMessage, RequestMessage.id == OutboundDelivery.message_id)
-            .where(
-                RequestMessage.request_type == "contact",
-                RequestMessage.request_id == contact_id,
+        (
+            await db.execute(
+                select(OutboundDelivery)
+                .join(RequestMessage, RequestMessage.id == OutboundDelivery.message_id)
+                .where(
+                    RequestMessage.request_type == "contact",
+                    RequestMessage.request_id == contact_id,
+                )
+                .order_by(OutboundDelivery.created_at)
             )
-            .order_by(OutboundDelivery.created_at)
         )
-    ).scalars().all()
+        .scalars()
+        .all()
+    )
     labels = (
         await db.execute(
             select(Label.id, Label.name, Label.color)
@@ -111,8 +115,7 @@ async def contact_detail(
         events=[EventOut.model_validate(e) for e in thread["events"]],
         deliveries=[DeliveryOut.model_validate(d) for d in deliveries],
         labels=[
-            {"id": str(lbl.id), "name": lbl.name, "color": lbl.color}
-            for lbl in labels
+            {"id": str(lbl.id), "name": lbl.name, "color": lbl.color} for lbl in labels
         ],
         allowed_transitions=sorted(TRANSITIONS["contact"].get(row.status, frozenset())),
         requester=_requester_dict(row),
@@ -141,8 +144,12 @@ async def log_call(
         is_note=True,
     )
     await thread_svc.add_event(
-        db, "contact", row.id, "call_logged",
-        actor=user, payload={"outcome": payload.outcome},
+        db,
+        "contact",
+        row.id,
+        "call_logged",
+        actor=user,
+        payload={"outcome": payload.outcome},
     )
     if row.status == "new":
         row.status = "contacted"
@@ -164,8 +171,13 @@ async def add_note(
     if row is None:
         raise HTTPException(404, {"code": "not_found", "message": "تماس یافت نشد."})
     await thread_svc.add_message(
-        db, "contact", row.id,
-        sender_type="staff", sender_id=user.id, body=payload.note, is_note=True,
+        db,
+        "contact",
+        row.id,
+        sender_type="staff",
+        sender_id=user.id,
+        body=payload.note,
+        is_note=True,
     )
     await db.commit()
     return {"ok": True}

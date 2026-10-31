@@ -2,12 +2,11 @@ import { Link } from 'react-router-dom'
 import { Mail, MapPin, Phone } from 'lucide-react'
 import { brand, contact, services } from '../content/lawyers.fa.js'
 import { publicNav } from '../content/remote'
+import { apiAsset } from '../services/api'
 import { SocialIcon } from './SocialIcon'
 import './Footer.css'
 
-const jalaliYear = new Intl.DateTimeFormat('fa-IR', { year: 'numeric' }).format(
-  new Date(),
-)
+const jalaliYear = new Intl.DateTimeFormat('fa-IR', { year: 'numeric' }).format(new Date())
 
 export function Footer() {
   return (
@@ -16,7 +15,14 @@ export function Footer() {
         <div className="site-footer__brand">
           <Link to="/" className="brand" aria-label={brand.legalName}>
             <span className="brand__seal">
-              <img src={brand.logoMark} alt="" width="42" height="33" loading="lazy" decoding="async" />
+              <img
+                src={apiAsset(brand.logoMark)}
+                alt=""
+                width="42"
+                height="33"
+                loading="lazy"
+                decoding="async"
+              />
             </span>
             <span className="brand__text">
               <span className="brand__name">{brand.legalName}</span>
@@ -67,9 +73,7 @@ export function Footer() {
             ))}
             <li>
               <MapPin size={16} aria-hidden="true" />
-              <span className="site-footer__link">
-                {contact.address ?? `ایران، ${contact.city}`}
-              </span>
+              <span className="site-footer__link">{contact.address ?? `ایران، ${contact.city}`}</span>
             </li>
             {contact.email ? (
               <li>
@@ -111,7 +115,9 @@ export function Footer() {
 
       <div className="site-footer__bar">
         <div className="container site-footer__bar-inner">
-          <p>© {jalaliYear} {brand.legalName} — تمامی حقوق محفوظ است.</p>
+          <p>
+            © {jalaliYear} {brand.legalName} — تمامی حقوق محفوظ است.
+          </p>
         </div>
       </div>
     </footer>

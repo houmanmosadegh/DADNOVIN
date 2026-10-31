@@ -26,6 +26,23 @@ export interface Notif {
   created_at: string
 }
 
+export interface BankMasked {
+  account_name: string
+  iban_masked: string
+  card_masked: string
+  has_bank: boolean
+  payout_hold_until: string | null
+}
+
+export interface ChannelStat {
+  channel: string
+  clicks: number
+  unique_clicks: number
+  requests: number
+  linked: boolean
+  url: string
+}
+
 export interface MarketerHome {
   status: string
   ref_code?: string
@@ -38,6 +55,7 @@ export interface MarketerHome {
   accepted_terms_version?: number
   terms?: { version: number; body: string }
   cookie_days?: number
+  payable?: number
   stats?: {
     clicks: number
     unique_clicks: number
@@ -45,10 +63,10 @@ export interface MarketerHome {
     requests: number
     accepted: number
     conversion: number
+    channels?: ChannelStat[]
   }
   links?: MarketerLink[]
-  rules?: { kind: string; value: number; tier_min: number; own: boolean }[]
-  iban_masked?: string
+  bank?: BankMasked
   reject_reason?: string
   reapply_at?: string
   applied_at?: string
@@ -56,22 +74,24 @@ export interface MarketerHome {
 
 export interface MarketerLink {
   id: string
-  label: string
+  channel: string
   clicks: number
   unique_clicks: number
+  requests: number
   url: string
 }
 
 /** فیلدهای whitelist بازاریاب — هیچ جزئیات پرونده‌ای در پاسخ نیست. */
 export interface MyCommission {
   id: string
-  masked_name: string
-  stage: string
+  name: string
+  contract_status: string
   fee_amount: number
   rate: number
   amount: number
   status: string
   entry_type: 'accrual' | 'reversal'
+  payout_id: string | null
   paid_at: string | null
   created_at: string
 }
@@ -82,20 +102,53 @@ export interface CommissionsView {
   marketing_enabled: boolean
 }
 
+export interface Payout {
+  id: string
+  amount: number
+  paid_at: string
+  tracking_ref: string
+  note: string
+  has_receipt: boolean
+  receipt_url: string | null
+}
+
+export interface PaymentsView {
+  payable: number
+  items: Payout[]
+}
+
+/** ارجاع‌ها — نام کامل فقط با رضایت مراجعه‌کننده. */
 export interface Referral {
-  masked_name: string
-  status: string
+  id: string
+  consent: boolean
+  full_name: string | null
+  name: string
+  contract_status: string
+  fee_amount: number
+  rate: number
+  commission_amount: number | null
+  commission_status: string
+  channel: string
   created_at: string
 }
 
 export const STATUS_FA: Record<string, string> = {
-  new: 'جدید', reviewing: 'در حال بررسی', awaiting_call: 'در انتظار تماس',
-  followed_up: 'پیگیری شد', consulted: 'مشاوره انجام شد', accepted: 'پرونده پذیرفته شد',
-  rejected: 'رد شد', completed: 'تکمیل شد', cancelled: 'لغو شد',
+  new: 'جدید',
+  reviewing: 'در حال بررسی',
+  awaiting_call: 'در انتظار تماس',
+  followed_up: 'پیگیری شد',
+  consulted: 'مشاوره انجام شد',
+  accepted: 'پرونده پذیرفته شد',
+  rejected: 'رد شد',
+  completed: 'تکمیل شد',
+  cancelled: 'لغو شد',
 }
 
 export const COMMISSION_FA: Record<string, string> = {
-  pending: 'در انتظار', approved: 'تأییدشده', paid: 'پرداخت‌شده', cancelled: 'لغوشده',
+  pending: 'در انتظار',
+  approved: 'تأییدشده',
+  paid: 'پرداخت‌شده',
+  cancelled: 'لغوشده',
 }
 
 export const faDate = (iso: string) =>
@@ -104,4 +157,4 @@ export const faDate = (iso: string) =>
 export const faDateTime = (iso: string) =>
   new Date(iso).toLocaleString('fa-IR', { dateStyle: 'medium', timeStyle: 'short' })
 
-export const rial = (n: number) => `${n.toLocaleString('fa-IR')} ریال`
+export const toman = (n: number) => `${n.toLocaleString('fa-IR')} تومان`

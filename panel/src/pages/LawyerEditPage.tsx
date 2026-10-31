@@ -36,15 +36,27 @@ interface ResumeDraft {
 }
 
 const KNOWN_KEYS = new Set([
-  "role", "nameEn", "degree", "motto", "highlights",
-  "expertiseTitle", "expertise", "educationTitle", "education",
+  "role",
+  "nameEn",
+  "degree",
+  "motto",
+  "highlights",
+  "expertiseTitle",
+  "expertise",
+  "educationTitle",
+  "education",
 ]);
 
 const EMPTY_RESUME: ResumeDraft = {
-  role: "", nameEn: "", degree: "", motto: "",
+  role: "",
+  nameEn: "",
+  degree: "",
+  motto: "",
   highlights: [],
-  expertiseTitle: "سوابق و تخصص‌ها", expertise: [],
-  educationTitle: "تحصیلات", education: [],
+  expertiseTitle: "سوابق و تخصص‌ها",
+  expertise: [],
+  educationTitle: "تحصیلات",
+  education: [],
   extra: {},
 };
 
@@ -69,7 +81,10 @@ function resumeFromApi(raw: unknown): ResumeDraft {
   const extra: Record<string, unknown> = {};
   for (const [k, v] of Object.entries(r)) if (!KNOWN_KEYS.has(k)) extra[k] = v;
   return {
-    role: str(r.role), nameEn: str(r.nameEn), degree: str(r.degree), motto: str(r.motto),
+    role: str(r.role),
+    nameEn: str(r.nameEn),
+    degree: str(r.degree),
+    motto: str(r.motto),
     highlights: hl,
     expertiseTitle: str(r.expertiseTitle) || "سوابق و تخصص‌ها",
     expertise: arr(r.expertise),
@@ -124,7 +139,10 @@ export default function LawyerEditPage() {
         name: f.name.trim(),
         title: f.title.trim(),
         bio: f.bio,
-        specialties: f.specialties.split(/[،,]/).map((s) => s.trim()).filter(Boolean),
+        specialties: f.specialties
+          .split(/[،,]/)
+          .map((s) => s.trim())
+          .filter(Boolean),
         resume: {
           ...extra,
           ...core,
@@ -210,19 +228,56 @@ export default function LawyerEditPage() {
 
       <div className="card space-y-4 p-5">
         <div className="grid gap-4 sm:grid-cols-2">
-          <Field label="نام کامل"><input value={f.name} onChange={(e) => setF({ ...f, name: e.target.value })} /></Field>
-          <Field label="نامک (انگلیسی، یکتا)"><input dir="ltr" value={f.slug} onChange={(e) => setF({ ...f, slug: e.target.value.toLowerCase() })} placeholder="vaziri" /></Field>
-          <Field label="عنوان شغلی"><input value={f.title} onChange={(e) => setF({ ...f, title: e.target.value })} placeholder="وکیل پایه یک دادگستری" /></Field>
-          <Field label="ترتیب نمایش"><input type="number" dir="ltr" value={f.sort_order} onChange={(e) => setF({ ...f, sort_order: Number(e.target.value) })} /></Field>
-          <Field label="تلفن"><input dir="ltr" value={f.phone} onChange={(e) => setF({ ...f, phone: e.target.value })} /></Field>
-          <Field label="ایمیل"><input dir="ltr" value={f.email} onChange={(e) => setF({ ...f, email: e.target.value })} /></Field>
+          <Field label="نام کامل">
+            <input value={f.name} onChange={(e) => setF({ ...f, name: e.target.value })} />
+          </Field>
+          <Field label="نامک (انگلیسی، یکتا)">
+            <input
+              dir="ltr"
+              value={f.slug}
+              onChange={(e) => setF({ ...f, slug: e.target.value.toLowerCase() })}
+              placeholder="vaziri"
+            />
+          </Field>
+          <Field label="عنوان شغلی">
+            <input
+              value={f.title}
+              onChange={(e) => setF({ ...f, title: e.target.value })}
+              placeholder="وکیل پایه یک دادگستری"
+            />
+          </Field>
+          <Field label="ترتیب نمایش">
+            <input
+              type="number"
+              dir="ltr"
+              value={f.sort_order}
+              onChange={(e) => setF({ ...f, sort_order: Number(e.target.value) })}
+            />
+          </Field>
+          <Field label="تلفن">
+            <input dir="ltr" value={f.phone} onChange={(e) => setF({ ...f, phone: e.target.value })} />
+          </Field>
+          <Field label="ایمیل">
+            <input dir="ltr" value={f.email} onChange={(e) => setF({ ...f, email: e.target.value })} />
+          </Field>
         </div>
         <Field label="تخصص‌ها (با «،» جدا کنید)">
-          <input value={f.specialties} onChange={(e) => setF({ ...f, specialties: e.target.value })} placeholder="امور کیفری، دعاوی ملکی" />
+          <input
+            value={f.specialties}
+            onChange={(e) => setF({ ...f, specialties: e.target.value })}
+            placeholder="امور کیفری، دعاوی ملکی"
+          />
         </Field>
-        <Field label="بیوگرافی کوتاه"><textarea rows={3} value={f.bio} onChange={(e) => setF({ ...f, bio: e.target.value })} /></Field>
+        <Field label="بیوگرافی کوتاه">
+          <textarea rows={3} value={f.bio} onChange={(e) => setF({ ...f, bio: e.target.value })} />
+        </Field>
         <label className="flex items-center gap-2 text-sm">
-          <input type="checkbox" className="!w-4" checked={f.is_visible} onChange={(e) => setF({ ...f, is_visible: e.target.checked })} />
+          <input
+            type="checkbox"
+            className="!w-4"
+            checked={f.is_visible}
+            onChange={(e) => setF({ ...f, is_visible: e.target.checked })}
+          />
           نمایش در سایت
         </label>
       </div>
@@ -231,10 +286,27 @@ export default function LawyerEditPage() {
       <div className="card space-y-4 p-5">
         <h2 className="text-[15px] font-semibold">کارت رزومهٔ صفحهٔ «دربارهٔ ما»</h2>
         <div className="grid gap-4 sm:grid-cols-2">
-          <Field label="سمت (kicker)"><input value={resume.role} onChange={(e) => setResume({ ...resume, role: e.target.value })} placeholder="وکیل پایه یک دادگستری" /></Field>
-          <Field label="نام لاتین"><input dir="ltr" value={resume.nameEn} onChange={(e) => setResume({ ...resume, nameEn: e.target.value })} placeholder="Mohammad Vaziri" /></Field>
-          <Field label="مدرک تحصیلی"><input value={resume.degree} onChange={(e) => setResume({ ...resume, degree: e.target.value })} /></Field>
-          <Field label="شعار/جمله"><input value={resume.motto} onChange={(e) => setResume({ ...resume, motto: e.target.value })} /></Field>
+          <Field label="سمت (kicker)">
+            <input
+              value={resume.role}
+              onChange={(e) => setResume({ ...resume, role: e.target.value })}
+              placeholder="وکیل پایه یک دادگستری"
+            />
+          </Field>
+          <Field label="نام لاتین">
+            <input
+              dir="ltr"
+              value={resume.nameEn}
+              onChange={(e) => setResume({ ...resume, nameEn: e.target.value })}
+              placeholder="Mohammad Vaziri"
+            />
+          </Field>
+          <Field label="مدرک تحصیلی">
+            <input value={resume.degree} onChange={(e) => setResume({ ...resume, degree: e.target.value })} />
+          </Field>
+          <Field label="شعار/جمله">
+            <input value={resume.motto} onChange={(e) => setResume({ ...resume, motto: e.target.value })} />
+          </Field>
         </div>
 
         {/* highlights — the 3-cell stats strip */}
@@ -243,7 +315,9 @@ export default function LawyerEditPage() {
             <p className="text-[13px] font-medium text-ink-1">نوار شاخص‌ها (۳ سلول زیر نام)</p>
             <button
               className="btn-ghost btn-sm"
-              onClick={() => setResume({ ...resume, highlights: [...resume.highlights, { icon: "scale", title: "", text: "" }] })}
+              onClick={() =>
+                setResume({ ...resume, highlights: [...resume.highlights, { icon: "scale", title: "", text: "" }] })
+              }
               disabled={resume.highlights.length >= 3}
             >
               <Plus size={13} /> افزودن
@@ -254,24 +328,61 @@ export default function LawyerEditPage() {
               <div key={i} className="flex items-end gap-2 rounded-lg border border-sand-2 p-2.5">
                 <div className="w-36">
                   <label className="!mb-1 text-[11px]">آیکن</label>
-                  <select className="!py-1.5 text-[13px]" value={h.icon} onChange={(e) => setResume({ ...resume, highlights: resume.highlights.map((x, j) => j === i ? { ...x, icon: e.target.value } : x) })}>
-                    {ICONS.map((ic) => <option key={ic.value} value={ic.value}>{ic.label}</option>)}
+                  <select
+                    className="!py-1.5 text-[13px]"
+                    value={h.icon}
+                    onChange={(e) =>
+                      setResume({
+                        ...resume,
+                        highlights: resume.highlights.map((x, j) => (j === i ? { ...x, icon: e.target.value } : x)),
+                      })
+                    }
+                  >
+                    {ICONS.map((ic) => (
+                      <option key={ic.value} value={ic.value}>
+                        {ic.label}
+                      </option>
+                    ))}
                   </select>
                 </div>
                 <div className="w-36">
                   <label className="!mb-1 text-[11px]">تیتر</label>
-                  <input className="!py-1.5 text-[13px]" value={h.title} onChange={(e) => setResume({ ...resume, highlights: resume.highlights.map((x, j) => j === i ? { ...x, title: e.target.value } : x) })} />
+                  <input
+                    className="!py-1.5 text-[13px]"
+                    value={h.title}
+                    onChange={(e) =>
+                      setResume({
+                        ...resume,
+                        highlights: resume.highlights.map((x, j) => (j === i ? { ...x, title: e.target.value } : x)),
+                      })
+                    }
+                  />
                 </div>
                 <div className="flex-1">
                   <label className="!mb-1 text-[11px]">متن</label>
-                  <input className="!py-1.5 text-[13px]" value={h.text} onChange={(e) => setResume({ ...resume, highlights: resume.highlights.map((x, j) => j === i ? { ...x, text: e.target.value } : x) })} />
+                  <input
+                    className="!py-1.5 text-[13px]"
+                    value={h.text}
+                    onChange={(e) =>
+                      setResume({
+                        ...resume,
+                        highlights: resume.highlights.map((x, j) => (j === i ? { ...x, text: e.target.value } : x)),
+                      })
+                    }
+                  />
                 </div>
-                <button className="rounded-lg p-1.5 text-ink-3 hover:text-red-400" onClick={() => setResume({ ...resume, highlights: resume.highlights.filter((_, j) => j !== i) })} aria-label="حذف">
+                <button
+                  className="rounded-lg p-1.5 text-ink-3 hover:text-red-400"
+                  onClick={() => setResume({ ...resume, highlights: resume.highlights.filter((_, j) => j !== i) })}
+                  aria-label="حذف"
+                >
                   <Trash2 size={15} />
                 </button>
               </div>
             ))}
-            {resume.highlights.length === 0 && <p className="text-[12px] text-ink-3">موردی نیست — حداکثر ۳ مورد اضافه کنید.</p>}
+            {resume.highlights.length === 0 && (
+              <p className="text-[12px] text-ink-3">موردی نیست — حداکثر ۳ مورد اضافه کنید.</p>
+            )}
           </div>
         </div>
 
@@ -292,7 +403,9 @@ export default function LawyerEditPage() {
       </div>
 
       <div className="flex justify-end gap-2">
-        <button className="btn-ghost" onClick={() => navigate("/content/lawyers")}>بازگشت</button>
+        <button className="btn-ghost" onClick={() => navigate("/content/lawyers")}>
+          بازگشت
+        </button>
         <button className="btn-primary" onClick={() => save.mutate()} disabled={save.isPending || !f.name || !f.slug}>
           <Save size={15} /> {save.isPending ? "در حال ذخیره…" : "ذخیره"}
         </button>
@@ -318,7 +431,9 @@ function ListEditor({
   return (
     <div>
       <div className="mb-2 grid gap-2 sm:grid-cols-[1fr_auto]">
-        <Field label="تیتر بخش"><input value={title} onChange={(e) => onTitle(e.target.value)} /></Field>
+        <Field label="تیتر بخش">
+          <input value={title} onChange={(e) => onTitle(e.target.value)} />
+        </Field>
         <button className="btn-ghost btn-sm self-end" onClick={() => onItems([...items, ""])}>
           <Plus size={13} /> {addLabel}
         </button>

@@ -3,7 +3,7 @@
 import pytest
 from sqlalchemy import select
 
-from main.models.account import CaseFeeReceipt, Commission, CommissionRule
+from main.models.account import CaseFeeReceipt, Commission
 from main.models.consultation import ConsultationRequest
 from main.models.content import SiteSetting
 
@@ -45,12 +45,17 @@ async def _admin(client):
     await login_as(client, ADMIN_USER)
 
 
-async def _consult(client, phone, name="مراجع تست", ref=""):
+async def _consult(client, phone, name="مراجع تست", ref="", consent=True):
     return await client.post(
         "/api/v1/consultations",
         json={
-            "full_name": name, "phone": phone, "topic": "ملکی",
-            "message": "توضیح تست", "source_page": "/", "ref_code": ref,
+            "full_name": name,
+            "phone": phone,
+            "topic": "ملکی",
+            "message": "توضیح تست",
+            "source_page": "/",
+            "ref_code": ref,
+            "ref_consent": consent,
         },
     )
 
@@ -64,8 +69,10 @@ async def _set_status(client, request_id, status, fee=None):
     )
 
 
-async def _consult_row(seeded_session, client, phone, name="مراجع تست", ref=""):
-    r = await _consult(client, phone, name, ref)
+async def _consult_row(
+    seeded_session, client, phone, name="مراجع تست", ref="", consent=True
+):
+    r = await _consult(client, phone, name, ref, consent)
     assert r.status_code == 201, r.text
     return (
         await seeded_session.execute(
@@ -91,7 +98,10 @@ async def _make_marketer(client, seeded_session, phone):
     await _enable_marketing(seeded_session)
     r = await _register(client, phone, "بازاریاب تست")
     assert r.status_code == 201, r.text
-    r = await client.post("/api/v1/account/marketer/apply", json={"note": "", "channel": "", "terms": True})
+    r = await client.post(
+        "/api/v1/account/marketer/apply",
+        json={"note": "", "channel": "", "terms": True},
+    )
     assert r.status_code == 201, r.text
     app_id = r.json()["id"]
     await _admin(client)
@@ -259,10 +269,14 @@ class TestCommissionLifecycle:
         assert r1.json()["commission_amount"] == 2_000_000
         assert r2.json()["commission_amount"] == 3_000_000
         comms = (
-            await seeded_session.execute(
-                select(Commission).where(Commission.entry_type == "accrual")
+            (
+                await seeded_session.execute(
+                    select(Commission).where(Commission.entry_type == "accrual")
+                )
             )
-        ).scalars().all()
+            .scalars()
+            .all()
+        )
         assert len(comms) == 2
         assert sum(c.amount for c in comms) == 5_000_000
 
@@ -288,9 +302,7 @@ class TestCommissionLifecycle:
         await _admin(client)
         from main.models.account import MarketerProfile
 
-        prof = (
-            await seeded_session.execute(select(MarketerProfile))
-        ).scalar_one()
+        prof = (await seeded_session.execute(select(MarketerProfile))).scalar_one()
         prof.custom_rate = 20
         await seeded_session.commit()
         row = await self._referred_case(client, seeded_session, code)
@@ -336,13 +348,9 @@ class TestCommissionLifecycle:
         assert r.status_code == 200, r.text
         assert r.json()["amount"] == -500_000
         # full second reversal then hits the already_reversed guard eventually
-        r = await client.post(
-            f"/api/v1/admin/commissions/{comm.id}/reverse", json={}
-        )
+        r = await client.post(f"/api/v1/admin/commissions/{comm.id}/reverse", json={})
         assert r.status_code == 200
-        r = await client.post(
-            f"/api/v1/admin/commissions/{comm.id}/reverse", json={}
-        )
+        r = await client.post(f"/api/v1/admin/commissions/{comm.id}/reverse", json={})
         assert r.status_code == 409
 
     async def test_idempotent_accrual(self, client, seeded_session):
@@ -353,12 +361,12 @@ class TestCommissionLifecycle:
         await _admin(client)
         row = await self._referred_case(client, seeded_session, code)
         await self._receipt(client, row.id, 10_000_000)
-        receipt = (
-            await seeded_session.execute(select(CaseFeeReceipt))
-        ).scalar_one()
+        receipt = (await seeded_session.execute(select(CaseFeeReceipt))).scalar_one()
         again = await comm_svc.accrue_for_receipt(seeded_session, receipt, None)
         assert again is None
-        assert len((await seeded_session.execute(select(Commission))).scalars().all()) == 1
+        assert (
+            len((await seeded_session.execute(select(Commission))).scalars().all()) == 1
+        )
 
     async def test_pay_flow_and_marketer_view(self, client, seeded_session):
         await self._enable(seeded_session, rate=10)
@@ -423,9 +431,7 @@ class TestCommissionLifecycle:
         r = await client.get("/api/v1/account/marketer")
         assert r.status_code == 404
         await _register(client, PHONE_B)
-        r = await client.post(
-            "/api/v1/account/marketer/apply", json={"terms": True}
-        )
+        r = await client.post("/api/v1/account/marketer/apply", json={"terms": True})
         assert r.status_code == 404
         await _admin(client)
         r = await client.get("/api/v1/admin/commissions")
@@ -438,9 +444,7 @@ class TestCommissionLifecycle:
         code = await _make_marketer(client, seeded_session, PHONE_M)
         await _admin(client)
         row = await self._referred_case(client, seeded_session, code)
-        attr = (
-            await seeded_session.execute(select(ReferralAttribution))
-        ).scalar_one()
+        attr = (await seeded_session.execute(select(ReferralAttribution))).scalar_one()
         attr.flag = "review"
         await seeded_session.commit()
         r = await self._receipt(client, row.id, 10_000_000)
@@ -461,17 +465,32 @@ class TestCommissionLifecycle:
         ).scalar_one_or_none() is None
 
     async def test_marketer_privacy_mask(self, client, seeded_session):
-        """Marketer sees masked name + coarse status — never case details."""
+        """بدون رضایت: نام مخفی؛ با رضایت: نام کامل — هرگز جزئیات پرونده."""
         code = await _make_marketer(client, seeded_session, PHONE_M)
-        await _consult_row(seeded_session, client, PHONE_B, name="علی رضایی", ref=code)
+        await _consult_row(
+            seeded_session, client, PHONE_B, name="علی رضایی", ref=code, consent=True
+        )
+        await _consult_row(
+            seeded_session,
+            client,
+            "09121110009",
+            name="مریم کریمی",
+            ref=code,
+            consent=False,
+        )
         r = await client.get("/api/v1/account/marketer/referrals")
         assert r.status_code == 200
         rows = r.json()
-        assert len(rows) == 1
-        assert "علی" not in str(rows)
-        assert "رضایی" not in str(rows)
-        assert "topic" not in rows[0] and "message" not in rows[0]
-        assert rows[0]["masked_name"].startswith("ع.")
+        assert len(rows) == 2
+        consented = next(x for x in rows if x["consent"])
+        refused = next(x for x in rows if not x["consent"])
+        assert consented["full_name"] == "علی رضایی"
+        assert consented["name"] == "علی رضایی"
+        assert refused["full_name"] is None
+        assert refused["name"] == "مراجعه‌کننده"  # not even initials leak
+        body = str(rows)
+        for forbidden in ("topic", "message", "phone", "tracking_code"):
+            assert forbidden not in body, forbidden
 
 
 class TestUsernameOtp:
@@ -531,9 +550,7 @@ class TestUsernameOtp:
         from main.models.account import OtpToken
 
         tok = (
-            await seeded_session.execute(
-                sel(OtpToken).where(OtpToken.phone == PHONE_A)
-            )
+            await seeded_session.execute(sel(OtpToken).where(OtpToken.phone == PHONE_A))
         ).scalar_one()
         # can't know the raw code — simulate verify attempts then expiry path
         tok.code_hash = "0" * 64  # impossible hash
@@ -557,7 +574,8 @@ class TestReferralLinks:
             f"/api/v1/referrals/r/{code}?src=instagram", follow_redirects=False
         )
         assert r.status_code == 302
-        assert r.headers["location"] == "/"
+        # redirect carries ?refui= so the SPA can prefill without a 2nd click
+        assert r.headers["location"] == f"/?refui={code}"
         assert "dn_ref" in r.headers["set-cookie"]
 
     async def test_bad_code_still_redirects(self, client, seeded_session):
@@ -567,32 +585,66 @@ class TestReferralLinks:
         r = await client.get("/api/v1/referrals/r/DN-NOPE", follow_redirects=False)
         assert r.status_code == 302
 
-    async def test_labeled_links_crud_and_stats(self, client, seeded_session):
+    async def test_channel_links_and_stats(self, client, seeded_session):
         code = await _make_marketer(client, seeded_session, PHONE_M)
         r = await client.post(
-            "/api/v1/account/marketer/links", json={"label": "instagram"}
+            "/api/v1/account/marketer/links", json={"channel": "instagram"}
         )
         assert r.status_code == 201, r.text
-        assert r.json()["url"] == f"/r/{code}?src=instagram"
+        assert r.json()["url"] == f"/r/{code}?s=instagram"
 
-        # click through the labeled link then check per-link stats
-        await client.get(f"/api/v1/referrals/r/{code}?src=instagram")
+        # click through the channel link then check per-channel stats
+        await client.get(f"/api/v1/referrals/r/{code}?s=instagram")
         r = await client.get("/api/v1/account/marketer/links")
         rows = r.json()
-        assert len(rows) == 1 and rows[0]["label"] == "instagram"
+        assert len(rows) == 1 and rows[0]["channel"] == "instagram"
         assert rows[0]["clicks"] == 1 and rows[0]["unique_clicks"] == 1
 
-        link_id = rows[0]["id"]
-        r = await client.delete(f"/api/v1/account/marketer/links/{link_id}")
+        # stats roll up by channel on the profile payload
+        r = await client.get("/api/v1/account/marketer")
+        ch = {c["channel"]: c for c in r.json()["stats"]["channels"]}
+        assert ch["instagram"]["clicks"] == 1
+
+        r = await client.delete("/api/v1/account/marketer/links/instagram")
         assert r.status_code == 204
         r = await client.get("/api/v1/account/marketer/links")
         assert r.json() == []
 
-    async def test_qr_svg(self, client, seeded_session):
-        await _make_marketer(client, seeded_session, PHONE_M)
-        r = await client.get("/api/v1/account/marketer/qr?src=telegram")
+        # non-whitelisted channel rejected
+        r = await client.post(
+            "/api/v1/account/marketer/links", json={"channel": "darkweb"}
+        )
+        assert r.status_code == 400
+
+    async def test_qr_png_decodes(self, client, seeded_session):
+        """QR must decode to the exact referral URL — real decoder, not vibes."""
+        code = await _make_marketer(client, seeded_session, PHONE_M)
+        r = await client.get("/api/v1/account/marketer/qr.png")
         assert r.status_code == 200
-        assert r.text.startswith("<svg") or "<svg" in r.text[:200]
+        assert r.headers["content-type"] == "image/png"
+        assert r.content[:8] == b"\x89PNG\r\n\x1a\n"
+        import io
+
+        import zxingcpp
+        from PIL import Image
+
+        img = Image.open(io.BytesIO(r.content))
+        decoded = zxingcpp.read_barcodes(img)
+        assert decoded, "QR did not decode"
+        assert decoded[0].text == f"http://localhost:8080/r/{code}"
+
+    async def test_card_png_and_pdf(self, client, seeded_session):
+        await _make_marketer(client, seeded_session, PHONE_M)
+        r = await client.get("/api/v1/account/marketer/card.png")
+        assert r.status_code == 200 and r.content[:8] == b"\x89PNG\r\n\x1a\n"
+        import io
+
+        from PIL import Image
+
+        img = Image.open(io.BytesIO(r.content))
+        assert img.width == 2362 and img.height == 1476  # ~300dpi card
+        r = await client.get("/api/v1/account/marketer/card.pdf")
+        assert r.status_code == 200 and r.content[:5] == b"%PDF-"
 
     async def test_links_forbidden_for_non_marketer(self, client, seeded_session):
         srow = await seeded_session.get(SiteSetting, "commission")
@@ -604,41 +656,39 @@ class TestReferralLinks:
 
 
 class TestAdminMarketing:
-    async def test_preview_calculator(self, client, seeded_session):
+    async def test_percentage_only_config(self, client, seeded_session):
+        """تب قواعد فقط درصد است — بدون rules engine، بدون ماشین‌حساب."""
         await _enable_marketing(seeded_session)
-        seeded_session.add(
-            CommissionRule(kind="percent", value=10, max_amount=1_000_000)
-        )
-        await seeded_session.commit()
         await _admin(client)
-        r = await client.post(
-            "/api/v1/admin/commissions/preview",
-            json={"basis_amount": 5_000_000},
+        r = await client.get("/api/v1/admin/commissions/config")
+        assert r.status_code == 200
+        assert r.json()["default_rate"] == 15
+        r = await client.patch(
+            "/api/v1/admin/commissions/config", json={"default_rate": 20}
         )
         assert r.status_code == 200
-        body = r.json()
-        assert body["matched"] is True
-        assert body["amount"] == 500_000  # 10% of 5M
+        assert r.json()["default_rate"] == 20
+        # audit history captures the change
+        r = await client.get("/api/v1/admin/commissions/rate-history")
+        assert r.json()[0]["to"] == 20
+        # dead endpoints are gone
+        r = await client.get("/api/v1/admin/commissions/rules")
+        assert r.status_code == 404
         r = await client.post(
-            "/api/v1/admin/commissions/preview",
-            json={"basis_amount": 50_000_000},
+            "/api/v1/admin/commissions/preview", json={"basis_amount": 1}
         )
-        assert r.json()["amount"] == 1_000_000  # clamped by max_amount
+        assert r.status_code == 404
 
-    async def test_rule_validity_window_and_clamps(self, client, seeded_session):
+    async def test_status_enum_guarded(self, client, seeded_session):
         await _enable_marketing(seeded_session)
         await _admin(client)
-        r = await client.post(
-            "/api/v1/admin/commissions/rules",
-            json={
-                "kind": "fixed", "value": 100_000, "min_amount": 200_000,
-                "ends_at": "2000-01-01T00:00:00Z",
-            },
+        r = await client.get("/api/v1/admin/commissions/summary")
+        assert r.status_code == 200
+        assert set(r.json()["office"]) == {"pending", "approved", "paid", "cancelled"}
+        r = await client.patch(
+            "/api/v1/admin/commissions/config", json={"default_rate": 101}
         )
-        assert r.status_code == 201, r.text
-        r = await client.get("/api/v1/admin/commissions/rules")
-        rule = r.json()[0]
-        assert rule["min_amount"] == 200_000 and rule["ends_at"] is not None
+        assert r.status_code == 422  # 0..100 validation
 
     async def test_report_and_csv(self, client, seeded_session):
         await _make_marketer(client, seeded_session, PHONE_M)
@@ -661,3 +711,171 @@ class TestAdminMarketing:
         suspicious = r.json()["suspicious"]
         assert len(suspicious) >= 1
         assert suspicious[0]["reason"] == "click_flood"
+
+
+class TestPayoutsBankConsent:
+    """Production v5 — settlement with receipt, encrypted bank data, consent gate."""
+
+    async def _setup_commission(
+        self, client, seeded_session, *, rate=10, amount=10_000_000, consent=True
+    ):
+        row_s = await seeded_session.get(SiteSetting, "commission")
+        row_s.value = {
+            **(row_s.value or {}),
+            "marketing_enabled": True,
+            "default_rate": rate,
+        }
+        await seeded_session.commit()
+        code = await _make_marketer(client, seeded_session, PHONE_M)
+        await _admin(client)
+        row = await _consult_row(
+            seeded_session, client, PHONE_B, ref=code, consent=consent
+        )
+        await _set_status(client, row.id, "accepted")
+        r = await client.post(
+            f"/api/v1/admin/requests/consultation/{row.id}/fee-receipts",
+            json={"amount": amount},
+        )
+        assert r.status_code == 201, r.text
+        return code, row
+
+    async def test_consent_gate_no_commission_no_name(self, client, seeded_session):
+        """بدون تیک رضایت — نه کمیسیون، نه نام."""
+        code, row = await self._setup_commission(client, seeded_session, consent=False)
+        assert (
+            await seeded_session.execute(select(Commission))
+        ).scalar_one_or_none() is None
+        await _login_user(client, PHONE_M)
+        rows = (await client.get("/api/v1/account/marketer/referrals")).json()
+        assert rows[0]["consent"] is False
+        assert rows[0]["full_name"] is None
+        assert rows[0]["commission_amount"] is None
+
+    async def test_payout_with_receipt_flow(self, client, seeded_session):
+        """ادمین تسویه می‌کند با فیش → بازاریاب پرداخت و فیش را می‌بیند."""
+        from main.models.account import MarketerProfile, Payout
+
+        code, _ = await self._setup_commission(client, seeded_session)
+        comm = (await seeded_session.execute(select(Commission))).scalar_one()
+        prof = (await seeded_session.execute(select(MarketerProfile))).scalar_one()
+        r = await client.post(f"/api/v1/admin/commissions/{comm.id}/approve")
+        assert r.status_code == 200
+
+        import io
+
+        from PIL import Image
+
+        buf = io.BytesIO()
+        Image.new("RGB", (20, 20), (255, 255, 255)).save(buf, "PNG")
+        buf.seek(0)
+        r = await client.post(
+            f"/api/v1/admin/marketers/{prof.id}/payouts",
+            data={"tracking_ref": "12345", "note": "تسویه اول"},
+            files={"file": ("receipt.png", buf, "image/png")},
+        )
+        assert r.status_code == 201, r.text
+        payout = (await seeded_session.execute(select(Payout))).scalar_one()
+        assert payout.amount == 1_000_000
+        await seeded_session.refresh(comm)
+        assert comm.status == "paid" and comm.payout_id == payout.id
+
+        # marketer sees it
+        await _login_user(client, PHONE_M)
+        pays = (await client.get("/api/v1/account/payments")).json()
+        items = pays["items"]
+        assert len(items) == 1 and items[0]["amount"] == 1_000_000
+        assert items[0]["receipt_url"].endswith(f"{payout.id}/receipt")
+        r = await client.get(f"/api/v1/account/payments/{payout.id}/receipt")
+        assert r.status_code == 200
+        assert r.headers["content-type"].startswith("image/")
+
+    async def test_payout_never_exceeds_payable(self, client, seeded_session):
+        from main.models.account import MarketerProfile
+
+        code, _ = await self._setup_commission(client, seeded_session)
+        comm = (await seeded_session.execute(select(Commission))).scalar_one()
+        prof = (await seeded_session.execute(select(MarketerProfile))).scalar_one()
+        await client.post(f"/api/v1/admin/commissions/{comm.id}/approve")
+        r = await client.post(
+            f"/api/v1/admin/marketers/{prof.id}/payouts",
+            data={"amount": "99999999"},
+        )
+        assert r.status_code == 409
+
+    async def test_bank_details_encrypted_masked(self, client, seeded_session):
+        """Luhn + IBAN mod97 → AES at rest → masked out → hold set."""
+        from main.models.account import MarketerProfile
+
+        await _make_marketer(client, seeded_session, PHONE_M)
+        card = "6037997531234566"  # Luhn-valid 16-digit card
+        iban = "IR062960000000100324200001"
+        r = await client.put(
+            "/api/v1/account/marketer/bank",
+            json={"account_name": "بازاریاب تست", "card_number": card, "iban": iban},
+        )
+        assert r.status_code == 200, r.text
+        prof = (await seeded_session.execute(select(MarketerProfile))).scalar_one()
+        # ciphertext at rest — never plaintext
+        assert card not in prof.card_enc and iban not in prof.iban_enc
+        assert prof.card_enc.startswith("gcm:")
+        assert prof.payout_hold_until is not None
+        r = await client.get("/api/v1/account/marketer/bank")
+        body = r.json()
+        assert card not in str(body) and iban not in str(body)
+        assert body["card_masked"] == "••••4566"
+        assert body["iban_masked"] == "IR••••0001"
+        # audit row exists
+        from sqlalchemy import select as sel
+
+        from main.models.audit import AuditLog
+
+        (
+            await seeded_session.execute(
+                sel(AuditLog).where(AuditLog.action == "account.bank_update")
+            )
+        ).scalar_one()
+
+    async def test_bank_validation_rejects_bad(self, client, seeded_session):
+        await _make_marketer(client, seeded_session, PHONE_M)
+        r = await client.put(
+            "/api/v1/account/marketer/bank",
+            json={
+                "account_name": "x",
+                "card_number": "1111111111111111",
+                "iban": "IR001",
+            },
+        )
+        assert r.status_code == 400
+
+    async def test_rotate_code_old_resolves(self, client, seeded_session):
+        from main.models.account import MarketerProfile
+
+        old = await _make_marketer(client, seeded_session, PHONE_M)
+        await _admin(client)
+        prof = (await seeded_session.execute(select(MarketerProfile))).scalar_one()
+        r = await client.post(f"/api/v1/admin/marketers/{prof.id}/rotate-code")
+        assert r.status_code == 200
+        new = r.json()["ref_code"]
+        assert (
+            new != old and new.startswith("DN-") and len(new) == 12
+        )  # DN- + 8 + check
+        # old code still resolves (retired) — past links keep attributing
+        r = await client.get(f"/api/v1/referrals/r/{old}", follow_redirects=False)
+        assert r.status_code == 302
+        assert "dn_ref" in r.headers["set-cookie"]
+
+    async def test_reveal_bank_audited(self, client, seeded_session):
+        from main.models.account import MarketerProfile
+        from main.models.audit import AuditLog
+        from sqlalchemy import select as sel
+
+        await _make_marketer(client, seeded_session, PHONE_M)
+        prof = (await seeded_session.execute(select(MarketerProfile))).scalar_one()
+        await _admin(client)
+        r = await client.post(f"/api/v1/admin/marketers/{prof.id}/reveal-bank")
+        assert r.status_code == 200
+        (
+            await seeded_session.execute(
+                sel(AuditLog).where(AuditLog.action == "marketer.reveal_bank")
+            )
+        ).scalar_one()

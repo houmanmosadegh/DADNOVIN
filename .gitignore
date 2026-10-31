@@ -22,6 +22,7 @@ coverage/
 # runtime data — persisted via docker volumes, not git
 storage/*
 !storage/.gitkeep
+backend/storage/
 
 # local agent/tooling dirs
 .agents/

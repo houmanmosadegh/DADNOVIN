@@ -118,7 +118,11 @@ async def retry_delivery(db: AsyncSession, delivery_id: uuid.UUID) -> OutboundDe
         await db.flush()
         return d
     send_fn = (
-        (lambda: provider.send_email(to=d.recipient, subject="پیام دادنوین", body=msg.body))
+        (
+            lambda: provider.send_email(
+                to=d.recipient, subject="پیام دادنوین", body=msg.body
+            )
+        )
         if d.channel == "email"
         else (lambda: provider.send_sms(to=d.recipient, body=msg.body))
     )

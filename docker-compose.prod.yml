@@ -10,6 +10,9 @@ services:
       COOKIE_SECURE: "true"
       EXPOSE_DOCS: "false"
       UVICORN_WORKERS: ${UVICORN_WORKERS:-2}
+      # demo content never auto-seeds in production — run `seed` explicitly
+      # once if the CMS must be primed: docker compose exec api python -m main.cli seed
+      SEED_ON_BOOT: "false"
     # app reads these from env/.env — refuse to boot on insecure prod config
     # (config.py validates: no dev secret, secure cookies, no wildcard CORS)
 

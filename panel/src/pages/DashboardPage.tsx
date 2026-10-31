@@ -1,23 +1,12 @@
 /** Operations dashboard — real KPIs, attention queues, trends, activity. */
 
 import { useQuery } from "@tanstack/react-query";
-import {
-  ArrowLeft,
-  FileText,
-  LifeBuoy,
-  Phone,
-  Timer,
-} from "lucide-react";
+import { ArrowLeft, FileText, LifeBuoy, Phone, Timer } from "lucide-react";
 import { useMemo, useState } from "react";
 import { Link } from "react-router-dom";
 import { api } from "../services/api";
 import type { DashboardOverview, TrendsOut } from "../types/api";
-import {
-  EmptyState,
-  fmtRelative,
-  PageSkeleton,
-  StatusBadge,
-} from "../components/ui";
+import { EmptyState, fmtRelative, PageSkeleton, StatusBadge } from "../components/ui";
 import { useAuth } from "../stores/auth";
 
 const KPI: {
@@ -28,11 +17,22 @@ const KPI: {
   accent?: boolean;
 }[] = [
   { key: "consultations_total", label: "کل درخواست‌های مشاوره", to: "/requests/consultations", icon: FileText },
-  { key: "consultations_new", label: "مشاورهٔ جدید", to: "/requests/consultations?tab=new", icon: FileText, accent: true },
+  {
+    key: "consultations_new",
+    label: "مشاورهٔ جدید",
+    to: "/requests/consultations?tab=new",
+    icon: FileText,
+    accent: true,
+  },
   { key: "contacts_unanswered", label: "تماس بی‌پاسخ", to: "/requests/contacts?tab=new", icon: Phone, accent: true },
   { key: "tickets_open", label: "تیکت باز", to: "/requests/tickets", icon: LifeBuoy },
   { key: "awaiting_followup", label: "در انتظار پیگیری", to: "/inbox?tab=unanswered", icon: Timer },
-  { key: "consultations_completed", label: "مشاورهٔ تکمیل‌شده", to: "/requests/consultations?status=completed", icon: FileText },
+  {
+    key: "consultations_completed",
+    label: "مشاورهٔ تکمیل‌شده",
+    to: "/requests/consultations?status=completed",
+    icon: FileText,
+  },
 ];
 
 const EVENT_FA: Record<string, string> = {
@@ -81,9 +81,7 @@ export default function DashboardPage() {
   return (
     <div className="space-y-5">
       <div>
-        <h1 className="text-lg font-semibold">
-          سلام{user?.full_name ? ` ${user.full_name}` : ""}، خوش آمدید
-        </h1>
+        <h1 className="text-lg font-semibold">سلام{user?.full_name ? ` ${user.full_name}` : ""}، خوش آمدید</h1>
         <p className="mt-0.5 text-[13px] text-ink-2">
           نمای کلی وضعیت سایت و درخواست‌ها
           {s.avg_first_response_hours != null && (
@@ -100,13 +98,9 @@ export default function DashboardPage() {
           <Link key={key} to={to} className="card group p-4 transition hover:border-gold-1/50">
             <div className="flex items-center justify-between">
               <Icon size={17} className="text-gold-1" />
-              {accent && Number(s[key]) > 0 && (
-                <span className="h-2 w-2 rounded-full bg-gold-2" />
-              )}
+              {accent && Number(s[key]) > 0 && <span className="h-2 w-2 rounded-full bg-gold-2" />}
             </div>
-            <p className="mt-3 text-2xl font-semibold tabular-nums">
-              {Number(s[key]).toLocaleString("fa-IR")}
-            </p>
+            <p className="mt-3 text-2xl font-semibold tabular-nums">{Number(s[key]).toLocaleString("fa-IR")}</p>
             <p className="mt-1 text-[12px] text-ink-2 group-hover:text-ink-1">{label}</p>
           </Link>
         ))}
@@ -142,7 +136,10 @@ export default function DashboardPage() {
             <ul className="divide-y divide-sand-2">
               {d.recent_consultations.map((r) => (
                 <li key={r.id}>
-                  <Link to={`/requests/consultation/${r.id}`} className="flex items-center gap-3 py-2.5 text-sm transition hover:bg-sand-0/60">
+                  <Link
+                    to={`/requests/consultation/${r.id}`}
+                    className="flex items-center gap-3 py-2.5 text-sm transition hover:bg-sand-0/60"
+                  >
                     <div className="min-w-0 flex-1">
                       <p className="truncate font-medium">{r.name}</p>
                       <p className="mt-0.5 truncate text-[11px] text-ink-3" dir="ltr">
@@ -173,7 +170,10 @@ export default function DashboardPage() {
             <ul className="divide-y divide-sand-2">
               {d.attention_tickets.map((t) => (
                 <li key={t.id}>
-                  <Link to={`/requests/ticket/${t.id}`} className="flex items-center gap-3 py-2.5 text-sm transition hover:bg-sand-0/60">
+                  <Link
+                    to={`/requests/ticket/${t.id}`}
+                    className="flex items-center gap-3 py-2.5 text-sm transition hover:bg-sand-0/60"
+                  >
                     <div className="min-w-0 flex-1">
                       <p className="truncate font-medium">{t.subject}</p>
                       <p className="mt-0.5 truncate text-[11px] text-ink-3">
@@ -204,10 +204,15 @@ export default function DashboardPage() {
             <ul className="divide-y divide-sand-2">
               {d.recent_contacts.map((c) => (
                 <li key={c.id}>
-                  <Link to={`/requests/contact/${c.id}`} className="flex items-center gap-3 py-2.5 text-sm transition hover:bg-sand-0/60">
+                  <Link
+                    to={`/requests/contact/${c.id}`}
+                    className="flex items-center gap-3 py-2.5 text-sm transition hover:bg-sand-0/60"
+                  >
                     <div className="min-w-0 flex-1">
                       <p className="truncate font-medium">{c.name}</p>
-                      <p className="mt-0.5 text-[11px] text-ink-3" dir="ltr">{c.phone}</p>
+                      <p className="mt-0.5 text-[11px] text-ink-3" dir="ltr">
+                        {c.phone}
+                      </p>
                     </div>
                     <StatusBadge value={c.status} />
                     <span className="text-[11px] text-ink-3">{fmtRelative(c.created_at)}</span>
@@ -234,7 +239,11 @@ export default function DashboardPage() {
               ))}
             </div>
           </div>
-          {trends.data ? <TrendChart data={trends.data} /> : <div className="h-36 animate-pulse rounded-lg bg-sand-0" />}
+          {trends.data ? (
+            <TrendChart data={trends.data} />
+          ) : (
+            <div className="h-36 animate-pulse rounded-lg bg-sand-0" />
+          )}
         </section>
 
         {/* E. activity */}
@@ -248,10 +257,7 @@ export default function DashboardPage() {
                 <li key={i} className="flex items-center gap-2.5 text-[13px]">
                   <span className="h-1.5 w-1.5 shrink-0 rounded-full bg-gold-2" />
                   <span className="text-ink-2">{EVENT_FA[a.event] ?? a.event}</span>
-                  <Link
-                    to={`/requests/${a.type}/${a.request_id}`}
-                    className="truncate text-ink-1 hover:text-gold-1"
-                  >
+                  <Link to={`/requests/${a.type}/${a.request_id}`} className="truncate text-ink-1 hover:text-gold-1">
                     {TYPE_FA[a.type] ?? a.type}
                   </Link>
                   {a.actor && <span className="text-[11px] text-ink-3">({a.actor})</span>}
@@ -278,7 +284,10 @@ export default function DashboardPage() {
             ))}
           </div>
           <div className="mt-4 border-t border-sand-2 pt-3 text-[12px] text-ink-3">
-            <p>وکیل فعال: {s.lawyers_visible.toLocaleString("fa-IR")} · کاربر: {s.users_active.toLocaleString("fa-IR")} · گفت‌وگوی هوش مصنوعی: {s.ai_conversations.toLocaleString("fa-IR")}</p>
+            <p>
+              وکیل فعال: {s.lawyers_visible.toLocaleString("fa-IR")} · کاربر: {s.users_active.toLocaleString("fa-IR")} ·
+              گفت‌وگوی هوش مصنوعی: {s.ai_conversations.toLocaleString("fa-IR")}
+            </p>
           </div>
         </section>
       </div>
@@ -333,11 +342,17 @@ function TrendChart({ data }: { data: TrendsOut }) {
         })}
       </div>
       <div className="mt-3 flex items-center gap-4 text-[11px] text-ink-2">
-        <span className="flex items-center gap-1.5"><span className="h-2 w-2 rounded-sm bg-gold-2" /> مجموع: {total.toLocaleString("fa-IR")}</span>
+        <span className="flex items-center gap-1.5">
+          <span className="h-2 w-2 rounded-sm bg-gold-2" /> مجموع: {total.toLocaleString("fa-IR")}
+        </span>
         <span className="mr-auto">
-          {buckets[0] && new Intl.DateTimeFormat("fa-IR", { month: "short", day: "numeric" }).format(new Date(buckets[0].date))}
+          {buckets[0] &&
+            new Intl.DateTimeFormat("fa-IR", { month: "short", day: "numeric" }).format(new Date(buckets[0].date))}
           {" تا "}
-          {buckets[buckets.length - 1] && new Intl.DateTimeFormat("fa-IR", { month: "short", day: "numeric" }).format(new Date(buckets[buckets.length - 1].date))}
+          {buckets[buckets.length - 1] &&
+            new Intl.DateTimeFormat("fa-IR", { month: "short", day: "numeric" }).format(
+              new Date(buckets[buckets.length - 1].date)
+            )}
         </span>
       </div>
     </div>

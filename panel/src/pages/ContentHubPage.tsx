@@ -13,10 +13,7 @@ export default function ContentHubPage() {
   const tab = params.get("tab") ?? "pages";
   return (
     <div>
-      <PageHeader
-        title="محتوای سایت"
-        subtitle="صفحات، مقالات، وکلا و تنظیمات نمایشی سایت عمومی"
-      />
+      <PageHeader title="محتوای سایت" subtitle="صفحات، مقالات، وکلا و تنظیمات نمایشی سایت عمومی" />
       <Tabs
         active={tab}
         onChange={(k) => setParams({ tab: k }, { replace: true })}

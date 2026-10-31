@@ -1,18 +1,6 @@
-import {
-  useEffect,
-  useRef,
-  useState,
-  type CSSProperties,
-  type ReactNode,
-} from 'react'
+import { useEffect, useRef, useState, type CSSProperties, type ReactNode } from 'react'
 
-export type RevealVariant =
-  | 'up'
-  | 'x-start'
-  | 'x-end'
-  | 'clip'
-  | 'line'
-  | 'fade'
+export type RevealVariant = 'up' | 'x-start' | 'x-end' | 'clip' | 'line' | 'fade'
 
 interface RevealProps {
   children: ReactNode
@@ -30,13 +18,7 @@ interface RevealProps {
  * vertical on mobile), clip (image un-crop), line (divider draw),
  * fade (opacity only). All motion is disabled under reduced-motion.
  */
-export function Reveal({
-  children,
-  className = '',
-  delay = 0,
-  variant = 'up',
-  style,
-}: RevealProps) {
+export function Reveal({ children, className = '', delay = 0, variant = 'up', style }: RevealProps) {
   const ref = useRef<HTMLDivElement>(null)
   const [visible, setVisible] = useState(false)
 
@@ -45,8 +27,7 @@ export function Reveal({
     if (!el || visible) return
 
     const reduce =
-      typeof window.matchMedia === 'function' &&
-      window.matchMedia('(prefers-reduced-motion: reduce)').matches
+      typeof window.matchMedia === 'function' && window.matchMedia('(prefers-reduced-motion: reduce)').matches
 
     if (reduce || !('IntersectionObserver' in window)) {
       setVisible(true)
@@ -60,7 +41,7 @@ export function Reveal({
           io.disconnect()
         }
       },
-      { threshold: 0.18, rootMargin: '0px 0px -6% 0px' },
+      { threshold: 0.18, rootMargin: '0px 0px -6% 0px' }
     )
     io.observe(el)
     return () => io.disconnect()

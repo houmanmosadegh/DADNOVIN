@@ -99,6 +99,16 @@ export default function AppLayout() {
     retry: false,
   });
 
+  // CMS logo — same public brand settings the site header/footer read
+  const brand = useQuery({
+    queryKey: ["public-brand"],
+    queryFn: () => api.get<{ brand?: { logoMark?: string; name?: string } }>("/public/settings"),
+    staleTime: 5 * 60_000,
+    retry: false,
+  });
+  const logoMark = brand.data?.brand?.logoMark ?? "";
+  const brandName = brand.data?.brand?.name ?? "دادنوین";
+
   const visibleNav = NAV.map((g) => ({
     ...g,
     items: g.items.filter((i) => !i.roles || hasRole(...i.roles)),
@@ -107,11 +117,13 @@ export default function AppLayout() {
   const sidebar = (
     <aside className="flex h-full w-64 flex-col border-l border-sand-2 bg-sand-1 text-ink-1">
       <div className="flex h-14 items-center gap-2.5 border-b border-sand-2 px-5">
-        <span className="flex h-9 w-9 items-center justify-center rounded-lg bg-gold-3 font-bold text-gold-1">
-          د
-        </span>
+        {logoMark ? (
+          <img src={logoMark} alt="" className="h-9 w-9 rounded-lg object-contain" />
+        ) : (
+          <span className="flex h-9 w-9 items-center justify-center rounded-lg bg-gold-3 font-bold text-gold-1">د</span>
+        )}
         <div>
-          <p className="text-sm font-semibold text-ink-0">دادنوین</p>
+          <p className="text-sm font-semibold text-ink-0">{brandName}</p>
           <p className="text-[11px] text-ink-3">پنل مدیریت</p>
         </div>
         <button
@@ -128,30 +140,28 @@ export default function AppLayout() {
             <div key={g.group || "root"} className="mb-4">
               {g.group ? <p className="nav-group-label">{g.group}</p> : null}
               {g.items.map((item) => {
-                  const to = item.to.split("?")[0];
-                  return (
-                    <NavLink
-                      key={item.to}
-                      to={item.to}
-                      end={to === "/"}
-                      onClick={() => setSidebarOpen(false)}
-                      className={({ isActive }) =>
-                        `nav-item ${isActive && location.pathname === to ? "nav-item-active" : ""}`
-                      }
-                    >
-                      {item.icon}
-                      {item.label}
-                      {item.badge === "new" && <NavBadge count={newCount.data?.total ?? 0} />}
-                    </NavLink>
-                  );
-                })}
+                const to = item.to.split("?")[0];
+                return (
+                  <NavLink
+                    key={item.to}
+                    to={item.to}
+                    end={to === "/"}
+                    onClick={() => setSidebarOpen(false)}
+                    className={({ isActive }) =>
+                      `nav-item ${isActive && location.pathname === to ? "nav-item-active" : ""}`
+                    }
+                  >
+                    {item.icon}
+                    {item.label}
+                    {item.badge === "new" && <NavBadge count={newCount.data?.total ?? 0} />}
+                  </NavLink>
+                );
+              })}
             </div>
           );
         })}
       </nav>
-      <div className="border-t border-sand-2 px-4 py-3 text-[11px] text-ink-3">
-        گروه حقوقی دادنوین
-      </div>
+      <div className="border-t border-sand-2 px-4 py-3 text-[11px] text-ink-3">گروه حقوقی دادنوین</div>
     </aside>
   );
 
@@ -171,11 +181,7 @@ export default function AppLayout() {
       <div className="flex min-w-0 flex-1 flex-col">
         {/* sticky topbar */}
         <header className="sticky top-0 z-20 flex h-14 shrink-0 items-center gap-3 border-b border-sand-2 bg-sand-1/95 px-4 backdrop-blur lg:px-6">
-          <button
-            className="text-ink-1 lg:hidden"
-            onClick={() => setSidebarOpen(true)}
-            aria-label="باز کردن منو"
-          >
+          <button className="text-ink-1 lg:hidden" onClick={() => setSidebarOpen(true)} aria-label="باز کردن منو">
             <Menu size={20} />
           </button>
 
@@ -235,9 +241,7 @@ export default function AppLayout() {
                   </p>
                   <div className="max-h-64 overflow-y-auto">
                     {(newCount.data?.items ?? []).length === 0 && (
-                      <p className="px-3 py-4 text-center text-[12px] text-ink-3">
-                        درخواست جدیدی نیست
-                      </p>
+                      <p className="px-3 py-4 text-center text-[12px] text-ink-3">درخواست جدیدی نیست</p>
                     )}
                     {(newCount.data?.items ?? []).map((r) => (
                       <NavLink
@@ -267,9 +271,7 @@ export default function AppLayout() {
                 <span className="flex h-7 w-7 items-center justify-center rounded-full bg-gold-2 text-[11px] font-semibold text-ink-0">
                   {(user?.full_name || user?.username || "؟").slice(0, 1)}
                 </span>
-                <span className="hidden text-[13px] font-medium sm:block">
-                  {user?.full_name || user?.username}
-                </span>
+                <span className="hidden text-[13px] font-medium sm:block">{user?.full_name || user?.username}</span>
                 <ChevronDown size={14} className="text-ink-3" />
               </button>
               {userMenu && (
@@ -279,7 +281,9 @@ export default function AppLayout() {
                 >
                   <div className="border-b border-sand-2 px-3 py-2">
                     <p className="text-[13px] font-medium">{user?.full_name}</p>
-                    <p className="text-[11px] text-ink-2" dir="ltr">{user?.email}</p>
+                    <p className="text-[11px] text-ink-2" dir="ltr">
+                      {user?.email}
+                    </p>
                     <p className="mt-0.5 text-[11px] text-gold-1">
                       {user?.roles.map((r) => r.description || r.name).join("، ")}
                     </p>

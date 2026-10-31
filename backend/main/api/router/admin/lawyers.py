@@ -41,7 +41,14 @@ async def create_lawyer(
     row = Lawyer(**payload.model_dump())
     db.add(row)
     await db.flush()
-    await audit(db, actor=user, action="lawyer.create", entity="lawyer", entity_id=row.id, request=request)
+    await audit(
+        db,
+        actor=user,
+        action="lawyer.create",
+        entity="lawyer",
+        entity_id=row.id,
+        request=request,
+    )
     await db.commit()
     return LawyerOut.model_validate(row)
 
@@ -58,13 +65,24 @@ async def update_lawyer(
     if row is None:
         raise HTTPException(404, {"code": "not_found", "message": "وکیل یافت نشد."})
     data = payload.model_dump(exclude_unset=True)
-    if "slug" in data and data["slug"] != row.slug and await slug_taken(db, data["slug"], exclude_id=row.id):
+    if (
+        "slug" in data
+        and data["slug"] != row.slug
+        and await slug_taken(db, data["slug"], exclude_id=row.id)
+    ):
         raise HTTPException(
             409, {"code": "slug_taken", "message": "این نامک قبلاً استفاده شده است."}
         )
     for field, value in data.items():
         setattr(row, field, value)
-    await audit(db, actor=user, action="lawyer.update", entity="lawyer", entity_id=row.id, request=request)
+    await audit(
+        db,
+        actor=user,
+        action="lawyer.update",
+        entity="lawyer",
+        entity_id=row.id,
+        request=request,
+    )
     await db.commit()
     return LawyerOut.model_validate(row)
 
@@ -76,8 +94,15 @@ async def delete_lawyer(
     row = await get_lawyer(db, lawyer_id)
     if row is None:
         raise HTTPException(404, {"code": "not_found", "message": "وکیل یافت نشد."})
-    await audit(db, actor=user, action="lawyer.delete", entity="lawyer", entity_id=row.id,
-                detail={"name": row.name}, request=request)
+    await audit(
+        db,
+        actor=user,
+        action="lawyer.delete",
+        entity="lawyer",
+        entity_id=row.id,
+        detail={"name": row.name},
+        request=request,
+    )
     await db.delete(row)
     await db.commit()
     return {"message": "وکیل حذف شد."}

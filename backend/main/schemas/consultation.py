@@ -20,6 +20,9 @@ class ConsultationIn(BaseModel):
     message: str = Field(default="", max_length=5000)
     source_page: str = Field(default="", max_length=120)
     ref_code: str = Field(default="", max_length=24)  # optional referrer code
+    # «نام من و وضعیت قرارداد، برای معرف نمایش داده می‌شود» — required for
+    # referral attribution to produce commissions/name exposure
+    ref_consent: bool = False
     website: str = Field(default="", max_length=200)  # honeypot
 
     @field_validator("phone")

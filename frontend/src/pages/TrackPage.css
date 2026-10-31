@@ -45,7 +45,9 @@
   padding: 0.65rem 0.8rem;
   font-family: var(--font-fa);
   font-size: 0.95rem;
-  transition: border-color 0.2s var(--ease-out), box-shadow 0.2s var(--ease-out);
+  transition:
+    border-color 0.2s var(--ease-out),
+    box-shadow 0.2s var(--ease-out);
 }
 
 .track__field input:focus-visible,

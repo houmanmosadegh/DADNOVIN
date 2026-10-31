@@ -17,14 +17,14 @@
   --ink-700: #5d524c;
   --ink-800: #3a3d46;
   --ink-900: #282b33;
-  --ink-950: #131418;            /* brand ink — cool charcoal */
+  --ink-950: #131418; /* brand ink — cool charcoal */
 
   --gold-50: #fbf8f4;
   --gold-100: #f7f2e9;
   --gold-200: #eee3ce;
   --gold-300: #e2ca9d;
   --gold-400: #d6af66;
-  --gold-500: #c8922d;           /* brand gold */
+  --gold-500: #c8922d; /* brand gold */
   --gold-600: #a67926;
   --gold-700: #89641f;
   --gold-800: #705219;
@@ -36,24 +36,24 @@
   --navy-950: #0f1524;
 
   /* --- channels (use as `rgb(var(--x) / <alpha>)`) --- */
-  --ink-rgb: 19 20 24;           /* ink-950 — cool charcoal */
-  --ink-0-rgb: 9 10 13;          /* #090a0d deepest — underlays, shadows */
-  --ink-2-rgb: 35 37 43;         /* #23252b raised surface */
-  --ink-3-rgb: 46 49 57;         /* #2e3139 surface */
-  --ink-4-rgb: 84 87 96;         /* #545760 graphite hairline base */
-  --gold-rgb: 202 148 46;        /* gold-500 #ca942e */
-  --gold-hi-rgb: 245 198 110;    /* #f5c66e molten highlight */
-  --gold-deep-rgb: 161 98 7;     /* #a16207 deep accent */
-  --gold-soft-rgb: 224 180 110;  /* #e0b46e light gold */
-  --ivory-rgb: 245 243 238;      /* #f5f3ee bone — never pure white */
-  --error-rgb: 217 122 108;      /* #d97a6c muted red */
-  --error-hi-rgb: 232 150 138;   /* #e8968a brighter error text */
-  --gold-ink-rgb: 30 22 6;       /* warm near-black text on gold fills */
-  --online-rgb: 111 217 140;     /* #6fd98c — functional online status only */
+  --ink-rgb: 19 20 24; /* ink-950 — cool charcoal */
+  --ink-0-rgb: 9 10 13; /* #090a0d deepest — underlays, shadows */
+  --ink-2-rgb: 35 37 43; /* #23252b raised surface */
+  --ink-3-rgb: 46 49 57; /* #2e3139 surface */
+  --ink-4-rgb: 84 87 96; /* #545760 graphite hairline base */
+  --gold-rgb: 202 148 46; /* gold-500 #ca942e */
+  --gold-hi-rgb: 245 198 110; /* #f5c66e molten highlight */
+  --gold-deep-rgb: 161 98 7; /* #a16207 deep accent */
+  --gold-soft-rgb: 224 180 110; /* #e0b46e light gold */
+  --ivory-rgb: 245 243 238; /* #f5f3ee bone — never pure white */
+  --error-rgb: 217 122 108; /* #d97a6c muted red */
+  --error-hi-rgb: 232 150 138; /* #e8968a brighter error text */
+  --gold-ink-rgb: 30 22 6; /* warm near-black text on gold fills */
+  --online-rgb: 111 217 140; /* #6fd98c — functional online status only */
 
   /* hero art direction — marble texture mates */
-  --hero-black: #07070a;         /* deepest stop, under the statue */
-  --hero-warm: #120d07;          /* warm ramp stop behind the copy */
+  --hero-black: #07070a; /* deepest stop, under the statue */
+  --hero-warm: #120d07; /* warm ramp stop behind the copy */
 
   /* --- semantic tokens — DARK theme (default) ---
      Every background has a paired foreground (color-palette rule). */
@@ -62,12 +62,12 @@
   --surface: #2e3139;
   --card: #23252b;
   --border: rgb(var(--ivory-rgb) / 0.08);
-  --text: var(--gold-50);        /* warm ivory — 15.8:1 on ink */
-  --text-muted: #a8a29e;         /* 6.9:1 on ink */
+  --text: var(--gold-50); /* warm ivory — 15.8:1 on ink */
+  --text-muted: #a8a29e; /* 6.9:1 on ink */
   --accent: var(--gold-500);
   --accent-hi: #f5c66e;
   --accent-deep: #a16207;
-  --accent-ink: rgb(var(--gold-ink-rgb));  /* text on gold fills — 6.5:1+ */
+  --accent-ink: rgb(var(--gold-ink-rgb)); /* text on gold fills — 6.5:1+ */
   --ring: var(--gold-500);
 
   /* --- semantic tokens — LIGHT theme set (band-scoped below) ---
@@ -75,14 +75,14 @@
      AA ≥4.5 on every light band incl. gray (#7a4a05: 5.0–7.2:1). */
   --lt-bg: #fafaf9;
   --lt-surface: #ffffff;
-  --lt-card: #131418;            /* dark cards stay dark on light bands */
+  --lt-card: #131418; /* dark cards stay dark on light bands */
   --lt-card-text: #f5f3ee;
   --lt-border: rgb(25 27 32 / 0.1);
   --lt-border-strong: rgb(25 27 32 / 0.22);
-  --lt-text: #191b20;            /* cool soft-ink, ~15:1 on white band */
-  --lt-text-muted: #555a63;      /* cool gray — AA on light bands */
-  --lt-accent: #7d5f1a;          /* AA text gold — hero panel accent */
-  --lt-accent-hi: #8e6c1f;       /* heading accent (≥3:1 everywhere) */
+  --lt-text: #191b20; /* cool soft-ink, ~15:1 on white band */
+  --lt-text-muted: #555a63; /* cool gray — AA on light bands */
+  --lt-accent: #7d5f1a; /* AA text gold — hero panel accent */
+  --lt-accent-hi: #8e6c1f; /* heading accent (≥3:1 everywhere) */
   --lt-accent-deep: #5f4a12;
 
   /* --- legacy aliases — kept so component CSS needs no renames ---
@@ -102,12 +102,7 @@
   --color-border-gold: rgb(var(--gold-rgb) / 0.26);
 
   /* --- lines & borders --- */
-  --line-gold: linear-gradient(
-    90deg,
-    transparent 0%,
-    rgb(var(--gold-rgb) / 0.7) 50%,
-    transparent 100%
-  );
+  --line-gold: linear-gradient(90deg, transparent 0%, rgb(var(--gold-rgb) / 0.7) 50%, transparent 100%);
 
   /* --- gold gradients (no flat yellow fills) --- */
   --gradient-gold: linear-gradient(
@@ -123,18 +118,8 @@
     rgb(var(--gold-deep-rgb)) 110%
   );
   /* CTA fill — compressed range so ink text keeps ≥4.99:1 on every stop */
-  --gradient-btn: linear-gradient(
-    160deg,
-    #e6be7a 0%,
-    #c8922d 55%,
-    #b07e24 100%
-  );
-  --gradient-btn-hover: linear-gradient(
-    160deg,
-    #f0cd8f 0%,
-    #d9a83e 55%,
-    #c08c2b 100%
-  );
+  --gradient-btn: linear-gradient(160deg, #e6be7a 0%, #c8922d 55%, #b07e24 100%);
+  --gradient-btn-hover: linear-gradient(160deg, #f0cd8f 0%, #d9a83e 55%, #c08c2b 100%);
 
   /* --- typography ---
      Custom Persian display system: Lalezar (OFL poster face — massive
@@ -150,37 +135,37 @@
   --title-gold: #c6a15b;
 
   /* type scale — responsive clamps */
-  --text-h1: clamp(2.5rem, 1.55rem + 4.2vw, 4.5rem);    /* 40–72px */
-  --text-h2: clamp(1.75rem, 1.3rem + 2vw, 2.75rem);     /* 28–44px */
-  --text-h3: clamp(1.25rem, 1.05rem + 1vw, 1.75rem);    /* 20–28px */
+  --text-h1: clamp(2.5rem, 1.55rem + 4.2vw, 4.5rem); /* 40–72px */
+  --text-h2: clamp(1.75rem, 1.3rem + 2vw, 2.75rem); /* 28–44px */
+  --text-h3: clamp(1.25rem, 1.05rem + 1vw, 1.75rem); /* 20–28px */
   --text-body: clamp(1rem, 0.95rem + 0.28vw, 1.125rem); /* 16–18px */
   --text-caption: clamp(0.8125rem, 0.78rem + 0.15vw, 0.875rem); /* 13–14px */
 
-  --lh-display: 1.25;   /* headings 1.1–1.3 */
-  --lh-body: 1.8;       /* Persian body */
-  --lh-ui: 1.45;        /* labels, buttons, nav */
+  --lh-display: 1.25; /* headings 1.1–1.3 */
+  --lh-body: 1.8; /* Persian body */
+  --lh-ui: 1.45; /* labels, buttons, nav */
 
   --weight-body: 400;
   --weight-medium: 500;
-  --weight-heading: 400;   /* Lalezar ships 400 only — it IS the bold */
-  --weight-display: 400;   /* poster face, inherently massive */
+  --weight-heading: 400; /* Lalezar ships 400 only — it IS the bold */
+  --weight-display: 400; /* poster face, inherently massive */
 
   /* --- section bands — the locked palette --------------------------
      مشکی لوکس → سفید استخونی → سورمه‌ای عمیق → فیلی گرم → فوتر ذغالی.
      Dark bands keep ivory/gold text; light bands flip to soft-ink text. */
-  --band-ink: #0b0b0f;            /* سکشن اول — مشکی لوکس */
-  --band-navy: #061021;           /* سکشن سوم — سورمه‌ای عمیق */
-  --band-white: #f6f3ec;          /* سکشن دوم — سفید استخونی */
-  --band-gray: #e8e5de;           /* سکشن چهارم — فیلی گرم ملایم */
-  --band-cream: #e8e5de;          /* light alias — warm gray family */
-  --band-goldblack: #0b0b0f;      /* dark alias — lux black family */
-  --band-goldwhite: #121212;      /* فوتر — مشکی ذغالی */
+  --band-ink: #0b0b0f; /* سکشن اول — مشکی لوکس */
+  --band-navy: #061021; /* سکشن سوم — سورمه‌ای عمیق */
+  --band-white: #f6f3ec; /* سکشن دوم — سفید استخونی */
+  --band-gray: #e8e5de; /* سکشن چهارم — فیلی گرم ملایم */
+  --band-cream: #e8e5de; /* light alias — warm gray family */
+  --band-goldblack: #0b0b0f; /* dark alias — lux black family */
+  --band-goldwhite: #121212; /* فوتر — مشکی ذغالی */
 
   /* --- hero/header spec palette --- */
-  --bone: #efeadf;                /* hero panel — warm bone */
-  --ink: #07080a;                 /* hero black field — lux black */
-  --gold: #d4a84b;                /* hero arc hairline / champagne */
-  --charcoal: #121315;            /* header glass */
+  --bone: #efeadf; /* hero panel — warm bone */
+  --ink: #07080a; /* hero black field — lux black */
+  --gold: #d4a84b; /* hero arc hairline / champagne */
+  --charcoal: #121315; /* header glass */
 
   /* --- layout --- */
   --container: 72rem;
@@ -193,9 +178,7 @@
   --shadow-card: 0 10px 30px -12px rgb(var(--ink-0-rgb) / 0.75);
   --shadow-gold: 0 8px 28px -10px rgb(var(--gold-rgb) / 0.3);
   --shadow-btn: 0 6px 18px -8px rgb(var(--gold-rgb) / 0.5);
-  --shadow-btn-hover:
-    0 10px 28px -8px rgb(var(--gold-rgb) / 0.65),
-    0 0 0 4px rgb(var(--gold-rgb) / 0.12);
+  --shadow-btn-hover: 0 10px 28px -8px rgb(var(--gold-rgb) / 0.65), 0 0 0 4px rgb(var(--gold-rgb) / 0.12);
 
   /* --- motion --- */
   --ease-out: cubic-bezier(0.22, 0.61, 0.21, 1);

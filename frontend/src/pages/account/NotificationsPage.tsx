@@ -10,14 +10,20 @@ export default function NotificationsPage() {
   const [err, setErr] = useState('')
   const navigate = useNavigate()
 
-  const load = () => api.get<Notif[]>('/account/notifications').then(setRows).catch(() => setErr('خطا در بارگذاری اعلان‌ها'))
-  useEffect(() => { void load() }, [])
+  const load = () =>
+    api
+      .get<Notif[]>('/account/notifications')
+      .then(setRows)
+      .catch(() => setErr('خطا در بارگذاری اعلان‌ها'))
+  useEffect(() => {
+    void load()
+  }, [])
 
   const mark = (n: Notif) => {
     if (!n.read) {
-      void api.post(`/account/notifications/${n.id}/read`, {}).then(() =>
-        setRows((p) => p?.map((x) => (x.id === n.id ? { ...x, read: true } : x)) ?? p),
-      )
+      void api
+        .post(`/account/notifications/${n.id}/read`, {})
+        .then(() => setRows((p) => p?.map((x) => (x.id === n.id ? { ...x, read: true } : x)) ?? p))
     }
     if (n.link?.startsWith('/panel')) navigate(n.link)
   }
@@ -43,7 +49,11 @@ export default function NotificationsPage() {
       {err ? (
         <p className="acc__err">{err}</p>
       ) : !rows ? (
-        <div className="acc__card acc__skels">{[0, 1, 2].map((i) => <span key={i} className="acc__skel" />)}</div>
+        <div className="acc__card acc__skels">
+          {[0, 1, 2].map((i) => (
+            <span key={i} className="acc__skel" />
+          ))}
+        </div>
       ) : rows.length === 0 ? (
         <div className="acc__card acc__empty">
           <BellOff size={40} aria-hidden="true" />
@@ -53,7 +63,11 @@ export default function NotificationsPage() {
       ) : (
         <div className="acc__card acc__list">
           {rows.map((n) => (
-            <button key={n.id} className={`acc__row acc__notif${n.read ? '' : ' is-unread'}`} onClick={() => mark(n)}>
+            <button
+              key={n.id}
+              className={`acc__row acc__notif${n.read ? '' : ' is-unread'}`}
+              onClick={() => mark(n)}
+            >
               <span className="acc__notif-dot" aria-hidden="true" />
               <span className="acc__notif-body">
                 <strong>{n.title}</strong>

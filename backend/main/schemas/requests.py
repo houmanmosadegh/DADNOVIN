@@ -5,6 +5,7 @@ from uuid import UUID
 
 from pydantic import BaseModel, ConfigDict, Field, field_validator
 
+from ..ai.render import sanitize_display_text
 from ..models.request_ops import CHANNELS, PRIORITIES, REQUEST_TYPES
 from ..utils.phone import is_valid_iranian_phone, normalize_phone
 
@@ -46,6 +47,12 @@ class MessageOut(BaseModel):
     is_note: bool
     attachments: list
     created_at: datetime
+
+    @field_validator("body")
+    @classmethod
+    def _no_raw_json(cls, v: str) -> str:
+        # legacy rows may embed `[key] {json}` blocks — never surface them
+        return sanitize_display_text(v)
 
 
 class EventOut(BaseModel):
@@ -181,24 +188,43 @@ class TrackPublicOut(BaseModel):
     messages: list[MessageOut]
 
 
+_SLUG = r"^[A-Za-z0-9\u0600-\u06FF][A-Za-z0-9\u0600-\u06FF_-]*$"
+_ARTICLE_STATUS = "^(draft|scheduled|published|archived)$"
+
+
 class ArticleIn(BaseModel):
-    slug: str = Field(min_length=2, max_length=120, pattern=r"^[a-z0-9-]+$")
+    slug: str = Field(min_length=2, max_length=120, pattern=_SLUG)
     title: str = Field(min_length=2, max_length=200)
     excerpt: str = Field(default="", max_length=500)
     body: str = Field(default="", max_length=60000)
     seo_title: str = Field(default="", max_length=200)
     seo_description: str = Field(default="", max_length=300)
-    status: str = Field(default="draft", pattern="^(draft|published)$")
+    canonical: str = Field(default="", max_length=300)
+    category: str = Field(default="", max_length=80)
+    tags: list[str] = Field(default_factory=list, max_length=20)
+    author_name: str = Field(default="", max_length=120)
+    author_bio: str = Field(default="", max_length=500)
+    featured_image_id: UUID | None = None
+    status: str = Field(default="draft", pattern=_ARTICLE_STATUS)
+    scheduled_at: datetime | None = None
 
 
 class ArticlePatchIn(BaseModel):
-    slug: str | None = Field(default=None, min_length=2, max_length=120, pattern=r"^[a-z0-9-]+$")
+    slug: str | None = Field(default=None, min_length=2, max_length=120, pattern=_SLUG)
     title: str | None = Field(default=None, min_length=2, max_length=200)
     excerpt: str | None = Field(default=None, max_length=500)
     body: str | None = Field(default=None, max_length=60000)
     seo_title: str | None = Field(default=None, max_length=200)
     seo_description: str | None = Field(default=None, max_length=300)
-    status: str | None = Field(default=None, pattern="^(draft|published)$")
+    canonical: str | None = Field(default=None, max_length=300)
+    category: str | None = Field(default=None, max_length=80)
+    tags: list[str] | None = Field(default=None, max_length=20)
+    author_name: str | None = Field(default=None, max_length=120)
+    author_bio: str | None = Field(default=None, max_length=500)
+    featured_image_id: UUID | None = None
+    clear_featured_image: bool = False
+    status: str | None = Field(default=None, pattern=_ARTICLE_STATUS)
+    scheduled_at: datetime | None = None
 
 
 class ArticleOut(BaseModel):
@@ -211,7 +237,15 @@ class ArticleOut(BaseModel):
     body: str
     seo_title: str
     seo_description: str
+    canonical: str
+    category: str
+    tags: list
+    author_name: str
+    author_bio: str
+    featured_image_id: UUID | None
+    read_time_min: int
     status: str
+    scheduled_at: datetime | None
     published_at: datetime | None
     created_at: datetime
     updated_at: datetime

@@ -13,8 +13,27 @@ from ..models.ai import AIKnowledgeSource
 
 _WORD_RE = re.compile(r"[\wآ-ی]+", re.UNICODE)
 _STOPWORDS = {
-    "از", "به", "در", "و", "با", "که", "این", "آن", "را", "برای", "است",
-    "من", "شما", "ما", "یا", "اگر", "یک", "های", "می", "چه", "چطور",
+    "از",
+    "به",
+    "در",
+    "و",
+    "با",
+    "که",
+    "این",
+    "آن",
+    "را",
+    "برای",
+    "است",
+    "من",
+    "شما",
+    "ما",
+    "یا",
+    "اگر",
+    "یک",
+    "های",
+    "می",
+    "چه",
+    "چطور",
 }
 
 
@@ -29,9 +48,7 @@ async def search_knowledge(
     rows = list(
         (
             await db.execute(
-                select(AIKnowledgeSource).where(
-                    AIKnowledgeSource.is_active.is_(True)
-                )
+                select(AIKnowledgeSource).where(AIKnowledgeSource.is_active.is_(True))
             )
         ).scalars()
     )

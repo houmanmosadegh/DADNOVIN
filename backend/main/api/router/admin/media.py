@@ -32,7 +32,14 @@ async def upload_media(
     alt: Annotated[str, Form(max_length=255)] = "",
 ) -> MediaOut:
     asset = await store_upload(db, file, user, alt=alt)
-    await audit(db, actor=user, action="media.upload", entity="media", entity_id=asset.id,
-                detail={"name": asset.original_name, "size": asset.size_bytes}, request=request)
+    await audit(
+        db,
+        actor=user,
+        action="media.upload",
+        entity="media",
+        entity_id=asset.id,
+        detail={"name": asset.original_name, "size": asset.size_bytes},
+        request=request,
+    )
     await db.commit()
     return _out(asset)

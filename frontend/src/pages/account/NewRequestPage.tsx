@@ -33,7 +33,8 @@ export default function NewRequestPage() {
 
   // admin-managed topic list — static fallback when the API is unreachable
   useEffect(() => {
-    api.get<string[]>('/public/legal-topics')
+    api
+      .get<string[]>('/public/legal-topics')
       .then((rows) => {
         if (rows.length > 0) {
           setTopics(rows)
@@ -62,7 +63,9 @@ export default function NewRequestPage() {
       f.body.trim(),
       `شیوهٔ تماس ترجیحی: ${f.contact}`,
       f.time.trim() && `زمان مناسب: ${f.time.trim()}`,
-    ].filter(Boolean).join('\n')
+    ]
+      .filter(Boolean)
+      .join('\n')
     try {
       const out = await api.post<Created>('/account/requests', {
         topic: f.topic,
@@ -85,10 +88,16 @@ export default function NewRequestPage() {
           <CheckCircle2 size={44} aria-hidden="true" />
           <h2>درخواست شما ثبت شد</h2>
           <p className="acc__muted">کد پیگیری را نگه دارید؛ کارشناسان به‌زودی پاسخ می‌دهند.</p>
-          <code className="acc__track" dir="ltr">{done.tracking_code}</code>
+          <code className="acc__track" dir="ltr">
+            {done.tracking_code}
+          </code>
           <div className="acc__success-actions">
-            <Link to={`/panel/requests/${done.id}`} className="btn btn--primary">مشاهدهٔ درخواست</Link>
-            <Link to="/panel/requests" className="btn btn--ghost">لیست درخواست‌ها</Link>
+            <Link to={`/panel/requests/${done.id}`} className="btn btn--primary">
+              مشاهدهٔ درخواست
+            </Link>
+            <Link to="/panel/requests" className="btn btn--ghost">
+              لیست درخواست‌ها
+            </Link>
           </div>
         </div>
       </div>
@@ -105,13 +114,21 @@ export default function NewRequestPage() {
           <label className="acc__field">
             <span>نوع موضوع</span>
             <select value={f.topic} onChange={(e) => setF({ ...f, topic: e.target.value })}>
-              {topics.map((t) => <option key={t} value={t}>{t}</option>)}
+              {topics.map((t) => (
+                <option key={t} value={t}>
+                  {t}
+                </option>
+              ))}
             </select>
           </label>
           <label className="acc__field">
             <span>شیوهٔ تماس ترجیحی</span>
             <select value={f.contact} onChange={(e) => setF({ ...f, contact: e.target.value })}>
-              {CONTACT_PREFS.map((t) => <option key={t} value={t}>{t}</option>)}
+              {CONTACT_PREFS.map((t) => (
+                <option key={t} value={t}>
+                  {t}
+                </option>
+              ))}
             </select>
           </label>
         </div>
@@ -147,33 +164,59 @@ export default function NewRequestPage() {
 
         <div className="acc__grid">
           <label className="acc__field">
-            <span>شمارهٔ تماس ترجیحی <em>(اختیاری)</em></span>
+            <span>
+              شمارهٔ تماس ترجیحی <em>(اختیاری)</em>
+            </span>
             <input
-              dir="ltr" inputMode="tel" value={f.phone}
+              dir="ltr"
+              inputMode="tel"
+              value={f.phone}
               onChange={(e) => setF({ ...f, phone: e.target.value })}
               placeholder="همان شمارهٔ حساب شما"
             />
           </label>
           <label className="acc__field">
-            <span>زمان مناسب تماس <em>(اختیاری)</em></span>
-            <input value={f.time} onChange={(e) => setF({ ...f, time: e.target.value })} placeholder="مثلاً عصرها" />
+            <span>
+              زمان مناسب تماس <em>(اختیاری)</em>
+            </span>
+            <input
+              value={f.time}
+              onChange={(e) => setF({ ...f, time: e.target.value })}
+              placeholder="مثلاً عصرها"
+            />
           </label>
         </div>
 
         <label className="acc__field" style={{ maxWidth: '16rem' }}>
-          <span>کد معرف <em>(اختیاری)</em></span>
-          <input dir="ltr" value={f.ref} onChange={(e) => setF({ ...f, ref: e.target.value })} placeholder="DN-XXXXXX" />
+          <span>
+            کد معرف <em>(اختیاری)</em>
+          </span>
+          <input
+            dir="ltr"
+            value={f.ref}
+            onChange={(e) => setF({ ...f, ref: e.target.value })}
+            placeholder="DN-XXXXXX"
+          />
         </label>
 
         {/* honeypot — مخفی از کاربر */}
         <input
-          type="text" tabIndex={-1} autoComplete="off" aria-hidden="true"
-          className="acc__hp" value={f.website}
+          type="text"
+          tabIndex={-1}
+          autoComplete="off"
+          aria-hidden="true"
+          className="acc__hp"
+          value={f.website}
           onChange={(e) => setF({ ...f, website: e.target.value })}
         />
 
         <label className="authp__check">
-          <input type="checkbox" checked={f.terms} onChange={(e) => setF({ ...f, terms: e.target.checked })} onBlur={blur('terms')} />
+          <input
+            type="checkbox"
+            checked={f.terms}
+            onChange={(e) => setF({ ...f, terms: e.target.checked })}
+            onBlur={blur('terms')}
+          />
           <span>صحت اطلاعات را تأیید می‌کنم و قوانین حریم خصوصی را می‌پذیرم</span>
         </label>
         {fieldErr.terms && <em className="acc__hint authp__hint--err">{fieldErr.terms}</em>}
@@ -182,7 +225,9 @@ export default function NewRequestPage() {
           <button className="btn btn--primary" disabled={busy}>
             {busy ? 'در حال ثبت…' : 'ثبت درخواست'}
           </button>
-          <Link to="/panel/requests" className="acc__sitelink">انصراف</Link>
+          <Link to="/panel/requests" className="acc__sitelink">
+            انصراف
+          </Link>
         </div>
       </form>
     </div>

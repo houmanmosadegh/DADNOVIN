@@ -76,6 +76,11 @@ class PublicArticleOut(BaseModel):
     slug: str
     title: str
     excerpt: str
+    category: str = ""
+    tags: list = []
+    author_name: str = ""
+    read_time_min: int = 0
+    featured_image: str = ""  # media id → /api/v1/media/<id>
     published_at: datetime | None
 
 
@@ -83,3 +88,5 @@ class PublicArticleDetailOut(PublicArticleOut):
     body: str
     seo_title: str
     seo_description: str
+    canonical: str = ""
+    author_bio: str = ""

@@ -15,10 +15,7 @@ export default function RequestsHubPage() {
 
   return (
     <div>
-      <PageHeader
-        title="درخواست‌ها"
-        subtitle="صندوق واحد — مشاوره، تماس، تیکت و بازاریابی"
-      />
+      <PageHeader title="درخواست‌ها" subtitle="صندوق واحد — مشاوره، تماس، تیکت و بازاریابی" />
       <Tabs
         active={tab}
         onChange={(k) => setParams({ tab: k }, { replace: true })}
@@ -33,9 +30,7 @@ export default function RequestsHubPage() {
       />
       <div className="pt-4">
         {tab === "inbox" && <InboxPage key="inbox" embedded />}
-        {tab === "consultations" && (
-          <InboxPage key="consultations" fixedType="consultation" embedded />
-        )}
+        {tab === "consultations" && <InboxPage key="consultations" fixedType="consultation" embedded />}
         {tab === "contacts" && <InboxPage key="contacts" fixedType="contact" embedded />}
         {tab === "tickets" && <InboxPage key="tickets" fixedType="ticket" embedded />}
         {tab === "marketers" && <ApplicationsTab />}

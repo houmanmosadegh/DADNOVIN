@@ -29,9 +29,7 @@ DbDep = Annotated[AsyncSession, Depends(get_db)]
 @router.get("/status")
 async def ai_status(_: AdminDep, db: DbDep) -> AiStatusOut:
     settings = get_settings()
-    sources = (
-        await db.execute(select(func.count(AIKnowledgeSource.id)))
-    ).scalar_one()
+    sources = (await db.execute(select(func.count(AIKnowledgeSource.id)))).scalar_one()
     return AiStatusOut(
         configured=settings.ai_configured,
         enabled=settings.ai_enabled,
@@ -41,9 +39,7 @@ async def ai_status(_: AdminDep, db: DbDep) -> AiStatusOut:
 
 @router.get("/knowledge")
 async def list_knowledge(_: AdminDep, db: DbDep, page: PageDep) -> dict:
-    total = (
-        await db.execute(select(func.count(AIKnowledgeSource.id)))
-    ).scalar_one()
+    total = (await db.execute(select(func.count(AIKnowledgeSource.id)))).scalar_one()
     items = (
         await db.execute(
             select(AIKnowledgeSource)
@@ -76,8 +72,14 @@ async def create_knowledge(
     )
     db.add(row)
     await db.flush()
-    await audit(db, actor=user, action="knowledge.create", entity="knowledge",
-                entity_id=row.id, request=request)
+    await audit(
+        db,
+        actor=user,
+        action="knowledge.create",
+        entity="knowledge",
+        entity_id=row.id,
+        request=request,
+    )
     await db.commit()
     return KnowledgeOut.model_validate(row)
 
@@ -95,8 +97,14 @@ async def patch_knowledge(
         raise HTTPException(404, {"code": "not_found", "message": "رکورد یافت نشد."})
     for field, value in payload.model_dump(exclude_unset=True).items():
         setattr(row, field, value)
-    await audit(db, actor=user, action="knowledge.update", entity="knowledge",
-                entity_id=row.id, request=request)
+    await audit(
+        db,
+        actor=user,
+        action="knowledge.update",
+        entity="knowledge",
+        entity_id=row.id,
+        request=request,
+    )
     await db.commit()
     return KnowledgeOut.model_validate(row)
 
@@ -108,8 +116,14 @@ async def delete_knowledge(
     row = await db.get(AIKnowledgeSource, row_id)
     if row is None:
         raise HTTPException(404, {"code": "not_found", "message": "رکورد یافت نشد."})
-    await audit(db, actor=user, action="knowledge.delete", entity="knowledge",
-                entity_id=row.id, request=request)
+    await audit(
+        db,
+        actor=user,
+        action="knowledge.delete",
+        entity="knowledge",
+        entity_id=row.id,
+        request=request,
+    )
     await db.delete(row)
     await db.commit()
     return {"message": "رکورد حذف شد."}
@@ -119,17 +133,21 @@ async def delete_knowledge(
 async def sync(request: Request, user: EditorDep, db: DbDep) -> dict:
     """Rebuild knowledge from published pages/settings/lawyers (idempotent)."""
     changed = await sync_knowledge(db)
-    await audit(db, actor=user, action="knowledge.sync", entity="knowledge",
-                detail={"changed": changed}, request=request)
+    await audit(
+        db,
+        actor=user,
+        action="knowledge.sync",
+        entity="knowledge",
+        detail={"changed": changed},
+        request=request,
+    )
     await db.commit()
     return {"message": f"{changed} رکورد به‌روزرسانی شد.", "changed": changed}
 
 
 @router.get("/conversations")
 async def conversations(_: AdminDep, db: DbDep, page: PageDep) -> dict:
-    total = (
-        await db.execute(select(func.count(AIConversation.id)))
-    ).scalar_one()
+    total = (await db.execute(select(func.count(AIConversation.id)))).scalar_one()
     items = (
         await db.execute(
             select(AIConversation)

@@ -3,7 +3,7 @@
 import uuid
 from datetime import datetime
 
-from sqlalchemy import DateTime, ForeignKey, String, Text, Uuid
+from sqlalchemy import CheckConstraint, DateTime, ForeignKey, String, Text, Uuid
 from sqlalchemy.orm import Mapped, mapped_column, relationship
 
 from ..db.base import Base, created_at_col, updated_at_col, uuid_pk
@@ -11,8 +11,15 @@ from ..db.base import Base, created_at_col, updated_at_col, uuid_pk
 # جدید ← در حال بررسی ← در انتظار تماس ← پیگیری شده ← مشاوره انجام شد ←
 # پذیرفته شد | رد شد | تکمیل شده (+لغو)
 STATUSES = (
-    "new", "reviewing", "awaiting_call", "followed_up", "consulted",
-    "accepted", "rejected", "completed", "cancelled",
+    "new",
+    "reviewing",
+    "awaiting_call",
+    "followed_up",
+    "consulted",
+    "accepted",
+    "rejected",
+    "completed",
+    "cancelled",
 )
 
 
@@ -42,7 +49,7 @@ class ConsultationRequest(Base):
     referrer_id: Mapped[uuid.UUID | None] = mapped_column(Uuid, nullable=True)
     client_ip: Mapped[str] = mapped_column(String(45), default="")
     client_ua: Mapped[str] = mapped_column(String(300), default="")
-    # admin-set fee basis for percent commissions (rials)
+    # admin-set fee basis for percent commissions (تومان)
     fee_amount: Mapped[int] = mapped_column(default=0)
     assigned_to: Mapped[uuid.UUID | None] = mapped_column(
         Uuid, ForeignKey("users.id", ondelete="SET NULL"), nullable=True
@@ -60,6 +67,8 @@ class ConsultationRequest(Base):
     created_at: Mapped[datetime] = created_at_col()
     updated_at: Mapped[datetime] = updated_at_col()
 
+    __table_args__ = (CheckConstraint("fee_amount >= 0", name="ck_consultation_fee"),)
+
     notes: Mapped[list["ConsultationNote"]] = relationship(
         back_populates="request",
         cascade="all, delete-orphan",
@@ -75,7 +84,8 @@ class ConsultationNote(Base):
 
     id: Mapped[uuid.UUID] = uuid_pk()
     request_id: Mapped[uuid.UUID] = mapped_column(
-        Uuid, ForeignKey("consultation_requests.id", ondelete="CASCADE"),
+        Uuid,
+        ForeignKey("consultation_requests.id", ondelete="CASCADE"),
         index=True,
     )
     author_id: Mapped[uuid.UUID | None] = mapped_column(Uuid, nullable=True)

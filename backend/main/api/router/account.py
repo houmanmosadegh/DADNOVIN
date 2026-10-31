@@ -9,20 +9,22 @@ from typing import Annotated
 
 from fastapi import APIRouter, Depends, HTTPException, Query, Request, Response
 from pydantic import BaseModel, Field
-from sqlalchemy import or_, select
+from sqlalchemy import func, select
 from sqlalchemy.ext.asyncio import AsyncSession
 
+from ...ai.render import sanitize_display_text
 from ...core.config import get_settings
 from ...core.rate_limit import client_key, limiter
 from ...db.session import get_db
 from ...models.account import (
+    CaseFeeReceipt,
     InboxNotification,
     MarketerApplication,
     OtpToken,
     PasswordResetToken,
+    Payout,
     ReferralAttribution,
     Commission,
-    CommissionRule,
 )
 from ...models.consultation import ConsultationRequest
 from ...models.request_ops import RequestEvent, RequestMessage
@@ -31,7 +33,6 @@ from ...models.user import Role, Session, User
 from ...notify.providers import get_provider
 from ...schemas.account import (
     AccountMeOut,
-    BankDetailsIn,
     ForgotIn,
     LoginPhoneIn,
     MarketerApplyIn,
@@ -43,7 +44,16 @@ from ...schemas.account import (
 )
 from ...security.passwords import hash_password, verify_password
 from ...security.sessions import create_session, revoke_session
-from ...security.vault import encrypt_field, mask_digits, decrypt_field
+from ...security.vault import (
+    decrypt_field,
+    encrypt_field,
+    iban_ok,
+    luhn_ok,
+    mask_digits,
+    mask_iban,
+    normalize_card,
+    normalize_iban,
+)
 from ...services import commissions as comm_svc
 from ...services import referrals as ref_svc
 from ...services import thread as thread_svc
@@ -69,7 +79,9 @@ async def _role(db: AsyncSession, name: str) -> Role:
         await db.execute(select(Role).where(Role.name == name))
     ).scalar_one_or_none()
     if role is None:
-        raise HTTPException(500, {"code": "no_role", "message": "نقش در سیستم تعریف نشده است."})
+        raise HTTPException(
+            500, {"code": "no_role", "message": "نقش در سیستم تعریف نشده است."}
+        )
     return role
 
 
@@ -88,13 +100,17 @@ def _set_session_cookie(response: Response, settings, token: str) -> None:
 async def _link_prior_requests(db: AsyncSession, user: User) -> int:
     """Claim guest requests submitted earlier with the same phone."""
     rows = (
-        await db.execute(
-            select(ConsultationRequest).where(
-                ConsultationRequest.phone == user.phone,
-                ConsultationRequest.user_id.is_(None),
+        (
+            await db.execute(
+                select(ConsultationRequest).where(
+                    ConsultationRequest.phone == user.phone,
+                    ConsultationRequest.user_id.is_(None),
+                )
             )
         )
-    ).scalars().all()
+        .scalars()
+        .all()
+    )
     for r in rows:
         r.user_id = user.id
     if rows:
@@ -245,10 +261,20 @@ async def register(
     await db.flush()
     await _link_prior_requests(db, user)
     session, token = await create_session(
-        db, user, ip=client_key(request), user_agent=request.headers.get("user-agent", "")[:300]
+        db,
+        user,
+        ip=client_key(request),
+        user_agent=request.headers.get("user-agent", "")[:300],
     )
     _set_session_cookie(response, settings, token)
-    await audit(db, actor=user, action="account.register", entity="user", entity_id=user.id, request=request)
+    await audit(
+        db,
+        actor=user,
+        action="account.register",
+        entity="user",
+        entity_id=user.id,
+        request=request,
+    )
     await db.commit()
     return await _me_out(db, user)
 
@@ -262,23 +288,36 @@ async def login_phone(
     user = (
         await db.execute(
             select(User).where(
-                (User.phone == payload.identifier) | (User.username == payload.identifier)
+                (User.phone == payload.identifier)
+                | (User.username == payload.identifier)
             )
         )
     ).scalar_one_or_none()
     generic = HTTPException(
         401, {"code": "bad_credentials", "message": "شناسه یا رمز عبور نادرست است."}
     )
-    if user is None or not user.is_active or not verify_password(
-        payload.password, user.password_hash
+    if (
+        user is None
+        or not user.is_active
+        or not verify_password(payload.password, user.password_hash)
     ):
         raise generic
     await _link_prior_requests(db, user)
     session, token = await create_session(
-        db, user, ip=client_key(request), user_agent=request.headers.get("user-agent", "")[:300]
+        db,
+        user,
+        ip=client_key(request),
+        user_agent=request.headers.get("user-agent", "")[:300],
     )
     _set_session_cookie(response, settings, token)
-    await audit(db, actor=user, action="account.login", entity="session", entity_id=session.id, request=request)
+    await audit(
+        db,
+        actor=user,
+        action="account.login",
+        entity="session",
+        entity_id=session.id,
+        request=request,
+    )
     await db.commit()
     return await _me_out(db, user)
 
@@ -312,7 +351,9 @@ async def forgot(payload: ForgotIn, request: Request, db: DbDep) -> dict:
 
 @auth_router.post("/reset")
 async def reset(payload: ResetIn, request: Request, db: DbDep) -> dict:
-    limiter.check("reset", client_key(request), get_settings().rate_limit_login_per_minute)
+    limiter.check(
+        "reset", client_key(request), get_settings().rate_limit_login_per_minute
+    )
     token_hash = hashlib.sha256(payload.token.encode()).hexdigest()
     row = (
         await db.execute(
@@ -321,12 +362,10 @@ async def reset(payload: ResetIn, request: Request, db: DbDep) -> dict:
             )
         )
     ).scalar_one_or_none()
-    if (
-        row is None
-        or row.used_at is not None
-        or aware(row.expires_at) < utcnow()
-    ):
-        raise HTTPException(400, {"code": "bad_token", "message": "کد نامعتبر یا منقضی است."})
+    if row is None or row.used_at is not None or aware(row.expires_at) < utcnow():
+        raise HTTPException(
+            400, {"code": "bad_token", "message": "کد نامعتبر یا منقضی است."}
+        )
     user = await db.get(User, row.user_id)
     if user is None:
         raise HTTPException(400, {"code": "bad_token", "message": "کد نامعتبر است."})
@@ -334,8 +373,10 @@ async def reset(payload: ResetIn, request: Request, db: DbDep) -> dict:
     row.used_at = datetime.now(UTC)
     # revoke all existing sessions for safety
     sessions = (
-        await db.execute(select(Session).where(Session.user_id == user.id))
-    ).scalars().all()
+        (await db.execute(select(Session).where(Session.user_id == user.id)))
+        .scalars()
+        .all()
+    )
     for s in sessions:
         await revoke_session(db, s)
     await db.commit()
@@ -374,7 +415,9 @@ async def account_me(db: DbDep, user: CurrentUser) -> AccountMeOut:
 
 
 @router.patch("/me")
-async def patch_me(db: DbDep, user: CurrentUser, payload: ProfilePatchIn) -> AccountMeOut:
+async def patch_me(
+    db: DbDep, user: CurrentUser, payload: ProfilePatchIn
+) -> AccountMeOut:
     if payload.full_name:
         user.full_name = payload.full_name.strip()
     if payload.phone and payload.phone != user.phone:
@@ -382,7 +425,9 @@ async def patch_me(db: DbDep, user: CurrentUser, payload: ProfilePatchIn) -> Acc
             await db.execute(select(User.id).where(User.phone == payload.phone))
         ).scalar_one_or_none()
         if clash is not None:
-            raise HTTPException(409, {"code": "phone_taken", "message": "این شماره قبلاً ثبت شده است."})
+            raise HTTPException(
+                409, {"code": "phone_taken", "message": "این شماره قبلاً ثبت شده است."}
+            )
         user.phone = payload.phone
         user.username = payload.phone
         await _link_prior_requests(db, user)
@@ -391,9 +436,13 @@ async def patch_me(db: DbDep, user: CurrentUser, payload: ProfilePatchIn) -> Acc
 
 
 @router.post("/password")
-async def change_password(db: DbDep, user: CurrentUser, payload: PasswordChangeIn) -> dict:
+async def change_password(
+    db: DbDep, user: CurrentUser, payload: PasswordChangeIn
+) -> dict:
     if not verify_password(payload.current, user.password_hash):
-        raise HTTPException(400, {"code": "bad_password", "message": "رمز فعلی نادرست است."})
+        raise HTTPException(
+            400, {"code": "bad_password", "message": "رمز فعلی نادرست است."}
+        )
     user.password_hash = hash_password(payload.new)
     await db.commit()
     return {"message": "رمز عبور تغییر کرد."}
@@ -402,7 +451,9 @@ async def change_password(db: DbDep, user: CurrentUser, payload: PasswordChangeI
 # ─── my requests ────────────────────────────────────────────────────
 
 
-async def _own_request(db: AsyncSession, user: User, request_id: uuid.UUID) -> ConsultationRequest:
+async def _own_request(
+    db: AsyncSession, user: User, request_id: uuid.UUID
+) -> ConsultationRequest:
     row = await db.get(ConsultationRequest, request_id)
     if row is None or (row.user_id != user.id and row.phone != user.phone):
         raise HTTPException(404, {"code": "not_found", "message": "درخواست یافت نشد."})
@@ -411,10 +462,14 @@ async def _own_request(db: AsyncSession, user: User, request_id: uuid.UUID) -> C
 
 class PanelConsultationIn(BaseModel):
     """Logged-in consultation submit — name/phone come from the account."""
+
     topic: str = Field(min_length=2, max_length=200)
     message: str = Field(min_length=10, max_length=5000)
     phone: str = Field(default="", max_length=40)  # preferred contact (optional)
     ref_code: str = Field(default="", max_length=24)
+    # «نام من و وضعیت قرارداد، برای معرف نمایش داده می‌شود» — required for
+    # the referral to create commission/name exposure
+    ref_consent: bool = False
 
 
 def _display_status(row: ConsultationRequest, last_sender: str | None) -> str:
@@ -433,7 +488,9 @@ async def create_request(
     db: DbDep, user: CurrentUser, payload: PanelConsultationIn, request: Request
 ) -> dict:
     limiter.check(
-        "consult_submit", client_key(request), get_settings().rate_limit_public_post_per_minute
+        "consult_submit",
+        client_key(request),
+        get_settings().rate_limit_public_post_per_minute,
     )
     phone = (payload.phone or user.phone or "").strip()
     code_str = secrets.token_hex(4)
@@ -463,13 +520,22 @@ async def create_request(
             )
             if reason:
                 await thread_svc.add_event(
-                    db, "consultation", row.id, "referral_blocked",
+                    db,
+                    "consultation",
+                    row.id,
+                    "referral_blocked",
                     payload={"reason": reason},
                 )
             else:
                 await ref_svc.attribute(
-                    db, prof, request_type="consultation", request_id=row.id,
-                    ip=row.client_ip, ua=row.client_ua,
+                    db,
+                    prof,
+                    request_type="consultation",
+                    request_id=row.id,
+                    ip=row.client_ip,
+                    ua=row.client_ua,
+                    consent=payload.ref_consent,
+                    channel=request.cookies.get("dn_src", ""),
                 )
                 row.ref_code = code
                 row.referrer_id = prof.id
@@ -483,22 +549,30 @@ async def create_request(
 @router.get("/requests")
 async def my_requests(db: DbDep, user: CurrentUser) -> list[dict]:
     rows = (
-        await db.execute(
-            select(ConsultationRequest)
-            .where(ConsultationRequest.user_id == user.id)
-            .order_by(ConsultationRequest.created_at.desc())
-            .limit(100)
-        )
-    ).scalars().all()
-    # also include still-unlinked requests sharing this phone (pending claim)
-    unlinked = (
-        await db.execute(
-            select(ConsultationRequest).where(
-                ConsultationRequest.phone == user.phone,
-                ConsultationRequest.user_id.is_(None),
+        (
+            await db.execute(
+                select(ConsultationRequest)
+                .where(ConsultationRequest.user_id == user.id)
+                .order_by(ConsultationRequest.created_at.desc())
+                .limit(100)
             )
         )
-    ).scalars().all()
+        .scalars()
+        .all()
+    )
+    # also include still-unlinked requests sharing this phone (pending claim)
+    unlinked = (
+        (
+            await db.execute(
+                select(ConsultationRequest).where(
+                    ConsultationRequest.phone == user.phone,
+                    ConsultationRequest.user_id.is_(None),
+                )
+            )
+        )
+        .scalars()
+        .all()
+    )
     for r in unlinked:
         r.user_id = user.id
         rows.append(r)
@@ -545,38 +619,46 @@ async def my_requests(db: DbDep, user: CurrentUser) -> list[dict]:
 
 
 @router.get("/requests/{request_id}")
-async def my_request_detail(db: DbDep, user: CurrentUser, request_id: uuid.UUID) -> dict:
+async def my_request_detail(
+    db: DbDep, user: CurrentUser, request_id: uuid.UUID
+) -> dict:
     row = await _own_request(db, user, request_id)
     msgs = (
-        await db.execute(
-            select(RequestMessage)
-            .where(
-                RequestMessage.request_type == "consultation",
-                RequestMessage.request_id == row.id,
-                RequestMessage.is_note.is_(False),
+        (
+            await db.execute(
+                select(RequestMessage)
+                .where(
+                    RequestMessage.request_type == "consultation",
+                    RequestMessage.request_id == row.id,
+                    RequestMessage.is_note.is_(False),
+                )
+                .order_by(RequestMessage.created_at)
             )
-            .order_by(RequestMessage.created_at)
         )
-    ).scalars().all()
+        .scalars()
+        .all()
+    )
     events = (
-        await db.execute(
-            select(RequestEvent)
-            .where(
-                RequestEvent.request_type == "consultation",
-                RequestEvent.request_id == row.id,
-                RequestEvent.event_type == "status_change",
+        (
+            await db.execute(
+                select(RequestEvent)
+                .where(
+                    RequestEvent.request_type == "consultation",
+                    RequestEvent.request_id == row.id,
+                    RequestEvent.event_type == "status_change",
+                )
+                .order_by(RequestEvent.created_at)
             )
-            .order_by(RequestEvent.created_at)
         )
-    ).scalars().all()
+        .scalars()
+        .all()
+    )
     return {
         "id": str(row.id),
         "tracking_code": row.tracking_code,
         "topic": row.topic or row.service_slug,
         "status": row.status,
-        "display_status": _display_status(
-            row, msgs[-1].sender_type if msgs else None
-        ),
+        "display_status": _display_status(row, msgs[-1].sender_type if msgs else None),
         "created_at": row.created_at.isoformat(),
         "events": [
             {
@@ -590,7 +672,7 @@ async def my_request_detail(db: DbDep, user: CurrentUser, request_id: uuid.UUID)
             {
                 "id": str(m.id),
                 "sender_type": m.sender_type,
-                "body": m.body,
+                "body": sanitize_display_text(m.body),
                 "created_at": m.created_at.isoformat(),
             }
             for m in msgs
@@ -605,16 +687,26 @@ async def my_request_reply(
     row = await _own_request(db, user, request_id)
     if row.status in ("completed", "cancelled", "rejected"):
         raise HTTPException(
-            409, {"code": "request_closed", "message": "این درخواست بسته شده و امکان پاسخ نیست."}
+            409,
+            {
+                "code": "request_closed",
+                "message": "این درخواست بسته شده و امکان پاسخ نیست.",
+            },
         )
     body = str(payload.get("body", "")).strip()
     if not body or len(body) > 4000:
-        raise HTTPException(400, {"code": "bad_body", "message": "متن پاسخ معتبر نیست."})
+        raise HTTPException(
+            400, {"code": "bad_body", "message": "متن پاسخ معتبر نیست."}
+        )
     msg = await thread_svc.add_message(
         db, "consultation", row.id, sender_type="customer", sender_id=user.id, body=body
     )
     await thread_svc.add_event(
-        db, "consultation", row.id, "customer_reply", payload={"message_id": str(msg.id)}
+        db,
+        "consultation",
+        row.id,
+        "customer_reply",
+        payload={"message_id": str(msg.id)},
     )
     await db.commit()
     return {"id": str(msg.id)}
@@ -626,13 +718,17 @@ async def my_request_reply(
 @router.get("/notifications")
 async def my_notifications(db: DbDep, user: CurrentUser) -> list[dict]:
     rows = (
-        await db.execute(
-            select(InboxNotification)
-            .where(InboxNotification.user_id == user.id)
-            .order_by(InboxNotification.created_at.desc())
-            .limit(50)
+        (
+            await db.execute(
+                select(InboxNotification)
+                .where(InboxNotification.user_id == user.id)
+                .order_by(InboxNotification.created_at.desc())
+                .limit(50)
+            )
         )
-    ).scalars().all()
+        .scalars()
+        .all()
+    )
     return [
         {
             "id": str(n.id),
@@ -667,7 +763,8 @@ async def marketer_apply(
     await _marketing_on(db)
     if not payload.terms:
         raise HTTPException(
-            422, {"code": "terms_required", "message": "پذیرش قوانین بازاریابی الزامی است."}
+            422,
+            {"code": "terms_required", "message": "پذیرش قوانین بازاریابی الزامی است."},
         )
     cfg = await comm_svc.referral_settings(db)
     terms = await comm_svc.terms_view(db)
@@ -679,7 +776,14 @@ async def marketer_apply(
         int(cfg.get("reapply_days", 14)),
         terms_version=terms["version"] or payload.terms_version,
     )
-    await audit(db, actor=user, action="marketer.apply", entity="marketer_application", entity_id=app.id, request=request)
+    await audit(
+        db,
+        actor=user,
+        action="marketer.apply",
+        entity="marketer_application",
+        entity_id=app.id,
+        request=request,
+    )
     await db.commit()
     return {"id": str(app.id), "status": app.status}
 
@@ -709,8 +813,15 @@ async def marketer_home(db: DbDep, user: CurrentUser) -> dict:
         if app is not None and app.status == "rejected":
             out["reject_reason"] = app.review_note
             out["reapply_at"] = (
-                aware(app.reviewed_at) + timedelta(days=int(cfg.get("reapply_days", 14)))
-            ).date().isoformat() if app.reviewed_at else ""
+                (
+                    aware(app.reviewed_at)
+                    + timedelta(days=int(cfg.get("reapply_days", 14)))
+                )
+                .date()
+                .isoformat()
+                if app.reviewed_at
+                else ""
+            )
         if app is not None and app.status == "pending":
             out["applied_at"] = app.created_at.isoformat()
         if app is None or app.status == "rejected":
@@ -718,30 +829,9 @@ async def marketer_home(db: DbDep, user: CurrentUser) -> dict:
             out["default_rate"] = int(cfg.get("default_rate") or 0)
         return out
     stats = await ref_svc.stats_for(db, prof.id)
+    stats["channels"] = await ref_svc.channel_stats_for(db, prof)
     links = await ref_svc.links_for(db, prof)
-    now = datetime.now(UTC)
-    rules = (
-        await db.execute(
-            select(CommissionRule)
-            .where(
-                CommissionRule.is_active.is_(True),
-                CommissionRule.kind == "percent",
-                or_(
-                    CommissionRule.marketer_id.is_(None),
-                    CommissionRule.marketer_id == prof.id,
-                ),
-                or_(
-                    CommissionRule.starts_at.is_(None),
-                    CommissionRule.starts_at <= now,
-                ),
-                or_(
-                    CommissionRule.ends_at.is_(None),
-                    CommissionRule.ends_at >= now,
-                ),
-            )
-            .order_by(CommissionRule.tier_min.desc())
-        )
-    ).scalars().all()
+    payable = await comm_svc.payable_balance(db, prof.id)
     return {
         "status": "approved",
         "ref_code": prof.ref_code,
@@ -754,26 +844,31 @@ async def marketer_home(db: DbDep, user: CurrentUser) -> dict:
         "cookie_days": int(cfg.get("cookie_days", 30)),
         "stats": stats,
         "links": links,
-        "iban_masked": _iban_masked(prof),
-        "rules": [
-            {
-                "kind": r.kind,
-                "value": r.value,
-                "tier_min": r.tier_min,
-                "own": r.marketer_id == prof.id,
-            }
-            for r in rules
-        ],
+        "payable": payable,
+        "bank": _bank_out(prof),
+        "terms": await comm_svc.terms_view(db),
     }
 
 
-def _iban_masked(prof) -> str:
-    raw = decrypt_field(prof.iban_enc) if prof.iban_enc else ""
-    return mask_digits(raw) if raw else ""
+def _bank_out(prof) -> dict:
+    """Masked bank coordinates for the account page — never raw digits."""
+    iban = decrypt_field(prof.iban_enc) if prof.iban_enc else ""
+    card = decrypt_field(prof.card_enc) if prof.card_enc else ""
+    return {
+        "account_name": decrypt_field(prof.account_name_enc)
+        if prof.account_name_enc
+        else "",
+        "iban_masked": mask_iban(iban) if iban else "",
+        "card_masked": mask_digits(card) if card else "",
+        "has_bank": bool(iban or card),
+        "payout_hold_until": prof.payout_hold_until.isoformat()
+        if prof.payout_hold_until
+        else None,
+    }
 
 
 class LinkIn(BaseModel):
-    label: str = Field(min_length=2, max_length=40)
+    channel: str = Field(min_length=2, max_length=20)
 
 
 @router.get("/marketer/links")
@@ -781,113 +876,390 @@ async def marketer_links(db: DbDep, user: CurrentUser) -> list[dict]:
     await _marketing_on(db)
     prof = await ref_svc.profile_for_user(db, user.id)
     if prof is None:
-        raise HTTPException(403, {"code": "not_marketer", "message": "حساب بازاریاب نیستید."})
+        raise HTTPException(
+            403, {"code": "not_marketer", "message": "حساب بازاریاب نیستید."}
+        )
     return await ref_svc.links_for(db, prof)
 
 
 @router.post("/marketer/links", status_code=201)
 async def marketer_link_create(db: DbDep, user: CurrentUser, payload: LinkIn) -> dict:
+    """Build a channel link — `channel` must be whitelisted (instagram,
+    telegram, whatsapp, website, email, other)."""
     await _marketing_on(db)
     prof = await ref_svc.profile_for_user(db, user.id)
     if prof is None:
-        raise HTTPException(403, {"code": "not_marketer", "message": "حساب بازاریاب نیستید."})
-    link = await ref_svc.link_or_404(db, prof.id, payload.label)
+        raise HTTPException(
+            403, {"code": "not_marketer", "message": "حساب بازاریاب نیستید."}
+        )
+    link = await ref_svc.link_or_404(db, prof.id, payload.channel)
     await db.commit()
-    return {"id": str(link.id), "label": link.label, "url": f"/r/{prof.ref_code}?src={link.label}"}
+    return {"channel": link.label, "url": f"/r/{prof.ref_code}?s={link.label}"}
 
 
-@router.delete("/marketer/links/{link_id}", status_code=204)
-async def marketer_link_delete(db: DbDep, user: CurrentUser, link_id: uuid.UUID) -> Response:
+@router.delete("/marketer/links/{channel}", status_code=204)
+async def marketer_link_delete(db: DbDep, user: CurrentUser, channel: str) -> Response:
     await _marketing_on(db)
     prof = await ref_svc.profile_for_user(db, user.id)
     if prof is None:
-        raise HTTPException(403, {"code": "not_marketer", "message": "حساب بازاریاب نیستید."})
-    await ref_svc.delete_link(db, prof.id, link_id)
+        raise HTTPException(
+            403, {"code": "not_marketer", "message": "حساب بازاریاب نیستید."}
+        )
+    await ref_svc.delete_channel_link(db, prof.id, channel)
     await db.commit()
     return Response(status_code=204)
 
 
-@router.get("/marketer/qr")
-async def marketer_qr(
-    db: DbDep, user: CurrentUser, src: Annotated[str, Query(max_length=40)] = ""
+def _ref_url(prof, channel: str = "") -> str:
+    """QR/link URL — only our own domain, never user-supplied hosts."""
+    url = f"{get_settings().public_base_url}/r/{prof.ref_code}"
+    ch = ref_svc.normalize_channel(channel)
+    return f"{url}?s={ch}" if ch else url
+
+
+@router.get("/marketer/qr.png")
+async def marketer_qr_png(
+    db: DbDep, user: CurrentUser, s: Annotated[str, Query(max_length=20)] = ""
 ) -> Response:
-    """QR of the marketer's link — segno renders a crisp SVG, no JS needed."""
+    """QR PNG — error-correction Q, 4-module quiet zone, own-domain URL only."""
     import io
 
-    import segno
+    from ...services import cards
 
     await _marketing_on(db)
     prof = await ref_svc.profile_for_user(db, user.id)
     if prof is None:
-        raise HTTPException(403, {"code": "not_marketer", "message": "حساب بازاریاب نیستید."})
-    label = ref_svc.normalize_label(src)
-    url = f"{get_settings().public_base_url}/r/{prof.ref_code}" + (
-        f"?src={label}" if label else ""
-    )
+        raise HTTPException(
+            403, {"code": "not_marketer", "message": "حساب بازاریاب نیستید."}
+        )
     buf = io.BytesIO()
-    segno.make(url, error="m").save(buf, kind="svg", scale=6, border=2, dark="#0e1a3a")
-    return Response(buf.getvalue(), media_type="image/svg+xml")
+    cards.qr_png(_ref_url(prof, s), buf)
+    return Response(
+        buf.getvalue(),
+        media_type="image/png",
+        headers={"Content-Disposition": 'inline; filename="qr.png"'},
+    )
+
+
+@router.get("/marketer/qr.pdf")
+async def marketer_qr_pdf(
+    db: DbDep, user: CurrentUser, s: Annotated[str, Query(max_length=20)] = ""
+) -> Response:
+    import io
+
+    from ...services import cards
+
+    await _marketing_on(db)
+    prof = await ref_svc.profile_for_user(db, user.id)
+    if prof is None:
+        raise HTTPException(
+            403, {"code": "not_marketer", "message": "حساب بازاریاب نیستید."}
+        )
+    buf = io.BytesIO()
+    cards.qr_pdf(_ref_url(prof, s), buf)
+    return Response(
+        buf.getvalue(),
+        media_type="application/pdf",
+        headers={"Content-Disposition": 'attachment; filename="dadnovin-qr.pdf"'},
+    )
+
+
+@router.get("/marketer/card.png")
+async def marketer_card_png(db: DbDep, user: CurrentUser) -> Response:
+    """Downloadable silver referral card — matte metal, QR tile, ~300 DPI."""
+    import io
+
+    from ...services import cards
+
+    await _marketing_on(db)
+    prof = await ref_svc.profile_for_user(db, user.id)
+    if prof is None:
+        raise HTTPException(
+            403, {"code": "not_marketer", "message": "حساب بازاریاب نیستید."}
+        )
+    buf = io.BytesIO()
+    await cards.card_png(db, prof, user, _ref_url(prof), buf)
+    return Response(
+        buf.getvalue(),
+        media_type="image/png",
+        headers={"Content-Disposition": 'attachment; filename="dadnovin-card.png"'},
+    )
+
+
+@router.get("/marketer/card.pdf")
+async def marketer_card_pdf(db: DbDep, user: CurrentUser) -> Response:
+    import io
+
+    from ...services import cards
+
+    await _marketing_on(db)
+    prof = await ref_svc.profile_for_user(db, user.id)
+    if prof is None:
+        raise HTTPException(
+            403, {"code": "not_marketer", "message": "حساب بازاریاب نیستید."}
+        )
+    buf = io.BytesIO()
+    await cards.card_pdf(db, prof, user, _ref_url(prof), buf)
+    return Response(
+        buf.getvalue(),
+        media_type="application/pdf",
+        headers={"Content-Disposition": 'attachment; filename="dadnovin-card.pdf"'},
+    )
 
 
 @router.get("/marketer/referrals")
 async def marketer_referrals(db: DbDep, user: CurrentUser) -> list[dict]:
-    """PRIVACY-SAFE list — masked name, coarse status, dates only.
+    """PRIVACY-SAFE whitelist — name (consented only), contract status,
+    related office fee, own rate, own commission, dates.
 
-    Never includes topic/message/documents — the marketer must not see
-    any case details.
+    Never includes subject/dispute type/parties/claim/descriptions/
+    documents/phone — the marketer must learn nothing about the case itself.
     """
     await _marketing_on(db)
     prof = await ref_svc.profile_for_user(db, user.id)
     if prof is None:
         return []
     attrs = (
-        await db.execute(
-            select(ReferralAttribution)
-            .where(ReferralAttribution.marketer_id == prof.id)
-            .order_by(ReferralAttribution.created_at.desc())
-            .limit(200)
+        (
+            await db.execute(
+                select(ReferralAttribution)
+                .where(ReferralAttribution.marketer_id == prof.id)
+                .order_by(ReferralAttribution.created_at.desc())
+                .limit(200)
+            )
         )
-    ).scalars().all()
-    out = []
-    status_map = {
-        "new": "در انتظار", "reviewing": "در حال بررسی", "awaiting_call": "در حال بررسی",
-        "followed_up": "در حال بررسی", "consulted": "در حال بررسی",
-        "accepted": "پذیرفته شد", "rejected": "رد شد",
-        "completed": "پذیرفته شد", "cancelled": "رد شد",
+        .scalars()
+        .all()
+    )
+    consults = {
+        str(c.id): c
+        for c in (
+            await db.execute(
+                select(ConsultationRequest).where(
+                    ConsultationRequest.id.in_(
+                        [
+                            a.request_id
+                            for a in attrs
+                            if a.request_type == "consultation"
+                        ]
+                        or [uuid.uuid4()]
+                    )
+                )
+            )
+        )
+        .scalars()
+        .all()
     }
+    req_ids = [a.request_id for a in attrs if a.request_type == "consultation"] or [
+        uuid.uuid4()
+    ]
+    receipts = {
+        rid: total
+        for rid, total in (
+            await db.execute(
+                select(
+                    CaseFeeReceipt.request_id,
+                    func.sum(CaseFeeReceipt.amount),
+                )
+                .where(CaseFeeReceipt.request_id.in_(req_ids))
+                .group_by(CaseFeeReceipt.request_id)
+            )
+        ).all()
+    }
+    comms = {
+        (c.request_id, c.referral_id): c
+        for c in (
+            await db.execute(
+                select(Commission).where(
+                    Commission.marketer_id == prof.id,
+                    Commission.entry_type == "accrual",
+                )
+            )
+        )
+        .scalars()
+        .all()
+    }
+    out = []
     for a in attrs:
-        name, status, created = "", "", a.created_at.isoformat()
-        if a.request_type == "consultation":
-            row = await db.get(ConsultationRequest, a.request_id)
-            if row:
-                name = _mask_name(row.full_name)
-                status = status_map.get(row.status, "در انتظار")
+        row = (
+            consults.get(str(a.request_id))
+            if a.request_type == "consultation"
+            else None
+        )
+        consented = a.consent_at is not None
+        comm = comms.get((a.request_id, a.id))
         out.append(
-            {"masked_name": name, "status": status, "created_at": created}
+            {
+                "id": str(a.id),
+                "consent": consented,
+                "full_name": (row.full_name if row else "") if consented else None,
+                "name": (row.full_name if row else "")
+                if consented
+                else comm_svc.mask_name(row.full_name if row else ""),
+                "contract_status": comm_svc.contract_status(row.status if row else ""),
+                "fee_amount": receipts.get(a.request_id, 0) if consented else 0,
+                "rate": comm.rate_bp / 100
+                if comm
+                else (await comm_svc.rate_for(db, prof))[0] / 100,
+                "commission_amount": comm.amount if comm else None,
+                "commission_status": comm.status if comm else "",
+                "channel": a.channel,
+                "created_at": a.created_at.isoformat(),
+            }
         )
     return out
 
 
-def _mask_name(name: str) -> str:
-    parts = (name or "").strip().split()
-    return " ".join(f"{p[0]}." for p in parts[:3] if p) or "—"
+class BankUpdateIn(BaseModel):
+    account_name: str = Field(default="", max_length=120)
+    card_number: str = Field(default="", max_length=19)
+    iban: str = Field(default="", max_length=34)
 
 
-@router.post("/marketer/bank")
-async def marketer_bank(db: DbDep, user: CurrentUser, payload: BankDetailsIn) -> dict:
+@router.get("/marketer/bank")
+async def marketer_bank_get(db: DbDep, user: CurrentUser) -> dict:
+    """Masked coordinates only — raw digits never leave the server."""
     await _marketing_on(db)
     prof = await ref_svc.profile_for_user(db, user.id)
     if prof is None:
-        raise HTTPException(403, {"code": "not_marketer", "message": "حساب بازاریاب نیستید."})
-    if payload.iban:
-        digits = "".join(ch for ch in payload.iban if ch.isdigit())
-        if len(digits) < 20:
-            raise HTTPException(400, {"code": "bad_iban", "message": "شماره شبا معتبر نیست."})
-        prof.iban_enc = encrypt_field(payload.iban.replace(" ", "").upper())
-    if payload.card:
-        prof.card_enc = encrypt_field(payload.card.replace(" ", ""))
+        raise HTTPException(
+            403, {"code": "not_marketer", "message": "حساب بازاریاب نیستید."}
+        )
+    return _bank_out(prof)
+
+
+@router.put("/marketer/bank")
+@router.post("/marketer/bank")
+async def marketer_bank(
+    db: DbDep, user: CurrentUser, payload: BankUpdateIn, request: Request
+) -> dict:
+    """Save payout coordinates — Luhn-checked card, mod-97 Sheba, AES-256-GCM
+    at rest. Any change starts a 24h hold before the next payout + an audit
+    row + an inbox notification."""
+    await _marketing_on(db)
+    prof = await ref_svc.profile_for_user(db, user.id)
+    if prof is None:
+        raise HTTPException(
+            403, {"code": "not_marketer", "message": "حساب بازاریاب نیستید."}
+        )
+    card = normalize_card(payload.card_number)
+    iban = normalize_iban(payload.iban)
+    if card and not luhn_ok(card):
+        raise HTTPException(
+            400, {"code": "bad_card", "message": "شماره کارت معتبر نیست."}
+        )
+    if iban and not iban_ok(iban):
+        raise HTTPException(
+            400, {"code": "bad_iban", "message": "شماره شبا معتبر نیست."}
+        )
+    name = payload.account_name.strip()
+    if not name:
+        raise HTTPException(
+            422, {"code": "name_required", "message": "نام صاحب حساب الزامی است."}
+        )
+    if not card and not iban:
+        raise HTTPException(
+            422,
+            {
+                "code": "bank_required",
+                "message": "حداقل یکی از شماره کارت یا شبا الزامی است.",
+            },
+        )
+    now = datetime.now(UTC)
+    changed = (
+        decrypt_field(prof.iban_enc) != iban
+        or decrypt_field(prof.card_enc) != card
+        or decrypt_field(prof.account_name_enc) != name
+    )
+    prof.account_name_enc = encrypt_field(name)
+    prof.iban_enc = encrypt_field(iban)
+    prof.card_enc = encrypt_field(card)
+    if changed:
+        prof.bank_updated_at = now
+        prof.payout_hold_until = now + comm_svc.BANK_CHANGE_HOLD
+        db.add(
+            InboxNotification(
+                user_id=user.id,
+                title="اطلاعات بانکی به‌روز شد",
+                body="برای امنیت، اولین پرداخت به حساب جدید تا ۲۴ ساعت ممکن نیست.",
+                kind="bank",
+                link="/panel/marketing",
+            )
+        )
+    await audit(
+        db,
+        actor=user,
+        action="account.bank_update",
+        entity="marketer_profile",
+        entity_id=prof.id,
+        request=request,
+        after={"changed": changed},
+    )
     await db.commit()
-    return {"message": "اطلاعات بانکی ذخیره شد.", "iban_masked": _iban_masked(prof)}
+    return {"message": "اطلاعات بانکی ذخیره شد.", "bank": _bank_out(prof)}
+
+
+# ─── payouts (marketer sees own settlements + receipts) ─────────────
+
+
+@router.get("/payments")
+@router.get("/marketer/payouts")
+async def marketer_payouts(db: DbDep, user: CurrentUser) -> dict:
+    await _marketing_on(db)
+    prof = await ref_svc.profile_for_user(db, user.id)
+    if prof is None:
+        raise HTTPException(
+            403, {"code": "not_marketer", "message": "حساب بازاریاب نیستید."}
+        )
+    rows = (
+        (
+            await db.execute(
+                select(Payout)
+                .where(Payout.marketer_id == prof.id)
+                .order_by(Payout.paid_at.desc())
+                .limit(100)
+            )
+        )
+        .scalars()
+        .all()
+    )
+    return {
+        "payable": await comm_svc.payable_balance(db, prof.id),
+        "items": [
+            {
+                "id": str(p.id),
+                "amount": p.amount,
+                "paid_at": p.paid_at.isoformat(),
+                "tracking_ref": p.tracking_ref,
+                "note": p.note,
+                "has_receipt": p.file_id is not None,
+                "receipt_url": f"/api/v1/account/payments/{p.id}/receipt"
+                if p.file_id
+                else None,
+            }
+            for p in rows
+        ],
+    }
+
+
+@router.get("/payments/{payout_id}/receipt")
+@router.get("/marketer/payouts/{payout_id}/receipt")
+async def marketer_payout_receipt(
+    db: DbDep, user: CurrentUser, payout_id: uuid.UUID
+) -> Response:
+    """Download the settlement receipt — own payouts only, auth-gated."""
+    from ...services import media as media_svc
+
+    await _marketing_on(db)
+    prof = await ref_svc.profile_for_user(db, user.id)
+    if prof is None:
+        raise HTTPException(
+            403, {"code": "not_marketer", "message": "حساب بازاریاب نیستید."}
+        )
+    payout = await db.get(Payout, payout_id)
+    if payout is None or payout.marketer_id != prof.id or payout.file_id is None:
+        raise HTTPException(404, {"code": "not_found", "message": "فیش یافت نشد."})
+    return await media_svc.file_response(db, payout.file_id)
 
 
 # ─── commissions (append-only ledger — no wallet, manual settlement) ───
@@ -904,15 +1276,21 @@ async def my_commissions(db: DbDep, user: CurrentUser) -> dict:
     await _marketing_on(db)
     prof = await ref_svc.profile_for_user(db, user.id)
     if prof is None:
-        raise HTTPException(403, {"code": "not_marketer", "message": "حساب بازاریاب نیستید."})
-    rows = (
-        await db.execute(
-            select(Commission)
-            .where(Commission.marketer_id == prof.id)
-            .order_by(Commission.created_at.desc())
-            .limit(200)
+        raise HTTPException(
+            403, {"code": "not_marketer", "message": "حساب بازاریاب نیستید."}
         )
-    ).scalars().all()
+    rows = (
+        (
+            await db.execute(
+                select(Commission)
+                .where(Commission.marketer_id == prof.id)
+                .order_by(Commission.created_at.desc())
+                .limit(200)
+            )
+        )
+        .scalars()
+        .all()
+    )
     consults = {
         str(c.id): c
         for c in (
@@ -923,16 +1301,37 @@ async def my_commissions(db: DbDep, user: CurrentUser) -> dict:
                     )
                 )
             )
-        ).scalars().all()
+        )
+        .scalars()
+        .all()
+    }
+    attrs = {
+        a.id: a
+        for a in (
+            await db.execute(
+                select(ReferralAttribution).where(
+                    ReferralAttribution.id.in_(
+                        [r.referral_id for r in rows if r.referral_id] or [uuid.uuid4()]
+                    )
+                )
+            )
+        )
+        .scalars()
+        .all()
     }
     items = []
     for r in rows:
         consult = consults.get(str(r.request_id))
+        consented = bool(
+            r.referral_id and r.referral_id in attrs and attrs[r.referral_id].consent_at
+        )
         items.append(
             comm_svc.marketer_commission_row(
                 r,
-                comm_svc.mask_name(consult.full_name if consult else ""),
-                comm_svc._STAGE_FA.get(consult.status if consult else "", "—"),
+                (consult.full_name if consult else "")
+                if consented
+                else comm_svc.mask_name(""),
+                comm_svc.contract_status(consult.status if consult else ""),
             )
         )
     cfg = await comm_svc.referral_settings(db)
@@ -941,5 +1340,3 @@ async def my_commissions(db: DbDep, user: CurrentUser) -> dict:
         "totals": comm_svc.net_totals(rows),
         "marketing_enabled": bool(cfg.get("marketing_enabled")),
     }
-
-

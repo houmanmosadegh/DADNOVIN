@@ -38,9 +38,15 @@ PRIORITIES = ("low", "normal", "high", "urgent")
 TRANSITIONS: dict[str, dict[str, frozenset[str]]] = {
     "consultation": {
         "new": frozenset({"reviewing", "cancelled"}),
-        "reviewing": frozenset({"awaiting_call", "consulted", "completed", "cancelled"}),
-        "awaiting_call": frozenset({"reviewing", "followed_up", "consulted", "completed", "cancelled"}),
-        "followed_up": frozenset({"awaiting_call", "consulted", "completed", "cancelled"}),
+        "reviewing": frozenset(
+            {"awaiting_call", "consulted", "completed", "cancelled"}
+        ),
+        "awaiting_call": frozenset(
+            {"reviewing", "followed_up", "consulted", "completed", "cancelled"}
+        ),
+        "followed_up": frozenset(
+            {"awaiting_call", "consulted", "completed", "cancelled"}
+        ),
         "consulted": frozenset({"accepted", "rejected", "completed", "cancelled"}),
         # پذیرفته‌شده فقط به سرنوشت نهایی می‌رود — کمیسیون در «لغو» باطل می‌شود
         "accepted": frozenset({"completed", "cancelled"}),
@@ -198,7 +204,21 @@ class Article(Base):
     body: Mapped[str] = mapped_column(Text, default="")
     seo_title: Mapped[str] = mapped_column(String(200), default="")
     seo_description: Mapped[str] = mapped_column(String(300), default="")
+    canonical: Mapped[str] = mapped_column(String(300), default="")
+    # legal specialty — خانواده / کیفری / ملکی / قراردادها / …
+    category: Mapped[str] = mapped_column(String(80), default="", index=True)
+    tags: Mapped[list] = mapped_column(JSON, default=list)
+    author_name: Mapped[str] = mapped_column(String(120), default="")
+    author_bio: Mapped[str] = mapped_column(String(500), default="")
+    featured_image_id: Mapped[uuid.UUID | None] = mapped_column(
+        Uuid, ForeignKey("media_assets.id", ondelete="SET NULL"), nullable=True
+    )
+    read_time_min: Mapped[int] = mapped_column(Integer, default=0)
+    # draft | scheduled | published | archived
     status: Mapped[str] = mapped_column(String(20), default="draft", index=True)
+    scheduled_at: Mapped[datetime | None] = mapped_column(
+        DateTime(timezone=True), nullable=True
+    )
     published_at: Mapped[datetime | None] = mapped_column(
         DateTime(timezone=True), nullable=True
     )

@@ -1,15 +1,7 @@
 import type { CSSProperties } from 'react'
 import './SectionWave.css'
 
-export type BandName =
-  | 'ink'
-  | 'navy'
-  | 'deep'
-  | 'white'
-  | 'gray'
-  | 'cream'
-  | 'goldblack'
-  | 'goldwhite'
+export type BandName = 'ink' | 'navy' | 'deep' | 'white' | 'gray' | 'cream' | 'goldblack' | 'goldwhite'
 
 const BAND_VAR: Record<BandName, string> = {
   ink: 'var(--band-ink)',

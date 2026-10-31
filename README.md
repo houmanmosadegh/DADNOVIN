@@ -1,132 +1,134 @@
-# دادنوین — وب‌سایت + پنل مدیریت + بک‌اند
+# دادنوین — پلتفرم حقوقی تمام‌عیار
 
-سامانهٔ کامل گروه حقوقی دادنوین: وب‌سایت عمومی (سینمایی/سه‌بعدی)، پنل مدیریت جداگانه، بک‌اند FastAPI با PostgreSQL، درخواست مشاوره، تیکت پشتیبانی و مشاور هوشمند مبتنی بر محتوای سایت.
+سامانه‌ی یکپارچه‌ی «گروه حقوقی دادنوین»: وب‌سایت عمومی فارسی/RTL با تجربه‌ی
+سه‌بعدی و pre-render برای سئو، پنل کاربری مشتریان، پنل مدیریت مجزا، سیستم
+بازاریابی با ارجاع و کمیسیون و تسویه‌ی فیش‌دار، CMS کامل برای محتوا، و
+دستیار هوش مصنوعی اختیاری — روی یک API واحد FastAPI/PostgreSQL.
 
-```
-dadnovin/
-├── frontend/        سایت عمومی + پنل کاربر (/panel) — Vite + React 19 + TS + three.js (RTL, فارسی)
-├── panel/           پنل مدیریت — Vite + React + TS + Tailwind (SPA جدا، base=/admin)
-├── backend/         FastAPI + SQLAlchemy async + Alembic + PostgreSQL
-│   ├── main/        app, api/router, models, schemas, security, ai, services
-│   ├── alembic/     مایگریشن‌ها (0001–0005)
-│   ├── seed/        site_content.json — محتوای استخراج‌شده از فرانت
-│   └── tests/       ۴۹ تست pytest (SQLite + httpx)
-├── infrastructure/nginx/   gateway.conf / web.conf / panel.conf
-├── storage/         فایل‌های آپلودی (ولوم persistent)
-├── docker-compose.yml        استک کامل: db + api + web + panel + gateway
-├── docker-compose.prod.yml   اورراید پروداکشن
-└── .env.example     متغیرهای محیطی
-```
+## امکانات
 
-## شروع سریع (Docker)
+- **سایت عمومی** — لندینگ سینمایی three.js، صفحات درباره/خدمات/مشاوره/تماس/پیگیری/مقالات، prerender کامل، sitemap داینامیک، کارکرد آفلاین با fallback استاتیک.
+- **پنل کاربر `/panel`** — ثبت و پیگیری مشاوره، اعلان‌ها، پروفایل، صفحه‌ی بازاریابی (لینک کانالی، QR، کارت دانلودی، اطلاعات بانکی، کمیسیون‌ها).
+- **پنل ادمین `/admin`** — مدیریت درخواست‌ها، تیکت‌ها، مخاطبان، وکلا، صفحات، مقالات (ادیتور غنی + نسخه‌ها)، رسانه، تنظیمات (برند/لوگو/سئو/شبکه‌ها)، بازاریاب‌ها، ارجاع‌ها، کمیسیون‌ها و تسویه با فیش.
+- **یک ورود برای همه** — ادمین، کارمند، مشتری و بازاریاب از یک فرم وارد می‌شوند؛ نقش‌ها مسیر را تعیین می‌کنند.
+- **بازاریابی/ارجاع** — کد ارجاع غیرقابل‌تغییر `DN-XXXX-XXXX` با check digit، لینک کانالی `?s=`، رضایت‌محور (بدون رضایت: بدون نام/بدون کمیسیون)، کمیسیون فقط درصدی، دفتر append-only، تسویه با فیش بانکی و هولد ۲۴h.
+- **امنیت** — نشست کوکی HttpOnly امضاشده (فقط هش در DB)، Argon2id، CSRF، rate limit، هدرهای امنیتی، آپلود با بررسی magic bytes، رمزنگاری AES-256-GCM بانک، audit log.
+
+## استک
+
+| لایه | فناوری |
+|---|---|
+| سایت عمومی + پنل کاربر | React 19 · Vite · TypeScript · three.js · prerender |
+| پنل ادمین | React 19 · Vite · Tailwind v4 · TanStack Query · TipTap 3 |
+| بک‌اند | FastAPI · SQLAlchemy async · Alembic · Pydantic v2 |
+| دیتابیس | PostgreSQL 16 (تست‌ها روی SQLite) |
+| لبه | Nginx gateway · Docker Compose |
+
+## شروع سریع
 
 ```bash
-cp .env.example .env          # SECRET_KEY و POSTGRES_PASSWORD را عوض کنید
-docker compose up -d --build
-```
+cp .env.example .env              # SECRET_KEY و POSTGRES_PASSWORD را بگذارید
+docker compose up -d --build      # کل استک: db + api + web + panel + gateway
 
-بعد از بالا آمدن:
+# اولین ادمین (هیچ رمز پیش‌فرضی در کد نیست)
+docker compose exec api python -m main.cli bootstrap-admin \
+  --username admin --password 'یک-رمز-قوی-طولانی' --name 'مدیر مجموعه'
+```
 
 | مسیر | چیست |
 |---|---|
-| `http://localhost:8080/` | وب‌سایت عمومی |
-| `http://localhost:8080/panel` | پنل کاربر — فرم ورود/ثبت‌نام مشترک همه (ادمین هم از همین‌جا وارد می‌شود و به /admin می‌رود) |
+| `http://localhost:8080/` | سایت عمومی |
+| `http://localhost:8080/panel` | پنل کاربر (فرم ورود مشترک همه‌ی نقش‌ها) |
 | `http://localhost:8080/admin/` | پنل مدیریت |
-| `http://localhost:8080/api/v1/...` | API |
-| `http://localhost:8080/docs` | OpenAPI (فقط development) |
+| `http://localhost:8080/api/v1` | API (docs در `/docs` فقط dev) |
 
-> مایگریشن و سید هنگام استارت `api` خودکار اجرا می‌شوند (entrypoint). دیتا در ولوم‌های `pgdata` و `media` پایدار می‌ماند.
+روال استارت `api`: **migration → roles → `seed` اگر `SEED_ON_BOOT` →
+`bootstrap-admin` اگر هر دو env ست شده → uvicorn.** دیتا در ولوم‌های
+`pgdata` و `media` پایدار می‌ماند.
 
-## ساخت اولین مدیر
+## متغیرهای محیطی
 
-```bash
-docker compose exec api python -m main.cli bootstrap-admin \
-  --username admin --password 'یک-رمز-قوی-طولانی' --name 'مدیر مجموعه' --email admin@example.com
+| متغیر | توضیح | پیش‌فرض |
+|---|---|---|
+| `POSTGRES_USER` / `POSTGRES_PASSWORD` / `POSTGRES_DB` | اتصال دیتابیس (داخلی — بدون پورت عمومی) | `dadnovin` / **اجباری** / `dadnovin` |
+| `SECRET_KEY` | امضای نشست — `openssl rand -hex 32` | **اجباری در prod** |
+| `ENVIRONMENT` | `development` / `production` | `development` |
+| `COOKIE_SECURE` | فقط پشت HTTPS `true` کنید | `false` |
+| `CORS_ORIGINS` | originهای مجاز API (جدا با `,`) | `http://localhost:8080` |
+| `PUBLIC_BASE_URL` | origin مطلق سایت — در لینک ارجاع/QR | `http://localhost:8080` |
+| `HTTP_PORT` | پورت gateway | `8080` |
+| `PAYOUT_ENC_KEY` | کلید AES-256-GCM بانک (fallback: مشتق از SECRET_KEY) | خالی |
+| `AI_ENABLED` / `AI_API_KEY` / `AI_BASE_URL` / `AI_MODEL` | دستیار AI — بدون کلید، حالت retrieval-only | `true` / خالی |
+| `BOOTSTRAP_ADMIN_*` | ساخت خودکار ادمین ران اول (اختیاری — CLI ترجیح دارد) | خالی |
+| `SEED_ON_BOOT` | سید محتوای اولیه در استارت | `false` |
+| `UVICORN_WORKERS` | تعداد ورکر | `1` (prod: `2`) |
+| `UVICORN_RELOAD` | `1` = hot-reload در dev override | — |
+
+**prod فایل:** `ENVIRONMENT=production` + `COOKIE_SECURE=true` + SECRET_KEY واقعی
++ CORS غیر wildcard — سرور در غیر این صورت boot نمی‌شود.
+
+## ساختار پوشه‌ها
+
+```
+├── frontend/          سایت عمومی + پنل کاربر  (src/, e2e/, AGENTS.md)
+├── panel/             پنل ادمین — SPA جدا (base=/admin)
+├── backend/
+│   ├── main/          api/router · services · repositories · models · schemas
+│   │                  security · ai · core (config/rate-limit) · seed·cli
+│   ├── alembic/       زنجیره‌ی migration (0001→0012، idempotent)
+│   ├── seed/          site_content.json (محتوای واقعی سایت)
+│   └── tests/         ۱۰۱ تست pytest
+├── infrastructure/nginx/   gateway/web/panel server blocks
+├── scripts/           backup.sh · restore.sh
+├── docs/              architecture · database(ERD) · api · deployment · referral
+├── docker-compose.yml        استک پایه
+├── docker-compose.dev.yml    اورراید توسعه (api reload + db :5433)
+├── docker-compose.prod.yml   اورراید پروداکشن
+└── Makefile           up/dev/prod · test · lint · migrate · seed* · backup/restore
 ```
 
-یا قبل از `up` مقدار `BOOTSTRAP_ADMIN_USERNAME/PASSWORD` را در `.env` بگذارید (فقط ران اول).
-
-## دستورهای عملیاتی
+## توسعه
 
 ```bash
-docker compose up -d --build                                   # استارت
-docker compose exec api alembic upgrade head                   # مایگریشن دستی
-docker compose exec api python -m main.cli seed                # سید مجدد (idempotent)
-docker compose logs -f api                                     # لاگ بک‌اند
-docker compose down                                            # توقف (دیتا می‌ماند)
-docker compose down -v                                         # توقف + حذف ولوم‌ها ⚠️
-cd backend && python -m pytest -q                              # تست‌های بک‌اند
-cd frontend && npm test && npm run build                       # تست/بیلد سایت
-cd panel && npm run build                                      # بیلد پنل
+make dev            # استک dev (api hot-reload، db روی localhost:5433)
+make test           # بک‌اند + فرانت + پنل
+make lint typecheck # ruff + prettier check + tsc
+make format         # ruff format + prettier --write روی کل پروژه
+make seed-dev       # داده‌ی دموی ساختگی — فقط توسعه (demo / Dev-Demo-1234)
 ```
 
-## توسعهٔ محلی (بدون داکر)
+| دستور | کار |
+|---|---|
+| `make migrate` | alembic upgrade head |
+| `make roles` | سید نقش‌های RBAC (همیشه امن) |
+| `make seed` | سید محتوای واقعی CMS (ایدم‌پوتنت) |
+| `make seed-dev` | داده‌ی دموی fake — در prod رد می‌شود |
+| `make bootstrap-admin U=.. P=..` | ساخت super_admin |
+| `make backup` / `make restore FILE=..` | dump/restore دیتابیس |
 
-```bash
-# بک‌اند روی :8000 — نیاز به postgres محلی یا docker compose up -d db
-cd backend && python -m venv .venv && source .venv/bin/activate
-pip install -e '.[dev]' && alembic upgrade head && python -m main.cli seed
-uvicorn main.main:app --reload
+تست‌ها: `cd backend && python -m pytest -q` (۱۰۱ تست) ·
+`cd frontend && npm test` (۲۳ تست) · `frontend/e2e` سناریوهای Playwright
+(به مرورگر محلی نیاز دارد).
 
-cd frontend && npm i && npm run dev     # سایت روی :5173 (پروکسی /api → :8000)
-cd panel && npm i && npm run dev        # پنل مدیریت روی :5174/admin/
-```
+## مستندات
 
-## معماری امنیت
+- `docs/architecture.md` — نمودار معماری و تصمیم‌ها
+- `docs/database.md` — ERD، کاتالوگ جدول‌ها، قواعد یکپارچگی، seed
+- `docs/api.md` — سطح‌ها و مسیرهای API
+- `docs/referral-and-commission.md` — منطق ارجاع/کمیسیون/تسویه + ملاحظات حقوقی
+- `docs/deployment.md` — استقرار production، TLS، backup، rollback
+- `CONTRIBUTING.md` — جریان کار تیمی و قوانین کد
 
-- رمزها با **Argon2id**؛ سشن‌ها opaque و فقط SHA-256 هش‌شان ذخیره می‌شود؛ کوکی HttpOnly + SameSite + انقضای idle/absolute
-- همهٔ مسیرهای `/api/v1/admin/*` پشت احراز هویت + RBAC (`super_admin`, `admin`, `editor`, `support`)
-- CSRF: هدر `X-Requested-With` یا Origin هم‌دامنه/مجاز؛ CORS محدود به لیست env
-- Rate limit درون‌حافظه‌ای: عمومی ۱۲۰/دقیقه، لاگین ۸/دقیقه، فرم‌ها ۱۰/دقیقه، AI ۱۵/دقیقه
-- آپلود: اعتبارسنجی امضای فایل (magic bytes)، محدودیت ۶MB/۴۰۰۰px، نام تصادفی، Pillow re-encode
-- تیکت: `access_code` فقط به‌صورت هش Argon2 نگه داشته می‌شود — شماره+کد لازم برای پیگیری
-- در پروداکشن `ENVIRONMENT=production` اجبار می‌کند: SECRET_KEY واقعی، `COOKIE_SECURE=true`، بدون CORS wildcard
+## امنیت و محرمانگی
 
-## مشاور هوشمند (AI)
+- نشست opaque + هش توکن در DB؛ انقضای idle و مطلق؛ CSRF؛ rate limit.
+- هر عملیات حساس سرور-مستول است (مالکیت، نقش، ارجاع، کمیسیون، تسویه).
+- داده‌ی بانکی رمزنگاری‌شده + mask؛ فیش‌ها هرگز عمومی سرو نمی‌شوند.
+- داده‌ی خصوصی وکیل/موکل در خروجی عمومی، JSON-LD و API نمی‌آید.
+- ریپو **خصوصی** — `LICENSE` = All Rights Reserved.
 
-- `POST /api/v1/ai/chat` — دانش از `ai_knowledge_sources` + صفحات منتشرشده بازیابی می‌شود (PostgreSQL FTS)، سپس به provider ارسال می‌گردد
-- بدون `AI_API_KEY` → پاسخ retrieval-only صادقانه (متن دانش + راهنمای تماس)، نه جعل
-- provider سازگار با OpenAI chat-completions از طریق `AI_BASE_URL`/`AI_MODEL` قابل تعویض است
-- محتوای بازیابی‌شده به‌عنوان untrusted input تزریق نمی‌شود به system prompt؛ خروجی با disclaimer حقوقی محدود می‌شود
-- پنل: مدیریت منابع دانش، sync دستی، تاریخچه مکالمات
+## محدودیت‌های شناخته‌شده
 
-## حساب کاربری، ارجاع و کمیسیون
-
-- `POST /api/v1/account-auth/register` — ثبت‌نام با نام+موبایل+رمز (+ کد معرف اختیاری)؛ ورود با موبایل/نام‌کاربری همان موتور سشن امن قبلی است
-- `GET/POST /api/v1/account/*` — پنل کاربر: ثبت/لیست/thread درخواست مشاوره، پیام‌ها، اعلان‌ها (مالکیت سرورساید — بدون IDOR)
-- بازاریابی: کاربر `POST /account/marketer/apply` می‌زند (با پذیرش قوانین نسخه‌دار)، ادمین تأیید کند → نقش `marketer` + کد ارجاع تغییرناپذیر (`DN-XXXXXX`)
-- لینک `/r/<CODE>` — کلیک با IP هش‌شده ثبت و کوکی `dn_ref` (HttpOnly/SameSite=Lax) گذاشته و ریدایرکت می‌کند؛ first-touch قفل می‌شود و فقط ادمین می‌تواند با audit تغییرش دهد
-- ضد تقلب: خودارجاعی (user_id یا تلفن یکسان)، «مشتری تکراری» و سیل کلیک از یک IP رد/پرچم می‌شود؛ ارجاعِ «نیازمند بررسی» کمیسیون نمی‌سازد
-- حریم خصوصی: بازاریاب فقط نام ماسک‌شده + مرحلهٔ کلی + مبلغ حق‌الوکالهٔ دفتر + نرخ و کمیسیون خودش را می‌بیند — serializer سفید در بک‌اند، نه فقط UI
-- **کمیسیون = دفتر کل append-only** روی مدل `Commission` (میگریشن 0010): به‌ازای هر «حق‌الوکالهٔ دریافتی» که ادمین روی پروندهٔ ارجاع‌شده ثبت کند (`POST /admin/requests/consultation/{id}/fee-receipts` — قسطی هم پشتیبانی می‌شود) یک ورودی `accrual` با نرخِ snapshot ساخته می‌شود؛ برگشت وجه → ورودی `reversal` منفی، نه حذف. نرخ: `custom_rate` بازاریاب → قاعدهٔ درصدی فعال → `default_rate` تنظیمات. چرخه: `pending → approved → paid` (تسویهٔ دستی با تاریخ+یادداشت) — **کیف پول و برداشت وجود ندارد**
-- پنل ادمین: «بازاریابی» یک بخش با تب — درخواست‌های همکاری، بازاریاب‌ها (نرخ اختصاصی/تعلیق)، ارجاع‌ها (پرچم/اتصال دستی)، کمیسیون‌ها (تأیید گروهی/پرداخت/برگشت)، قواعد، قوانین نسخه‌دار، گزارش+CSV+جمع ماهانه، تنظیمات
-
-### ملاحظات انطباق
-
-> **هشدار:** پرداخت پورسانت بابت جذب موکل ممکن است با مقررات کانون وکلا و اخلاق حرفه‌ای تعارض داشته باشد. به همین دلیل `marketing_enabled` **پیش‌فرض خاموش** است و قبل از فعال‌سازی باید با کانون/مشاور حقوقی هماهنگ شود. مبنای کمیسیون فقط «حق‌الوکالهٔ دریافت‌شدهٔ دفتر» است — نه مبلغ خواسته، نه نتیجهٔ دادرسی؛ هزینه‌ای از مراجعه‌کننده گرفته نمی‌شود. هیچ متن UI وعدهٔ نتیجهٔ پرونده نمی‌دهد.
-
-تنظیمات از طریق API (`/api/v1/admin/settings`، کلید `commission`): `marketing_enabled`، `default_rate` (٪)، `cookie_days`، `holdback_days`، `monthly_cap`، `reapply_days`. کلید قدیمی `commission_enabled` به‌صورت خودکار به‌عنوان alias خوانده می‌شود. وقتی `marketing_enabled` خاموش است، همهٔ منوها/روت‌ها/لینک‌های بازاریابی پنهان می‌شوند و APIهای مربوط ۴۰۴ می‌دهند (کلیک‌ها هم ثبت نمی‌شود). `/r/*`، `/panel` و `/admin` هم در `robots.txt` و هم با هدر `X-Robots-Tag: noindex` از ایندکس خارج‌اند.
-
-## ادیت محتوا از پنل
-
-- **تنظیمات**: برند، شماره‌ها، ایمیل، آدرس، شبکه‌ها، SEO پیش‌فرض → فوری روی سایت (فرانت موقع لود `/api/v1/public/settings` را merge می‌کند؛ fallback = فایل استاتیک)
-- **صفحات**: سکشن‌های هر صفحه (hero، لید، پاراگراف‌ها…) + revision history + بازگردانی
-- **وکلا**: CRUD کامل، آپلود/جایگزینی عکس، ترتیب نمایش، نمایش/عدم نمایش عمومی
-- **رسانه**: کتابخانهٔ تصاویر
-- **درخواست‌ها/تیکت‌ها**: جدول، فیلتر وضعیت، جزئیات، ارجاع، یادداشت داخلی، پاسخ، رسید حق‌الوکاله (کمیسیون)
-- **کاربران/نقش‌ها**، **گزارش فعالیت (audit)**، **تنظیمات AI**
-
-## پروداکشن
-
-```bash
-docker compose -f docker-compose.yml -f docker-compose.prod.yml up -d --build
-```
-
-در `.env`: `ENVIRONMENT=production`، `SECRET_KEY` قوی، `COOKIE_SECURE=true` (پشت HTTPS)، `CORS_ORIGINS=https://domain.tld`، `HTTP_PORT=80`. TLS را در لبه (LB/Cloudflare/سرتیفیکیت واقعی روی gateway) تمامینیش کنید — `infrastructure/nginx/gateway.conf` را با بلاک `listen 443 ssl` + cert واقعی گسترش دهید. دیتابیس هیچ پورتی به بیرون expose نمی‌کند.
-
-## نکات و محدودیت‌ها
-
-- Rate limiter حافظه‌ای است؛ با `UVICORN_WORKERS>1` سهمیه بین پروسس‌ها تقسیم می‌شود — برای enforce دقیق multi-worker به Redis نیاز است
-- سید idempotent است — محتوای ویرایش‌شدهٔ کاربر را بازنویسی نمی‌کند
-- `privateNotDisplayed` در `lawyers.fa.js` هرگز به API/seed/خروجی راه ندارد
-- پرِندر استاتیک (`frontend/dist`) کپی پیش‌فرض را شامل می‌شود؛ محتوای CMS سمت کلاینت و لحظه‌ای merge می‌شود — برای SEO متن‌های اصلی همچنان از build-time render می‌آیند
+- rate limit در حافظه‌ی هر worker است (برای چند replica، در لبه limit بگذارید).
+- E2E مرورگری نیاز به نصب Playwright دارد؛ در CI مرورگر دانلود می‌شود.
+- `seed-dev` فقط برای توسعه است و در `ENVIRONMENT=production` رد می‌شود.

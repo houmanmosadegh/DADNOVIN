@@ -25,7 +25,9 @@ def upgrade() -> None:
     insp = sa.inspect(op.get_bind())
     cols = {c["name"] for c in insp.get_columns("users")}
     if "username" not in cols:
-        op.add_column("users", sa.Column("username", sa.String(length=80), nullable=True))
+        op.add_column(
+            "users", sa.Column("username", sa.String(length=80), nullable=True)
+        )
         op.execute(
             """
             UPDATE users SET username = lower(

@@ -176,11 +176,7 @@
   content: '';
   flex: 1;
   height: 1px;
-  background: linear-gradient(
-    to left,
-    rgb(var(--gold-rgb) / 0.4),
-    rgb(var(--gold-rgb) / 0.06)
-  );
+  background: linear-gradient(to left, rgb(var(--gold-rgb) / 0.4), rgb(var(--gold-rgb) / 0.06));
 }
 .rcard__cols {
   columns: 2;

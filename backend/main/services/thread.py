@@ -28,6 +28,7 @@ _MODELS = {
     "contact": ContactRequest,
 }
 
+
 # the public-facing subject line shown in the inbox for each type
 def request_subject(row) -> str:
     if isinstance(row, Ticket):
@@ -81,7 +82,9 @@ async def next_tracking_code(db: AsyncSession, request_type: str) -> str:
 
 async def load_request(db: AsyncSession, request_type: str, request_id: uuid.UUID):
     if request_type not in REQUEST_TYPES:
-        raise HTTPException(400, {"code": "bad_type", "message": "نوع درخواست نامعتبر است."})
+        raise HTTPException(
+            400, {"code": "bad_type", "message": "نوع درخواست نامعتبر است."}
+        )
     row = await db.get(_MODELS[request_type], request_id)
     if row is None:
         raise HTTPException(404, {"code": "not_found", "message": "درخواست یافت نشد."})
@@ -140,7 +143,11 @@ async def add_message(
 
 
 # first staff reply moves a fresh request to its "in progress" state
-_IN_PROGRESS = {"consultation": "reviewing", "ticket": "reviewing", "contact": "contacted"}
+_IN_PROGRESS = {
+    "consultation": "reviewing",
+    "ticket": "reviewing",
+    "contact": "contacted",
+}
 
 
 async def record_staff_reply(
@@ -154,7 +161,9 @@ async def record_staff_reply(
     if row.first_response_at is None:
         row.first_response_at = now
         target = _IN_PROGRESS[request_type]
-        if row.status == "new" and target in TRANSITIONS[request_type].get("new", set()):
+        if row.status == "new" and target in TRANSITIONS[request_type].get(
+            "new", set()
+        ):
             row.status = target
     await db.flush()
 
@@ -269,16 +278,22 @@ async def migrate_legacy_thread(
     copied = 0
     if request_type == "ticket":
         rows = (
-            await db.execute(
-                select(TicketMessage).where(TicketMessage.ticket_id == request_id)
+            (
+                await db.execute(
+                    select(TicketMessage).where(TicketMessage.ticket_id == request_id)
+                )
             )
-        ).scalars().all()
+            .scalars()
+            .all()
+        )
         for r in rows:
             db.add(
                 RequestMessage(
                     request_type="ticket",
                     request_id=request_id,
-                    sender_type="staff" if r.sender_type in ("staff", "note") else "customer",
+                    sender_type="staff"
+                    if r.sender_type in ("staff", "note")
+                    else "customer",
                     sender_id=r.sender_id,
                     body=r.body,
                     is_note=r.sender_type == "note",
@@ -288,10 +303,16 @@ async def migrate_legacy_thread(
             copied += 1
     elif request_type == "consultation":
         rows = (
-            await db.execute(
-                select(ConsultationNote).where(ConsultationNote.request_id == request_id)
+            (
+                await db.execute(
+                    select(ConsultationNote).where(
+                        ConsultationNote.request_id == request_id
+                    )
+                )
             )
-        ).scalars().all()
+            .scalars()
+            .all()
+        )
         for r in rows:
             db.add(
                 RequestMessage(

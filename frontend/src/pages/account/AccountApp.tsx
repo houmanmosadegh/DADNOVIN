@@ -3,18 +3,10 @@
 
 import { useEffect, useMemo, useState } from 'react'
 import { NavLink, Navigate, Route, Routes, useLocation, useNavigate } from 'react-router-dom'
-import {
-  Bell,
-  FileText,
-  LayoutDashboard,
-  LogOut,
-  Menu,
-  Share2,
-  UserRound,
-  X,
-} from 'lucide-react'
-import { api } from '../../services/api'
+import { Bell, FileText, LayoutDashboard, LogOut, Menu, Share2, UserRound, X } from 'lucide-react'
+import { api, apiAsset } from '../../services/api'
 import { siteFlags } from '../../content/remote'
+import { brand } from '../../content/lawyers.fa.js'
 import { useAuth } from '../../services/auth'
 import AuthPage from './AuthPage'
 import DashboardPage from './DashboardPage'
@@ -54,7 +46,8 @@ export default function AccountApp() {
   }, [me, pathname])
   useEffect(() => {
     if (!me) return
-    api.get<Notif[]>('/account/notifications')
+    api
+      .get<Notif[]>('/account/notifications')
       .then((rows) => setUnread(rows.filter((n) => !n.read).length))
       .catch(() => {})
   }, [me, pathname])
@@ -117,7 +110,7 @@ export default function AccountApp() {
       {/* sidebar */}
       <aside className="acc__side">
         <NavLink to="/panel" className="acc__brand" end>
-          <img src="/images/logo-mark.png" alt="" width={30} height={24} decoding="async" />
+          <img src={apiAsset(brand.logoMark)} alt="" width={30} height={24} decoding="async" />
           <div>
             <strong>دادنوین</strong>
             <span>پنل کاربری</span>
@@ -130,7 +123,9 @@ export default function AccountApp() {
           </span>
           <div>
             <p className="acc__username">{me.full_name}</p>
-            <p className="acc__muted" dir="ltr">{me.phone}</p>
+            <p className="acc__muted" dir="ltr">
+              {me.phone}
+            </p>
           </div>
         </div>
 
@@ -158,8 +153,14 @@ export default function AccountApp() {
         </nav>
 
         <div className="acc__side-foot">
-          {isStaff && <a className="acc__stafflink" href="/admin/">ورود به پنل مدیریت ←</a>}
-          <a href="/" className="acc__sitelink">مشاهدهٔ سایت</a>
+          {isStaff && (
+            <a className="acc__stafflink" href="/admin/">
+              ورود به پنل مدیریت ←
+            </a>
+          )}
+          <a href="/" className="acc__sitelink">
+            مشاهدهٔ سایت
+          </a>
         </div>
       </aside>
 

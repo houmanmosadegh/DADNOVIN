@@ -4,14 +4,17 @@ import asyncio
 from typing import Annotated
 
 from fastapi import APIRouter, Depends, Request, Response, status
+from sqlalchemy import func, select
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from ...ai.service import consultation_draft
 from ...core.config import get_settings
 from ...core.rate_limit import client_key, limiter
 from ...db.session import get_db
+from ...ai.render import sanitize_display_text
 from ...models.consultation import ConsultationRequest
 from ...models.content import SiteSetting
+from ...models.request_ops import RequestMessage
 from ...schemas.consultation import ConsultationCreatedOut, ConsultationIn
 from ...security.passwords import hash_password
 from ...services import commissions as comm_svc
@@ -33,7 +36,9 @@ async def submit_consultation(
     accepted silently but never stored.
     """
     limiter.check(
-        "consult_submit", client_key(request), get_settings().rate_limit_public_post_per_minute
+        "consult_submit",
+        client_key(request),
+        get_settings().rate_limit_public_post_per_minute,
     )
     if payload.website:
         response.status_code = status.HTTP_201_CREATED
@@ -66,7 +71,7 @@ async def submit_consultation(
     )
 
 
-AI_HEADER = "دستیار هوشمند دادنوین — پاسخ اولیهٔ اطلاعاتی:"
+AI_HEADER = "پاسخ خودکار سیستم — اطلاعات اولیه:"
 
 REF_COOKIE = "dn_ref"
 
@@ -101,6 +106,8 @@ async def _maybe_attribute(
         request_id=row.id,
         ip=row.client_ip,
         ua=row.client_ua,
+        consent=bool(getattr(payload, "ref_consent", False)),
+        channel=request.cookies.get("dn_src", ""),
     )
     row.ref_code = code
     row.referrer_id = prof.id
@@ -124,6 +131,19 @@ async def _attach_ai_first_reply(db: AsyncSession, row: ConsultationRequest) -> 
     settings = get_settings()
     if not settings.ai_enabled:
         return
+    # idempotent — an earlier assistant reply on this request means we
+    # already did this; never attach a second auto-reply
+    already = (
+        await db.execute(
+            select(func.count(RequestMessage.id)).where(
+                RequestMessage.request_type == "consultation",
+                RequestMessage.request_id == row.id,
+                RequestMessage.sender_type == "assistant",
+            )
+        )
+    ).scalar_one()
+    if already:
+        return
     try:
         if not await _ai_auto_reply_enabled(db):
             return
@@ -140,13 +160,13 @@ async def _attach_ai_first_reply(db: AsyncSession, row: ConsultationRequest) -> 
         return
     if not reply:
         return
-    msg = await thread_svc.add_message(
+    msg = await thread_svc.add_message(  # noqa: E501
         db,
         "consultation",
         row.id,
         sender_type="assistant",
         sender_id=None,
-        body=f"{AI_HEADER}\n\n{reply}",
+        body=f"{AI_HEADER}\n\n{sanitize_display_text(reply)}",
     )
     await thread_svc.add_event(
         db, "consultation", row.id, "ai_reply", payload={"message_id": str(msg.id)}

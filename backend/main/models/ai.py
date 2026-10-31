@@ -53,6 +53,4 @@ class AIMessage(Base):
     content: Mapped[str] = mapped_column(Text)
     created_at: Mapped[datetime] = created_at_col()
 
-    conversation: Mapped[AIConversation] = relationship(
-        back_populates="messages"
-    )
+    conversation: Mapped[AIConversation] = relationship(back_populates="messages")

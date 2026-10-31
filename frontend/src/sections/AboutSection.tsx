@@ -19,12 +19,7 @@ export function AboutSection() {
       <div className="container about__grid">
         <div className="about__side">
           <Reveal>
-            <ChapterHead
-              index="۰۱"
-              eyebrow="گروه حقوقی دادنوین"
-              title={about.title}
-              id="about-title"
-            />
+            <ChapterHead index="۰۱" eyebrow="گروه حقوقی دادنوین" title={about.title} id="about-title" />
           </Reveal>
           <Reveal delay={90}>
             <div className="about__body">

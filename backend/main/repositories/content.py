@@ -40,11 +40,7 @@ async def public_settings_map(db: AsyncSession) -> dict[str, dict]:
 
 async def list_pages(db: AsyncSession) -> list[Page]:
     return list(
-        (
-            await db.execute(
-                select(Page).order_by(Page.sort_order, Page.slug)
-            )
-        ).scalars()
+        (await db.execute(select(Page).order_by(Page.sort_order, Page.slug))).scalars()
     )
 
 

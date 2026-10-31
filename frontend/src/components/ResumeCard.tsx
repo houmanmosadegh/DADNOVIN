@@ -46,7 +46,6 @@ export function ResumeCard({ lawyer }: { lawyer: ResumeLawyer }) {
   const r = lawyer.resume
   return (
     <article className="rcard">
-
       <div className="rcard__top">
         <div className="rcard__id">
           <p className="rcard__kicker">{r.role}</p>
@@ -62,7 +61,9 @@ export function ResumeCard({ lawyer }: { lawyer: ResumeLawyer }) {
           {lawyer.portrait ? (
             <img
               src={lawyer.portrait}
-              srcSet={lawyer.portrait.replace('-720.webp', '-440.webp') + ' 440w, ' + lawyer.portrait + ' 720w'}
+              srcSet={
+                lawyer.portrait.replace('-720.webp', '-440.webp') + ' 440w, ' + lawyer.portrait + ' 720w'
+              }
               sizes="(max-width: 48rem) 86vw, 22rem"
               alt={`پرتره ${lawyer.name}`}
               width="720"

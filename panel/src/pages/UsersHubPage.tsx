@@ -5,14 +5,7 @@ import { Search } from "lucide-react";
 import { useMemo, useState } from "react";
 import { useSearchParams } from "react-router-dom";
 import { api } from "../services/api";
-import {
-  EmptyState,
-  ErrorState,
-  PageHeader,
-  Skeleton,
-  Table,
-  Tabs,
-} from "../components/ui";
+import { EmptyState, ErrorState, PageHeader, Skeleton, Table, Tabs } from "../components/ui";
 import type { UserOut } from "../types/api";
 import { ProfilesTab } from "./marketing/parts";
 import UsersPage from "./UsersPage";
@@ -38,11 +31,7 @@ export default function UsersHubPage() {
   return (
     <div>
       <PageHeader title="کاربران" subtitle="حساب‌های کاربری، بازاریاب‌ها و ادمین‌ها" />
-      <Tabs
-        active={tab}
-        onChange={(k) => setParams({ tab: k }, { replace: true })}
-        tabs={TABS}
-      />
+      <Tabs active={tab} onChange={(k) => setParams({ tab: k }, { replace: true })} tabs={TABS} />
       <div className="pt-4">
         {tab === "all" && <AllUsersTab />}
         {tab === "marketers" && <ProfilesTab />}
@@ -62,15 +51,14 @@ function AllUsersTab() {
 
   const rows = useMemo(() => {
     let out = list.data ?? [];
-    if (role)
-      out = out.filter((u) => u.roles.some((r) => r.name === role));
+    if (role) out = out.filter((u) => u.roles.some((r) => r.name === role));
     const needle = q.trim().toLowerCase();
     if (needle)
       out = out.filter(
         (u) =>
           u.full_name?.toLowerCase().includes(needle) ||
           u.username.toLowerCase().includes(needle) ||
-          u.phone?.includes(needle),
+          u.phone?.includes(needle)
       );
     return out;
   }, [list.data, q, role]);
@@ -90,7 +78,9 @@ function AllUsersTab() {
         <select className="w-40" value={role} onChange={(e) => setRole(e.target.value)}>
           <option value="">همهٔ نقش‌ها</option>
           {Object.entries(ROLE_FA).map(([k, v]) => (
-            <option key={k} value={k}>{v}</option>
+            <option key={k} value={k}>
+              {v}
+            </option>
           ))}
         </select>
         <span className="text-[12px] text-ink-2">{rows.length.toLocaleString("fa-IR")} کاربر</span>
@@ -105,13 +95,19 @@ function AllUsersTab() {
           {rows.map((u) => (
             <tr key={u.id} className="border-b border-sand-2 last:border-0">
               <td className="td font-medium">{u.full_name || "—"}</td>
-              <td className="td" dir="ltr"><span className="font-mono text-[12px]">{u.username}</span></td>
-              <td className="td" dir="ltr"><span className="font-mono text-[12px]">{u.phone || "—"}</span></td>
+              <td className="td" dir="ltr">
+                <span className="font-mono text-[12px]">{u.username}</span>
+              </td>
+              <td className="td" dir="ltr">
+                <span className="font-mono text-[12px]">{u.phone || "—"}</span>
+              </td>
               <td className="td text-[12px]">
                 {u.roles.map((r) => ROLE_FA[r.name] ?? r.description ?? r.name).join("، ") || "—"}
               </td>
               <td className="td">
-                <span className={`rounded-full px-2 py-0.5 text-[11px] ${u.is_active ? "bg-emerald-500/10 text-emerald-400" : "bg-red-500/10 text-red-400"}`}>
+                <span
+                  className={`rounded-full px-2 py-0.5 text-[11px] ${u.is_active ? "bg-emerald-500/10 text-emerald-400" : "bg-red-500/10 text-red-400"}`}
+                >
                   {u.is_active ? "فعال" : "غیرفعال"}
                 </span>
               </td>

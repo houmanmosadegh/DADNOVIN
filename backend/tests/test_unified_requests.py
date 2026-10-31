@@ -129,18 +129,25 @@ async def test_staff_reply_flow(client, admin_client, db_session):
     # staff reply over the track channel → delivery recorded, first_response set
     reply = await admin_client.post(
         f"/api/v1/admin/requests/contact/{rid}/messages",
-        json={"body": "در اسرع وقت تماس می‌گیریم", "is_note": False,
-              "channels": ["track", "sms"]},
+        json={
+            "body": "در اسرع وقت تماس می‌گیریم",
+            "is_note": False,
+            "channels": ["track", "sms"],
+        },
     )
     assert reply.status_code == 201
 
     deliveries = (
-        await db_session.execute(
-            select(OutboundDelivery)
-            .join(RequestMessage, RequestMessage.id == OutboundDelivery.message_id)
-            .where(RequestMessage.request_id == uuid.UUID(rid))
+        (
+            await db_session.execute(
+                select(OutboundDelivery)
+                .join(RequestMessage, RequestMessage.id == OutboundDelivery.message_id)
+                .where(RequestMessage.request_id == uuid.UUID(rid))
+            )
         )
-    ).scalars().all()
+        .scalars()
+        .all()
+    )
     channels = {d.channel for d in deliveries}
     assert channels == {"track", "sms"}
     assert all(d.status == "sent" for d in deliveries)
@@ -161,15 +168,20 @@ async def test_staff_reply_flow(client, admin_client, db_session):
 
 async def test_customer_reply_reopens(client, admin_client):
     created = await _contact(client)
-    rid = (await admin_client.get("/api/v1/admin/inbox?type=contact")).json()["items"][0]["id"]
+    rid = (await admin_client.get("/api/v1/admin/inbox?type=contact")).json()["items"][
+        0
+    ]["id"]
     await admin_client.post(
         f"/api/v1/admin/requests/contact/{rid}/status",
         json={"status": "contacted"},
     )
     resp = await client.post(
         "/api/v1/public/track/reply",
-        json={"code": created["tracking_code"],
-              "credential": created["access_code"], "body": "منتظرم"},
+        json={
+            "code": created["tracking_code"],
+            "credential": created["access_code"],
+            "body": "منتظرم",
+        },
     )
     assert resp.status_code == 201
     detail = await admin_client.get(f"/api/v1/admin/requests/contact/{rid}")
@@ -178,9 +190,9 @@ async def test_customer_reply_reopens(client, admin_client):
 
 async def test_status_transition_rules(client, admin_client):
     await _consultation(client)
-    rid = (
-        await admin_client.get("/api/v1/admin/inbox?type=consultation")
-    ).json()["items"][0]["id"]
+    rid = (await admin_client.get("/api/v1/admin/inbox?type=consultation")).json()[
+        "items"
+    ][0]["id"]
 
     # invalid jump: new → completed
     bad = await admin_client.post(
@@ -213,9 +225,9 @@ async def test_status_transition_rules(client, admin_client):
 
 async def test_assignment_and_labels(client, admin_client, db_session):
     await _consultation(client)
-    rid = (
-        await admin_client.get("/api/v1/admin/inbox?type=consultation")
-    ).json()["items"][0]["id"]
+    rid = (await admin_client.get("/api/v1/admin/inbox?type=consultation")).json()[
+        "items"
+    ][0]["id"]
 
     assignees = (await admin_client.get("/api/v1/admin/assignees")).json()
     target = next(a for a in assignees if a["username"] == "support")
@@ -228,8 +240,7 @@ async def test_assignment_and_labels(client, admin_client, db_session):
 
     resp = await admin_client.patch(
         f"/api/v1/admin/requests/consultation/{rid}",
-        json={"assigned_to": target["id"], "priority": "high",
-              "label_ids": [lid]},
+        json={"assigned_to": target["id"], "priority": "high", "label_ids": [lid]},
     )
     assert resp.status_code == 200
 
@@ -246,7 +257,9 @@ async def test_assignment_and_labels(client, admin_client, db_session):
 
 async def test_audit_before_after(client, admin_client, db_session):
     await _contact(client)
-    rid = (await admin_client.get("/api/v1/admin/inbox?type=contact")).json()["items"][0]["id"]
+    rid = (await admin_client.get("/api/v1/admin/inbox?type=contact")).json()["items"][
+        0
+    ]["id"]
     await admin_client.post(
         f"/api/v1/admin/requests/contact/{rid}/status",
         json={"status": "contacted"},
@@ -272,8 +285,13 @@ async def test_articles_crud_rbac(client, admin_client):
     await login_as(admin_client, "editor")
     created = await admin_client.post(
         "/api/v1/admin/articles",
-        json={"slug": "family-law-101", "title": "راهنمای حقوق خانواده",
-              "excerpt": "خلاصه", "body": "متن مقاله", "status": "draft"},
+        json={
+            "slug": "family-law-101",
+            "title": "راهنمای حقوق خانواده",
+            "excerpt": "خلاصه",
+            "body": "متن مقاله",
+            "status": "draft",
+        },
     )
     assert created.status_code == 201
     aid = created.json()["id"]
@@ -293,7 +311,9 @@ async def test_articles_crud_rbac(client, admin_client):
 
 async def test_call_log(client, admin_client):
     await _contact(client)
-    rid = (await admin_client.get("/api/v1/admin/inbox?type=contact")).json()["items"][0]["id"]
+    rid = (await admin_client.get("/api/v1/admin/inbox?type=contact")).json()["items"][
+        0
+    ]["id"]
     resp = await admin_client.post(
         f"/api/v1/admin/requests/contact/{rid}/call-log",
         json={"outcome": "answered", "note": "قرار جلسه گذاشته شد"},
@@ -343,9 +363,7 @@ async def test_admin_contacts_module(admin_client, seeded_session):
     )
     assert resp.status_code == 201
 
-    resp = await admin_client.get(
-        f"/api/v1/admin/contacts/{uuid.uuid4()}"
-    )
+    resp = await admin_client.get(f"/api/v1/admin/contacts/{uuid.uuid4()}")
     assert resp.status_code == 404
 
 

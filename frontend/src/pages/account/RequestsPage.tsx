@@ -18,7 +18,10 @@ export default function RequestsPage() {
   const [filter, setFilter] = useState('all')
 
   useEffect(() => {
-    api.get<MyRequest[]>('/account/requests').then(setRows).catch(() => setErr('خطا در بارگذاری درخواست‌ها'))
+    api
+      .get<MyRequest[]>('/account/requests')
+      .then(setRows)
+      .catch(() => setErr('خطا در بارگذاری درخواست‌ها'))
   }, [])
 
   const view = useMemo(() => {
@@ -34,7 +37,9 @@ export default function RequestsPage() {
     <div className="acc__page">
       <div className="acc__page-head">
         <h1 className="acc__title">درخواست‌های من</h1>
-        <Link to="/panel/requests/new" className="btn btn--primary">ثبت درخواست جدید</Link>
+        <Link to="/panel/requests/new" className="btn btn--primary">
+          ثبت درخواست جدید
+        </Link>
       </div>
 
       <div className="acc__toolbar">
@@ -66,14 +71,18 @@ export default function RequestsPage() {
         <p className="acc__err">{err}</p>
       ) : !rows ? (
         <div className="acc__card acc__skels" aria-busy="true">
-          {[0, 1, 2].map((i) => <span key={i} className="acc__skel" />)}
+          {[0, 1, 2].map((i) => (
+            <span key={i} className="acc__skel" />
+          ))}
         </div>
       ) : rows.length === 0 ? (
         <div className="acc__card acc__empty">
           <Inbox size={40} aria-hidden="true" />
           <h2>هنوز درخواستی ندارید</h2>
           <p className="acc__muted">اولین درخواست مشاوره خود را ثبت کنید تا کارشناسان بررسی کنند.</p>
-          <Link to="/panel/requests/new" className="btn btn--primary">ثبت درخواست جدید</Link>
+          <Link to="/panel/requests/new" className="btn btn--primary">
+            ثبت درخواست جدید
+          </Link>
         </div>
       ) : view.length === 0 ? (
         <div className="acc__card acc__empty">
@@ -83,7 +92,9 @@ export default function RequestsPage() {
         <div className="acc__card acc__list">
           {view.map((r) => (
             <Link key={r.id} to={`/panel/requests/${r.id}`} className="acc__row">
-              <span dir="ltr" className="acc__code">{r.tracking_code}</span>
+              <span dir="ltr" className="acc__code">
+                {r.tracking_code}
+              </span>
               <span className="acc__row-topic">
                 {r.topic || '—'}
                 {r.has_new_reply && <span className="acc__newreply">پاسخ جدید</span>}

@@ -26,12 +26,11 @@ export function ConsultationForm() {
   const preselect = params.get('service') ?? ''
   const [name, setName] = useState('')
   const [phone, setPhone] = useState('')
-  const [service, setService] = useState(
-    services.some((s) => s.slug === preselect) ? preselect : '',
-  )
+  const [service, setService] = useState(services.some((s) => s.slug === preselect) ? preselect : '')
   const [message, setMessage] = useState('')
   // referral code — prefilled from the dn_ref cookie when present
   const [refCode, setRefCode] = useState(() => readRefCookie())
+  const [refConsent, setRefConsent] = useState(false)
   const [honey, setHoney] = useState('')
   const [errors, setErrors] = useState<Errors>({})
   const [summary, setSummary] = useState<string | null>(null)
@@ -47,9 +46,7 @@ export function ConsultationForm() {
   }, [preselect])
 
   const serviceTitle =
-    service === 'other'
-      ? F.fields.serviceOther
-      : services.find((s) => s.slug === service)?.title ?? ''
+    service === 'other' ? F.fields.serviceOther : (services.find((s) => s.slug === service)?.title ?? '')
 
   const buildSummary = () =>
     [
@@ -84,19 +81,17 @@ export function ConsultationForm() {
     try {
       // real submission — persisted server-side; the honeypot field is
       // forwarded so the backend can silently drop bot traffic
-      const created = await api.post<{ tracking_code?: string; access_code?: string }>(
-        '/consultations',
-        {
-          full_name: name.trim(),
-          phone: phone.trim(),
-          service_slug: service === 'other' ? '' : service,
-          topic: service === 'other' ? F.fields.serviceOther : serviceTitle,
-          message: message.trim(),
-          source_page: '/consultation',
-          ref_code: refCode.trim().toUpperCase(),
-          website: honey,
-        },
-      )
+      const created = await api.post<{ tracking_code?: string; access_code?: string }>('/consultations', {
+        full_name: name.trim(),
+        phone: phone.trim(),
+        service_slug: service === 'other' ? '' : service,
+        topic: service === 'other' ? F.fields.serviceOther : serviceTitle,
+        message: message.trim(),
+        source_page: '/consultation',
+        ref_code: refCode.trim().toUpperCase(),
+        ref_consent: refConsent,
+        website: honey,
+      })
       setSent(true)
       if (created.tracking_code && created.access_code) {
         setTracking({ code: created.tracking_code, access: created.access_code })
@@ -117,13 +112,10 @@ export function ConsultationForm() {
         <h2 className="cform__result-title">{F.readyTitle}</h2>
         {sent === true ? (
           <>
-            <p className="cform__result-text">
-              درخواست شما در سامانهٔ دفتر ثبت شد.
-            </p>
+            <p className="cform__result-text">درخواست شما در سامانهٔ دفتر ثبت شد.</p>
             {tracking ? (
               <p className="cform__ticket">
-                کد پیگیری: <b dir="ltr">{tracking.code}</b> — کد دسترسی:{' '}
-                <b dir="ltr">{tracking.access}</b>
+                کد پیگیری: <b dir="ltr">{tracking.code}</b> — کد دسترسی: <b dir="ltr">{tracking.access}</b>
               </p>
             ) : null}
             <p className="cform__result-text">
@@ -139,19 +131,11 @@ export function ConsultationForm() {
           {summary}
         </pre>
         <div className="cform__result-actions">
-          <button
-            type="button"
-            className="btn btn--primary"
-            onClick={() => void copy(summary)}
-          >
+          <button type="button" className="btn btn--primary" onClick={() => void copy(summary)}>
             {copied ? <Check size={17} aria-hidden="true" /> : <ClipboardCopy size={17} aria-hidden="true" />}
             {copied ? F.copied : F.copyAction}
           </button>
-          <button
-            type="button"
-            className="btn btn--ghost"
-            onClick={() => setSummary(null)}
-          >
+          <button type="button" className="btn btn--ghost" onClick={() => setSummary(null)}>
             {F.edit}
           </button>
           {tracking ? (
@@ -252,7 +236,9 @@ export function ConsultationForm() {
         </div>
 
         <div className="cform__field">
-          <label htmlFor="cf-ref">کد معرف <span className="cform__opt">(اختیاری)</span></label>
+          <label htmlFor="cf-ref">
+            کد معرف <span className="cform__opt">(اختیاری)</span>
+          </label>
           <input
             id="cf-ref"
             type="text"
@@ -263,14 +249,23 @@ export function ConsultationForm() {
           />
         </div>
 
+        {refCode.trim() ? (
+          <div className="cform__field cform__field--wide">
+            <label className="cform__check" htmlFor="cf-ref-consent">
+              <input
+                id="cf-ref-consent"
+                type="checkbox"
+                checked={refConsent}
+                onChange={(e) => setRefConsent(e.target.checked)}
+              />
+              <span>نام من و وضعیت قرارداد، برای معرف نمایش داده می‌شود.</span>
+            </label>
+          </div>
+        ) : null}
+
         <div className="cform__field cform__field--wide">
           <label htmlFor="cf-message">{F.fields.message}</label>
-          <textarea
-            id="cf-message"
-            rows={4}
-            value={message}
-            onChange={(e) => setMessage(e.target.value)}
-          />
+          <textarea id="cf-message" rows={4} value={message} onChange={(e) => setMessage(e.target.value)} />
         </div>
       </div>
 

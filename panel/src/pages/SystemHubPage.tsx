@@ -14,10 +14,7 @@ export default function SystemHubPage() {
   const tab = params.get("tab") ?? "audit";
   return (
     <div>
-      <PageHeader
-        title="مدیریت سیستم"
-        subtitle="گزارش فعالیت‌ها، مشاور هوشمند و سلامت سیستم"
-      />
+      <PageHeader title="مدیریت سیستم" subtitle="گزارش فعالیت‌ها، مشاور هوشمند و سلامت سیستم" />
       <Tabs
         active={tab}
         onChange={(k) => setParams({ tab: k }, { replace: true })}
@@ -43,10 +40,7 @@ function HealthTab() {
     queryKey: ["sys-health"],
     queryFn: async () => {
       // /api/health lives outside the versioned API root
-      const res = await fetch(
-        (import.meta.env.VITE_API_URL ?? "") + "/api/health",
-        { credentials: "include" },
-      );
+      const res = await fetch((import.meta.env.VITE_API_URL ?? "") + "/api/health", { credentials: "include" });
       if (!res.ok) throw new Error(String(res.status));
       return (await res.json()) as Record<string, unknown>;
     },
@@ -56,9 +50,7 @@ function HealthTab() {
   return (
     <div className="max-w-lg space-y-3">
       {q.isLoading && <Skeleton className="h-32" />}
-      {q.isError && (
-        <ErrorState text="سرویس API پاسخ نمی‌دهد." onRetry={() => q.refetch()} />
-      )}
+      {q.isError && <ErrorState text="سرویس API پاسخ نمی‌دهد." onRetry={() => q.refetch()} />}
       {q.data && (
         <div className="card p-5">
           <div className="flex items-center gap-2 text-emerald-400">
@@ -68,7 +60,9 @@ function HealthTab() {
           <dl className="mt-3 space-y-1.5 text-[13px]">
             {Object.entries(q.data).map(([k, v]) => (
               <div key={k} className="flex justify-between border-b border-sand-2 pb-1.5 last:border-0">
-                <dt dir="ltr" className="font-mono text-[12px] text-ink-2">{k}</dt>
+                <dt dir="ltr" className="font-mono text-[12px] text-ink-2">
+                  {k}
+                </dt>
                 <dd className="font-medium">{typeof v === "object" ? JSON.stringify(v) : String(v)}</dd>
               </div>
             ))}

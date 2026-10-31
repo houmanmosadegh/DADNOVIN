@@ -74,4 +74,6 @@ class UserUpdateIn(BaseModel):
     email: str | None = Field(default=None, max_length=255)
     is_active: bool | None = None
     role_ids: list[int] | None = None
-    password: str | None = Field(default=None, min_length=MIN_PASSWORD_LEN, max_length=200)
+    password: str | None = Field(
+        default=None, min_length=MIN_PASSWORD_LEN, max_length=200
+    )

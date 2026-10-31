@@ -58,7 +58,11 @@ class LoginPhoneIn(BaseModel):
     @field_validator("identifier")
     @classmethod
     def _identifier(cls, v: str) -> str:
-        return normalize_phone(v) if is_valid_iranian_phone(normalize_phone(v)) else v.strip()
+        return (
+            normalize_phone(v)
+            if is_valid_iranian_phone(normalize_phone(v))
+            else v.strip()
+        )
 
 
 class ForgotIn(BaseModel):
@@ -109,13 +113,7 @@ class MarketerReviewIn(BaseModel):
 class BankDetailsIn(BaseModel):
     iban: str = Field(default="", max_length=34)
     card: str = Field(default="", max_length=19)
-
-
-class CommissionRuleIn(BaseModel):
-    kind: str = Field(pattern="^(fixed|percent)$")
-    value: int = Field(ge=0)
-    tier_min: int = Field(default=0, ge=0)
-    marketer_id: uuid.UUID | None = None
+    account_name: str = Field(default="", max_length=120)
 
 
 class FeeIn(BaseModel):
@@ -131,17 +129,5 @@ class AccountMeOut(BaseModel):
     ref_code: str = ""
     marketer_status: str = ""  # ''|pending|approved|rejected
     created_at: datetime | None = None
-
-    model_config = {"from_attributes": True}
-
-
-class CommissionRuleOut(BaseModel):
-    id: uuid.UUID
-    kind: str
-    value: int
-    tier_min: int
-    marketer_id: uuid.UUID | None
-    is_active: bool
-    created_at: datetime
 
     model_config = {"from_attributes": True}

@@ -16,13 +16,39 @@ from ..models.account import (
     ReferralAttribution,
     ReferralClick,
     ReferralLink,
+    RetiredRefCode,
 )
 from ..models.consultation import ConsultationRequest
 from ..models.user import Role, User
 from ..db.base import aware
 from ..utils.phone import normalize_phone
 
-CODE_ALPHABET = "ABCDEFGHJKMNPQRSTUVWXYZ23456789"  # no 0/O/1/I — read over phone
+CODE_ALPHABET = "ABCDEFGHJKMNPQRSTUVWXYZ23456789"  # no 0/O/1/I/L — unambiguous
+CODE_BODY_LEN = 8  # 8 CSPRNG chars + 1 check char = DN-XXXXXXXXX
+_REF_PREFIX = "DN-"
+
+# codes containing any of these are re-rolled (reserved/unfortunate strings)
+_CODE_BLOCKLIST = (
+    "ADMIN",
+    "GOD",
+    "SEX",
+    "TEST",
+    "DEMO",
+    "XXX",
+    "666",
+    "FUCK",
+    "SHIT",
+    "KILL",
+    "DEAD",
+    "NAZI",
+    "KKK",
+    "SIS",
+    "ASS",
+    "CUM",
+)
+
+# allowed ?s= channels on referral links — anything else is ignored
+CHANNELS = ("instagram", "telegram", "whatsapp", "website", "email", "other")
 
 # click-attack heuristics — the same visitor hammering a link in 24h
 CLICK_FLOOD_WINDOW = timedelta(hours=24)
@@ -34,8 +60,37 @@ def visitor_hash(ip: str, ua: str) -> str:
     return hashlib.sha256(f"{ip}|{ua}".encode()).hexdigest()
 
 
+def _check_char(body: str) -> str:
+    """Sum of alphabet positions mod alphabet size — catches typos."""
+    return CODE_ALPHABET[
+        sum(CODE_ALPHABET.index(ch) for ch in body) % len(CODE_ALPHABET)
+    ]
+
+
+def normalize_code(code: str) -> str:
+    """Case-insensitive lookup key — strips separators, uppercases."""
+    return re.sub(r"[^A-Za-z0-9]", "", code or "").upper()
+
+
+def code_check_ok(code: str) -> bool:
+    """Verify the check digit — only new-format codes (DN- + 9 chars) carry
+    one; legacy 6-char codes skip verification."""
+    body = normalize_code(code)
+    if body.startswith("DN"):
+        body = body[2:]
+    if len(body) != CODE_BODY_LEN + 1:
+        return True
+    return _check_char(body[:-1]) == body[-1]
+
+
 def gen_ref_code() -> str:
-    return "DN-" + "".join(secrets.choice(CODE_ALPHABET) for _ in range(6))
+    """DN- + 8 CSPRNG chars + check digit, blocklist filtered."""
+    for _ in range(50):
+        body = "".join(secrets.choice(CODE_ALPHABET) for _ in range(CODE_BODY_LEN))
+        if any(bad in body for bad in _CODE_BLOCKLIST):
+            continue
+        return f"{_REF_PREFIX}{body}{_check_char(body)}"
+    raise RuntimeError("ref code generation exhausted")  # pragma: no cover
 
 
 async def apply(
@@ -57,7 +112,11 @@ async def apply(
     ).scalar_one_or_none()
     if latest is not None and latest.status == "pending":
         raise HTTPException(
-            409, {"code": "already_pending", "message": "درخواست بازاریابی شما در انتظار بررسی است."}
+            409,
+            {
+                "code": "already_pending",
+                "message": "درخواست بازاریابی شما در انتظار بررسی است.",
+            },
         )
     if latest is not None and latest.status == "rejected" and latest.reviewed_at:
         unlock = aware(latest.reviewed_at) + timedelta(days=reapply_days)
@@ -72,7 +131,8 @@ async def apply(
     prof = await profile_for_user(db, user.id)
     if prof is not None:
         raise HTTPException(
-            409, {"code": "already_marketer", "message": "حساب شما هم‌اکنون بازاریاب است."}
+            409,
+            {"code": "already_marketer", "message": "حساب شما هم‌اکنون بازاریاب است."},
         )
     app = MarketerApplication(
         user_id=user.id,
@@ -86,7 +146,9 @@ async def apply(
     return app
 
 
-async def profile_for_user(db: AsyncSession, user_id: uuid.UUID) -> MarketerProfile | None:
+async def profile_for_user(
+    db: AsyncSession, user_id: uuid.UUID
+) -> MarketerProfile | None:
     return (
         await db.execute(
             select(MarketerProfile).where(MarketerProfile.user_id == user_id)
@@ -99,7 +161,9 @@ async def approve(
 ) -> MarketerProfile:
     """Approve → create profile with a unique ref code + grant `marketer` role."""
     if app.status != "pending":
-        raise HTTPException(409, {"code": "already_reviewed", "message": "قبلاً بررسی شده است."})
+        raise HTTPException(
+            409, {"code": "already_reviewed", "message": "قبلاً بررسی شده است."}
+        )
     user = await db.get(User, app.user_id)
     if user is None:
         raise HTTPException(404, {"code": "user_gone", "message": "کاربر یافت نشد."})
@@ -113,7 +177,9 @@ async def approve(
         if clash is None:
             break
     else:  # pragma: no cover
-        raise HTTPException(500, {"code": "code_gen", "message": "خطا در تولید کد ارجاع."})
+        raise HTTPException(
+            500, {"code": "code_gen", "message": "خطا در تولید کد ارجاع."}
+        )
     prof = MarketerProfile(
         user_id=user.id,
         ref_code=code,
@@ -139,7 +205,9 @@ async def reject(
     db: AsyncSession, app: MarketerApplication, admin: User, note: str
 ) -> MarketerApplication:
     if app.status != "pending":
-        raise HTTPException(409, {"code": "already_reviewed", "message": "قبلاً بررسی شده است."})
+        raise HTTPException(
+            409, {"code": "already_reviewed", "message": "قبلاً بررسی شده است."}
+        )
     app.status = "rejected"
     app.reviewed_by = admin.id
     app.reviewed_at = datetime.now(UTC)
@@ -160,20 +228,70 @@ async def reactivate(db: AsyncSession, profile: MarketerProfile, admin: User) ->
 
 
 async def resolve_code(db: AsyncSession, code: str) -> MarketerProfile | None:
-    code = code.strip().upper()
-    if not code:
+    """Active profile for a code — normalized, check-digit verified.
+
+    Retired codes (rotated by an admin) still resolve so old links keep
+    attributing to the same marketer. Suspended/inactive profiles return
+    None — identical to an invalid code (no enumeration)."""
+    raw = normalize_code(code)
+    if not raw or not code_check_ok(raw):
         return None
+    dashed = f"DN-{raw[2:]}" if raw.startswith("DN") else raw
+    cands = {raw, dashed}
     prof = (
         await db.execute(
-            select(MarketerProfile).where(MarketerProfile.ref_code == code)
+            select(MarketerProfile).where(MarketerProfile.ref_code.in_(cands))
         )
     ).scalar_one_or_none()
+    if prof is None:
+        retired = (
+            await db.execute(
+                select(RetiredRefCode.marketer_id).where(RetiredRefCode.code.in_(cands))
+            )
+        ).scalar_one_or_none()
+        if retired is not None:
+            prof = (
+                await db.execute(
+                    select(MarketerProfile).where(MarketerProfile.id == retired)
+                )
+            ).scalar_one_or_none()
     return prof if prof is not None and prof.is_active else None
+
+
+async def rotate_code(db: AsyncSession, profile: MarketerProfile, admin: User) -> str:
+    """Admin-only: retire the current code and mint a fresh unique one.
+    The old code keeps resolving via retired_ref_codes for past links."""
+    old = profile.ref_code
+    if old:
+        db.add(RetiredRefCode(code=old, marketer_id=profile.id))
+    for _ in range(20):
+        code = gen_ref_code()
+        clash = (
+            await db.execute(
+                select(MarketerProfile.id).where(MarketerProfile.ref_code == code)
+            )
+        ).scalar_one_or_none()
+        retired_clash = await db.get(RetiredRefCode, code)
+        if clash is None and retired_clash is None:
+            break
+    else:  # pragma: no cover
+        raise HTTPException(
+            500, {"code": "code_gen", "message": "خطا در تولید کد ارجاع."}
+        )
+    profile.ref_code = code
+    await db.flush()
+    return code
 
 
 def normalize_label(label: str) -> str:
     label = (label or "").strip().lower()[:40]
     return label if LABEL_RE.match(label) else ""
+
+
+def normalize_channel(raw: str) -> str:
+    """`?s=` channel — whitelist only, anything else drops to ''."""
+    s = (raw or "").strip().lower()
+    return s if s in CHANNELS else ""
 
 
 async def record_click(
@@ -187,7 +305,6 @@ async def record_click(
 ) -> ReferralClick:
     """Store a click; flag obvious floods so stats stay honest."""
     code = code.strip().upper()
-    label = normalize_label(label)
     vh = visitor_hash(ip, ua)
     window_start = datetime.now(UTC) - CLICK_FLOOD_WINDOW
     recent_same_visitor = (
@@ -215,10 +332,13 @@ async def record_click(
     return click
 
 
-async def link_or_404(db: AsyncSession, marketer_id: uuid.UUID, label: str) -> ReferralLink:
-    label = normalize_label(label)
+async def link_or_404(
+    db: AsyncSession, marketer_id: uuid.UUID, label: str
+) -> ReferralLink:
+    """Channel link — `label` must be one of the whitelisted channels."""
+    label = normalize_channel(label)
     if not label:
-        raise HTTPException(400, {"code": "bad_label", "message": "برچسب نامعتبر است."})
+        raise HTTPException(400, {"code": "bad_label", "message": "کانال نامعتبر است."})
     row = (
         await db.execute(
             select(ReferralLink).where(
@@ -235,47 +355,135 @@ async def link_or_404(db: AsyncSession, marketer_id: uuid.UUID, label: str) -> R
     return row
 
 
-async def links_for(
-    db: AsyncSession, profile: MarketerProfile
-) -> list[dict]:
-    """Labeled links + per-link click stats (raw vs unique visitors)."""
+async def links_for(db: AsyncSession, profile: MarketerProfile) -> list[dict]:
+    """Channel links + per-channel click/referral stats."""
     rows = (
-        await db.execute(
-            select(ReferralLink)
-            .where(ReferralLink.marketer_id == profile.id)
-            .order_by(ReferralLink.created_at)
+        (
+            await db.execute(
+                select(ReferralLink)
+                .where(ReferralLink.marketer_id == profile.id)
+                .order_by(ReferralLink.created_at)
+            )
         )
-    ).scalars().all()
+        .scalars()
+        .all()
+    )
+    # one pass — per-channel clicks/unique/attributed grouped by label
+    click_rows = (
+        await db.execute(
+            select(
+                ReferralClick.link_label,
+                func.count(ReferralClick.id),
+                func.count(func.distinct(ReferralClick.visitor_hash)),
+            )
+            .where(
+                ReferralClick.ref_code == profile.ref_code,
+                ReferralClick.suspicious.is_(False),
+            )
+            .group_by(ReferralClick.link_label)
+        )
+    ).all()
+    per_channel = {lab: (n, uq) for lab, n, uq in click_rows}
+    attr_rows = (
+        await db.execute(
+            select(
+                ReferralAttribution.channel,
+                func.count(ReferralAttribution.id),
+            )
+            .where(ReferralAttribution.marketer_id == profile.id)
+            .group_by(ReferralAttribution.channel)
+        )
+    ).all()
+    per_attr = {ch: n for ch, n in attr_rows}
     out = []
     for link in rows:
-        base = select(func.count(ReferralClick.id)).where(
-            ReferralClick.ref_code == profile.ref_code,
-            ReferralClick.link_label == link.label,
-            ReferralClick.suspicious.is_(False),
-        )
-        raw = (await db.execute(base)).scalar_one()
-        unique = (
-            await db.execute(
-                select(func.count(func.distinct(ReferralClick.visitor_hash))).where(
-                    ReferralClick.ref_code == profile.ref_code,
-                    ReferralClick.link_label == link.label,
-                    ReferralClick.suspicious.is_(False),
-                )
-            )
-        ).scalar_one()
+        n, uq = per_channel.get(link.label, (0, 0))
         out.append(
             {
                 "id": str(link.id),
-                "label": link.label,
-                "clicks": raw,
-                "unique_clicks": unique,
-                "url": f"/r/{profile.ref_code}?src={link.label}",
+                "channel": link.label,
+                "clicks": n,
+                "unique_clicks": uq,
+                "requests": per_attr.get(link.label, 0),
+                "url": f"/r/{profile.ref_code}?s={link.label}",
             }
         )
     return out
 
 
-async def delete_link(db: AsyncSession, marketer_id: uuid.UUID, link_id: uuid.UUID) -> None:
+async def delete_channel_link(
+    db: AsyncSession, marketer_id: uuid.UUID, channel: str
+) -> None:
+    """Remove a channel link by its whitelisted channel name."""
+    row = (
+        await db.execute(
+            select(ReferralLink).where(
+                ReferralLink.marketer_id == marketer_id,
+                ReferralLink.label == normalize_channel(channel),
+            )
+        )
+    ).scalar_one_or_none()
+    if row is not None:
+        await db.delete(row)
+        await db.flush()
+
+
+async def channel_stats_for(db: AsyncSession, profile: MarketerProfile) -> list[dict]:
+    """Per-whitelisted-channel rollup for the marketer dashboard — channels
+    with zero activity still show (so the link builder is discoverable)."""
+    click_rows = (
+        await db.execute(
+            select(
+                ReferralClick.link_label,
+                func.count(ReferralClick.id),
+                func.count(func.distinct(ReferralClick.visitor_hash)),
+            )
+            .where(
+                ReferralClick.ref_code == profile.ref_code,
+                ReferralClick.suspicious.is_(False),
+            )
+            .group_by(ReferralClick.link_label)
+        )
+    ).all()
+    per_channel = {lab: (n, uq) for lab, n, uq in click_rows}
+    attr_rows = (
+        await db.execute(
+            select(
+                ReferralAttribution.channel,
+                func.count(ReferralAttribution.id),
+            )
+            .where(ReferralAttribution.marketer_id == profile.id)
+            .group_by(ReferralAttribution.channel)
+        )
+    ).all()
+    per_attr = {ch: n for ch, n in attr_rows}
+    linked = {
+        r.label
+        for r in (
+            await db.execute(
+                select(ReferralLink).where(ReferralLink.marketer_id == profile.id)
+            )
+        ).scalars()
+    }
+    out = []
+    for ch in CHANNELS:
+        n, uq = per_channel.get(ch, (0, 0))
+        out.append(
+            {
+                "channel": ch,
+                "clicks": n,
+                "unique_clicks": uq,
+                "requests": per_attr.get(ch, 0),
+                "linked": ch in linked,
+                "url": f"/r/{profile.ref_code}?s={ch}",
+            }
+        )
+    return out
+
+
+async def delete_link(
+    db: AsyncSession, marketer_id: uuid.UUID, link_id: uuid.UUID
+) -> None:
     row = (
         await db.execute(
             select(ReferralLink).where(
@@ -306,9 +514,11 @@ async def attribution_block_reason(
     if user is not None and user.id == profile.user_id:
         return "self_referral"
     marketer_user = await db.get(User, profile.user_id)
-    if marketer_user is not None and marketer_user.phone and normalize_phone(
-        marketer_user.phone
-    ) == phone:
+    if (
+        marketer_user is not None
+        and marketer_user.phone
+        and normalize_phone(marketer_user.phone) == phone
+    ):
         return "self_referral"
     prior_q = select(func.count(ConsultationRequest.id)).where(
         ConsultationRequest.phone == phone
@@ -330,9 +540,12 @@ async def attribute(
     ip: str,
     ua: str,
     flag: str = "",
+    consent: bool = False,
+    channel: str = "",
 ) -> ReferralAttribution:
     """Immutable attribution — unique per request. `flag='review'` keeps the
-    row for admin triage but blocks commission accrual until cleared."""
+    row for admin triage; without `consent` no commission accrues and the
+    client's name stays hidden from the marketer."""
     attr = ReferralAttribution(
         marketer_id=profile.id,
         request_type=request_type,
@@ -341,6 +554,8 @@ async def attribute(
         ip=ip[:45],
         user_agent=ua[:300],
         flag=flag,
+        channel=normalize_channel(channel),
+        consent_at=datetime.now(UTC) if consent else None,
     )
     db.add(attr)
     await db.flush()

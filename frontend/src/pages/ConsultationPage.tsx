@@ -91,43 +91,45 @@ export function ConsultationPage() {
         <div className="container">
           <Reveal delay={140}>
             <div className="consult-layout">
-            {/* direct-contact rail — premium firm pattern: channels beside the form */}
-            <aside className="consult-aside" aria-label={F.direct.title}>
-              <h2 className="consult-aside__title">{F.direct.title}</h2>
-              <ul className="consult-aside__list" role="list">
-                {people.map((l) => (
-                  <li key={l.id}>
-                    <a className="consult-aside__row" href={`tel:${l.resume.phone}`}>
-                      <span className="consult-aside__icon" aria-hidden="true">
-                        <Phone size={18} />
-                      </span>
-                      <span className="consult-aside__meta">
-                        <span className="consult-aside__who">{l.name}</span>
-                        <span className="consult-aside__what">{F.direct.callLabel}</span>
-                      </span>
-                      <span className="consult-aside__value" dir="ltr">
-                        {l.resume.phone}
-                      </span>
-                    </a>
-                  </li>
-                ))}
-                {contact.email ? (
-                  <li>
-                    <a className="consult-aside__row" href={`mailto:${contact.email}`}>
-                      <span className="consult-aside__icon" aria-hidden="true">
-                        <Mail size={18} />
-                      </span>
-                      <span className="consult-aside__meta">
-                        <span className="consult-aside__who">{F.direct.emailLabel}</span>
-                        <span className="consult-aside__what" dir="ltr">{contact.email}</span>
-                      </span>
-                    </a>
-                  </li>
-                ) : null}
-              </ul>
-              <p className="consult-aside__note">{consultationPage.note}</p>
-              <p className="consult-aside__privacy">{F.direct.privacy}</p>
-            </aside>
+              {/* direct-contact rail — premium firm pattern: channels beside the form */}
+              <aside className="consult-aside" aria-label={F.direct.title}>
+                <h2 className="consult-aside__title">{F.direct.title}</h2>
+                <ul className="consult-aside__list" role="list">
+                  {people.map((l) => (
+                    <li key={l.id}>
+                      <a className="consult-aside__row" href={`tel:${l.resume.phone}`}>
+                        <span className="consult-aside__icon" aria-hidden="true">
+                          <Phone size={18} />
+                        </span>
+                        <span className="consult-aside__meta">
+                          <span className="consult-aside__who">{l.name}</span>
+                          <span className="consult-aside__what">{F.direct.callLabel}</span>
+                        </span>
+                        <span className="consult-aside__value" dir="ltr">
+                          {l.resume.phone}
+                        </span>
+                      </a>
+                    </li>
+                  ))}
+                  {contact.email ? (
+                    <li>
+                      <a className="consult-aside__row" href={`mailto:${contact.email}`}>
+                        <span className="consult-aside__icon" aria-hidden="true">
+                          <Mail size={18} />
+                        </span>
+                        <span className="consult-aside__meta">
+                          <span className="consult-aside__who">{F.direct.emailLabel}</span>
+                          <span className="consult-aside__what" dir="ltr">
+                            {contact.email}
+                          </span>
+                        </span>
+                      </a>
+                    </li>
+                  ) : null}
+                </ul>
+                <p className="consult-aside__note">{consultationPage.note}</p>
+                <p className="consult-aside__privacy">{F.direct.privacy}</p>
+              </aside>
 
               <div className="consult-form-wrap">
                 <h2 className="consult-form-wrap__title">{F.title}</h2>

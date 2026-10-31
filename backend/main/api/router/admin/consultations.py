@@ -55,16 +55,20 @@ async def detail(request_id: uuid.UUID, _: SupportDep, db: DbDep) -> Consultatio
     out = ConsultationOut.model_validate(row)
     # post-migration the unified thread already contains legacy notes
     unified = (
-        await db.execute(
-            select(RequestMessage)
-            .where(
-                RequestMessage.request_type == "consultation",
-                RequestMessage.request_id == request_id,
-                RequestMessage.is_note.is_(True),
+        (
+            await db.execute(
+                select(RequestMessage)
+                .where(
+                    RequestMessage.request_type == "consultation",
+                    RequestMessage.request_id == request_id,
+                    RequestMessage.is_note.is_(True),
+                )
+                .order_by(RequestMessage.created_at)
             )
-            .order_by(RequestMessage.created_at)
         )
-    ).scalars().all()
+        .scalars()
+        .all()
+    )
     out.notes = [
         NoteOut(id=m.id, author_id=m.sender_id, body=m.body, created_at=m.created_at)
         for m in unified
@@ -87,14 +91,21 @@ async def patch(
     before = {"status": row.status, "assigned_to": str(row.assigned_to or "")}
     if "status" in data and data["status"] != row.status:
         await thread_svc.set_status(
-            db, "consultation", row, data.pop("status"),
-            actor=user, reason=data.pop("reason", "") or "",
+            db,
+            "consultation",
+            row,
+            data.pop("status"),
+            actor=user,
+            reason=data.pop("reason", "") or "",
         )
     data.pop("reason", None)
     for field, value in data.items():
         setattr(row, field, value)
     await audit(
-        db, actor=user, action="consultation.update", entity="consultation",
+        db,
+        actor=user,
+        action="consultation.update",
+        entity="consultation",
         entity_id=row.id,
         before=before,
         after={"status": row.status, "assigned_to": str(row.assigned_to or "")},
@@ -115,9 +126,13 @@ async def add_note(
     if row is None:
         raise HTTPException(404, {"code": "not_found", "message": "درخواست یافت نشد."})
     msg = await thread_svc.add_message(
-        db, "consultation", row.id,
-        sender_type="staff", sender_id=user.id,
-        body=payload.body, is_note=True,
+        db,
+        "consultation",
+        row.id,
+        sender_type="staff",
+        sender_id=user.id,
+        body=payload.body,
+        is_note=True,
     )
     await db.commit()
     return NoteOut(

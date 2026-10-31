@@ -15,6 +15,7 @@ from .prompts import (
     knowledge_block,
     sanitize_chunk,
 )
+from .render import sanitize_display_text
 from .retrieval import search_knowledge
 from .schemas import ChatIn, ChatOut
 
@@ -25,9 +26,7 @@ async def _get_or_create_conversation(
     if session_key:
         conv = (
             await db.execute(
-                select(AIConversation).where(
-                    AIConversation.session_key == session_key
-                )
+                select(AIConversation).where(AIConversation.session_key == session_key)
             )
         ).scalar_one_or_none()
         if conv is not None:
@@ -121,7 +120,9 @@ def _retrieval_fallback(sources) -> str:
     if not sources:
         return FALLBACK_REPLY
     top = sources[0]
-    body = top.body.strip()
+    body = sanitize_display_text(top.body).strip()
+    if not body:
+        return FALLBACK_REPLY
     if len(body) > 900:
         body = body[:900].rsplit(" ", 1)[0] + "…"
     return f"بر اساس اطلاعات سایت ({top.title}):\n\n{body}"

@@ -17,8 +17,7 @@ export default function LawyersPage() {
   });
 
   const toggle = useMutation({
-    mutationFn: (l: LawyerOut) =>
-      api.patch(`/admin/lawyers/${l.id}`, { is_visible: !l.is_visible }),
+    mutationFn: (l: LawyerOut) => api.patch(`/admin/lawyers/${l.id}`, { is_visible: !l.is_visible }),
     onSuccess: () => qc.invalidateQueries({ queryKey: ["admin-lawyers"] }),
     onError: (e) => toast("error", e instanceof Error ? e.message : "خطا"),
   });
@@ -40,9 +39,7 @@ export default function LawyersPage() {
       <div className="flex items-center justify-between">
         <div>
           <h1 className="text-lg font-semibold">مدیریت وکلا</h1>
-          <p className="mt-0.5 text-[13px] text-ink-1/60">
-            افزودن، ویرایش و مدیریت نمایش وکلای سایت
-          </p>
+          <p className="mt-0.5 text-[13px] text-ink-1/60">افزودن، ویرایش و مدیریت نمایش وکلای سایت</p>
         </div>
         <Link to="/content/lawyers/new" className="btn-gold">
           <Plus size={16} /> وکیل جدید

@@ -11,6 +11,7 @@ import sys
 
 from sqlalchemy import func, select
 
+from .core.config import get_settings
 from .db.session import SessionFactory
 from .models.user import Role, User
 from .security.passwords import hash_password
@@ -65,12 +66,19 @@ def main() -> int:
     b.add_argument("--name", default="مدیر مجموعه")
     b.add_argument("--email", default="")
 
-    sub.add_parser("seed", help="idempotent content + role seed")
+    sub.add_parser("seed", help="idempotent content + role seed (dev / explicit only)")
+    sub.add_parser(
+        "roles", help="idempotent RBAC roles only — needed for login to work"
+    )
+    sub.add_parser("seed-dev", help="fake demo data — NEVER in production")
 
     args = p.parse_args()
     if args.cmd == "bootstrap-admin":
-        return asyncio.run(_bootstrap_admin(args.username, args.password, args.name, args.email))
+        return asyncio.run(
+            _bootstrap_admin(args.username, args.password, args.name, args.email)
+        )
     if args.cmd == "seed":
+
         async def _run() -> int:
             async with SessionFactory() as db:
                 counts = await run_seed(db)
@@ -78,6 +86,26 @@ def main() -> int:
             return 0
 
         return asyncio.run(_run())
+    if args.cmd == "roles":
+
+        async def _roles() -> int:
+            from .seed import _seed_roles
+
+            async with SessionFactory() as db:
+                await _seed_roles(db)
+                await db.commit()
+            print("roles ready")
+            return 0
+
+        return asyncio.run(_roles())
+    if args.cmd == "seed-dev":
+        if get_settings().environment == "production":
+            print("error: seed-dev is disabled in production", file=sys.stderr)
+            return 2
+        from .seed_dev import main as dev_main
+
+        dev_main()
+        return 0
     return 1
 
 

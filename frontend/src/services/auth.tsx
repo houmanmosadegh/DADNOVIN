@@ -4,14 +4,7 @@
  * accordingly.
  */
 
-import {
-  createContext,
-  useCallback,
-  useContext,
-  useEffect,
-  useState,
-  type ReactNode,
-} from 'react'
+import { createContext, useCallback, useContext, useEffect, useState, type ReactNode } from 'react'
 import { api } from './api'
 
 export interface AccountMe {
@@ -91,7 +84,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
       setMe(out)
       return out
     },
-    [],
+    []
   )
 
   const logout = useCallback(async () => {
@@ -103,8 +96,6 @@ export function AuthProvider({ children }: { children: ReactNode }) {
   }, [])
 
   return (
-    <AuthCtx.Provider value={{ me, loading, refresh, login, register, logout }}>
-      {children}
-    </AuthCtx.Provider>
+    <AuthCtx.Provider value={{ me, loading, refresh, login, register, logout }}>{children}</AuthCtx.Provider>
   )
 }

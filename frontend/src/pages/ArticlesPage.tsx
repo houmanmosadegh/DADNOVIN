@@ -4,7 +4,7 @@ import { ArrowLeft } from 'lucide-react'
 import { Reveal } from '../components/Reveal'
 import { SectionWave } from '../components/SectionWave'
 import { articlesPage as T } from '../content/lawyers.fa.js'
-import { api } from '../services/api'
+import { api, apiAsset } from '../services/api'
 import { useSeo } from '../utils/seo'
 import './pages.css'
 import './ArticlesPage.css'
@@ -13,15 +13,18 @@ export interface ArticleItem {
   slug: string
   title: string
   excerpt: string
+  category: string
+  tags: string[]
+  author_name: string
+  read_time_min: number
+  featured_image: string
   published_at: string | null
 }
 
 export function fmtDate(iso: string | null) {
   if (!iso) return ''
   try {
-    return new Intl.DateTimeFormat('fa-IR', { dateStyle: 'long' }).format(
-      new Date(iso),
-    )
+    return new Intl.DateTimeFormat('fa-IR', { dateStyle: 'long' }).format(new Date(iso))
   } catch {
     return ''
   }
@@ -73,18 +76,25 @@ export function ArticlesPage() {
                 <li key={a.slug}>
                   <Reveal delay={i * 70}>
                     <Link to={`/articles/${a.slug}`} className="articles__card">
-                      <h2 className="articles__card-title">{a.title}</h2>
-                      {a.excerpt ? (
-                        <p className="articles__card-excerpt">{a.excerpt}</p>
+                      {a.featured_image ? (
+                        <img
+                          className="articles__card-img"
+                          src={apiAsset(`/api/v1/media/${a.featured_image}`)}
+                          alt=""
+                          loading="lazy"
+                          decoding="async"
+                        />
                       ) : null}
+                      {a.category ? <span className="articles__card-cat">{a.category}</span> : null}
+                      <h2 className="articles__card-title">{a.title}</h2>
+                      {a.excerpt ? <p className="articles__card-excerpt">{a.excerpt}</p> : null}
                       <span className="articles__card-foot">
-                        {a.published_at ? (
-                          <time dateTime={a.published_at}>
-                            {fmtDate(a.published_at)}
-                          </time>
-                        ) : (
-                          <span />
-                        )}
+                        <span className="articles__card-meta">
+                          {a.published_at ? (
+                            <time dateTime={a.published_at}>{fmtDate(a.published_at)}</time>
+                          ) : null}
+                          {a.read_time_min ? <em>{a.read_time_min} دقیقه</em> : null}
+                        </span>
                         <span className="articles__card-more">
                           {T.readMore}
                           <ArrowLeft size={15} aria-hidden="true" />

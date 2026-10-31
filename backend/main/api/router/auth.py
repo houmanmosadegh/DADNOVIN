@@ -21,7 +21,9 @@ DbDep = Annotated[AsyncSession, Depends(get_db)]
 
 
 @router.post("/login")
-async def login(payload: LoginIn, request: Request, response: Response, db: DbDep) -> MeOut:
+async def login(
+    payload: LoginIn, request: Request, response: Response, db: DbDep
+) -> MeOut:
     """Verify credentials and set the HttpOnly session cookie."""
     settings = get_settings()
     limiter.check("login", client_key(request), settings.rate_limit_login_per_minute)
@@ -32,7 +34,10 @@ async def login(payload: LoginIn, request: Request, response: Response, db: DbDe
     # generic message — do not reveal whether the account exists
     generic = HTTPException(
         status_code=401,
-        detail={"code": "bad_credentials", "message": "نام کاربری یا رمز عبور نادرست است."},
+        detail={
+            "code": "bad_credentials",
+            "message": "نام کاربری یا رمز عبور نادرست است.",
+        },
     )
     if user is None or not user.is_active:
         raise generic
@@ -55,7 +60,12 @@ async def login(payload: LoginIn, request: Request, response: Response, db: DbDe
         path="/",
     )
     await audit(
-        db, actor=user, action="auth.login", entity="session", entity_id=session.id, request=request
+        db,
+        actor=user,
+        action="auth.login",
+        entity="session",
+        entity_id=session.id,
+        request=request,
     )
     await db.commit()
     return MeOut.model_validate(user)

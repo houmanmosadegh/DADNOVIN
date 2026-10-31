@@ -18,14 +18,7 @@ function initialsOf(name: string): string {
 }
 
 /** Editorial lawyer row — media block overlapping a text column. */
-export function LawyerCard({
-  name,
-  title,
-  portrait,
-  specialties,
-  bio,
-  flip = false,
-}: LawyerCardProps) {
+export function LawyerCard({ name, title, portrait, specialties, bio, flip = false }: LawyerCardProps) {
   const [imgFailed, setImgFailed] = useState(false)
   const showImage = Boolean(portrait) && !imgFailed
 

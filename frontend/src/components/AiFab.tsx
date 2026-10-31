@@ -66,13 +66,10 @@ export function AiFab() {
     setBusy(true)
     setMsgs((m) => [...m, { id: nextId.current++, from: 'user', text }])
     try {
-      const res = await api.post<{ reply: string; session_key: string }>(
-        '/ai/chat',
-        {
-          session_key: sessionKey.current,
-          messages: [{ role: 'user', content: text }],
-        },
-      )
+      const res = await api.post<{ reply: string; session_key: string }>('/ai/chat', {
+        session_key: sessionKey.current,
+        messages: [{ role: 'user', content: text }],
+      })
       sessionKey.current = res.session_key
       try {
         localStorage.setItem(SESSION_KEY, res.session_key)
@@ -145,10 +142,7 @@ export function AiFab() {
                   </p>
                 ))}
                 {busy ? (
-                  <p
-                    className="ai-chat__msg ai-chat__msg--ai ai-chat__msg--typing"
-                    aria-live="polite"
-                  >
+                  <p className="ai-chat__msg ai-chat__msg--ai ai-chat__msg--typing" aria-live="polite">
                     …
                   </p>
                 ) : null}

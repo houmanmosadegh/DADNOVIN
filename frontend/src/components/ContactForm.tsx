@@ -35,8 +35,7 @@ export function ContactForm() {
   const [sendFailed, setSendFailed] = useState(false)
 
   const subjectLabel =
-    F.fields.subjects.find((s: { value: string; label: string }) => s.value === subject)
-      ?.label ?? ''
+    F.fields.subjects.find((s: { value: string; label: string }) => s.value === subject)?.label ?? ''
 
   const buildSummary = () =>
     [
@@ -68,17 +67,14 @@ export function ContactForm() {
     const text = buildSummary()
     setSubmitting(true)
     try {
-      const created = await api.post<{ ticket_number: string; access_code: string }>(
-        '/tickets',
-        {
-          requester_name: name.trim(),
-          requester_phone: phone.trim(),
-          subject: subjectLabel || subject,
-          category: subject,
-          body: message.trim(),
-          website: honey,
-        },
-      )
+      const created = await api.post<{ ticket_number: string; access_code: string }>('/tickets', {
+        requester_name: name.trim(),
+        requester_phone: phone.trim(),
+        subject: subjectLabel || subject,
+        category: subject,
+        body: message.trim(),
+        website: honey,
+      })
       setTicket({ number: created.ticket_number, code: created.access_code })
     } catch {
       setSendFailed(true)
@@ -92,15 +88,12 @@ export function ContactForm() {
   if (summary !== null) {
     return (
       <div className="cform__result" role="status">
-        <h2 className="cform__result-title">
-          {ticket ? F.readyTitle : 'پیام شما آماده شد'}
-        </h2>
+        <h2 className="cform__result-title">{ticket ? F.readyTitle : 'پیام شما آماده شد'}</h2>
         {ticket ? (
           <>
             <p className="cform__result-text">{F.readyText}</p>
             <p className="cform__ticket">
-              شمارهٔ تیکت: <b dir="ltr">{ticket.number}</b> — کد پیگیری:{' '}
-              <b dir="ltr">{ticket.code}</b>
+              شمارهٔ تیکت: <b dir="ltr">{ticket.number}</b> — کد پیگیری: <b dir="ltr">{ticket.code}</b>
             </p>
           </>
         ) : sendFailed ? (
@@ -114,19 +107,11 @@ export function ContactForm() {
           {summary}
         </pre>
         <div className="cform__result-actions">
-          <button
-            type="button"
-            className="btn btn--primary"
-            onClick={() => void copy(summary)}
-          >
+          <button type="button" className="btn btn--primary" onClick={() => void copy(summary)}>
             {copied ? <Check size={17} aria-hidden="true" /> : <ClipboardCopy size={17} aria-hidden="true" />}
             {copied ? F.copied : F.copyAction}
           </button>
-          <button
-            type="button"
-            className="btn btn--ghost"
-            onClick={() => setSummary(null)}
-          >
+          <button type="button" className="btn btn--ghost" onClick={() => setSummary(null)}>
             {F.edit}
           </button>
           {ticket ? (
