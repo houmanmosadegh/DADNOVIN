@@ -14,7 +14,7 @@ dependencies = [
     "sqlalchemy[asyncio]==2.0.44",
     "alembic==1.17.2",
     "asyncpg==0.31.0",
-    "pydantic==2.12.5",
+    "pydantic==2.14.1",
     "pydantic-settings==2.14.2",
     "argon2-cffi==25.1.0",
     "pillow==13.0.0",
