@@ -1,11 +1,15 @@
-"""QR codes + the downloadable silver marketer card.
+"""QR codes + the branded marketer card.
 
 QR: error-correction Q, ≥4-module quiet zone, own-domain URL only.
-Card: matte silver ~300 DPI PNG/PDF with the office logo, white QR tile,
-ref code and the marketer's name — Persian text reshaped + BiDi-ordered.
+Card: the static brand template (`assets/cards/dadnovin-card-template.png`)
+with a light rounded plaque + dark QR composited into the empty gold box.
+Box geometry lives in `assets/cards/card-template.json`; composed cards are
+cached under <storage>/cards keyed by URL + template mtime.
 """
 
+import hashlib
 import io
+import json
 from pathlib import Path
 
 import arabic_reshaper
@@ -16,21 +20,18 @@ from sqlalchemy.ext.asyncio import AsyncSession
 
 from ..core.config import get_settings
 from ..models.account import MarketerProfile
-from ..models.content import SiteSetting
-from ..models.media import MediaAsset
 from ..models.user import User
 
-_ASSETS = Path(__file__).resolve().parent.parent / "assets" / "fonts"
-_FONT_BODY = _ASSETS / "Estedad-Var.ttf"
-_FONT_DISPLAY = _ASSETS / "Lalezar.ttf"
-
-# ~300dpi business card (20×12.5cm ≈ 2362×1476 px)
-CARD_W, CARD_H = 2362, 1476
+_ASSETS = Path(__file__).resolve().parent.parent / "assets"
+_FONT_BODY = _ASSETS / "fonts" / "Estedad-Var.ttf"
+_FONT_DISPLAY = _ASSETS / "fonts" / "Lalezar.ttf"
+_CARDS_DIR = _ASSETS / "cards"
+_CARD_CFG = json.loads((_CARDS_DIR / "card-template.json").read_text("utf-8"))
+_TEMPLATE = _CARDS_DIR / _CARD_CFG["template"]
 
 _INK = (41, 37, 36)  # warm near-black
-_MUTED = (94, 87, 79)
-_GOLD = (122, 90, 28)  # deep bronze — legible on silver
-_TILE = (255, 255, 255)
+
+_CACHE_VERSION = "v2"
 
 
 def _font(size: int, display: bool = False, wght: int = 400) -> ImageFont.FreeTypeFont:
@@ -86,109 +87,69 @@ def qr_pdf(url: str, buf: io.BytesIO) -> None:
     page.save(buf, "PDF", resolution=300.0)
 
 
-async def _brand_logo(db: AsyncSession) -> Image.Image | None:
-    row = await db.get(SiteSetting, "brand")
-    file_id = (row.value or {}).get("logoFileId") if row else None
-    if not file_id:
-        return None
-    asset = await db.get(MediaAsset, file_id)
-    if asset is None:
-        return None
-    from .media import media_path
+def render_card(qr_url: str) -> Image.Image:
+    """Brand template + light plaque + dark QR inside the empty gold box."""
+    box = _CARD_CFG["qr_box"]
+    pl = _CARD_CFG["plaque"]
+    inset = box["inner_border_inset"]
 
-    path = media_path(asset)
-    if not path.exists():
-        return None
-    try:
-        return Image.open(path).convert("RGBA")
-    except Exception:
-        return None
+    card = Image.open(_TEMPLATE).convert("RGB")
 
+    # inner safe area = box minus its inner gold border
+    ix, iy = box["x"] + inset, box["y"] + inset
+    iw, ih = box["w"] - 2 * inset, box["h"] - 2 * inset
 
-def _metal_base(w: int, h: int) -> Image.Image:
-    """Matte silver — a soft vertical gradient + hairline edge, no glow."""
-    base = Image.new("RGB", (w, h))
-    top, bottom = (236, 237, 240), (198, 201, 207)
-    for y in range(h):
-        t = y / (h - 1)
-        base.paste(
-            tuple(round(a + (b - a) * t) for a, b in zip(top, bottom)),
-            (0, y, w, y + 1),
-        )
-    d = ImageDraw.Draw(base)
-    d.rectangle((26, 26, w - 26, h - 26), outline=(168, 172, 179), width=3)
-    d.rectangle((34, 34, w - 34, h - 34), outline=(215, 217, 222), width=2)
-    return base
-
-
-def render_card(
-    logo: Image.Image | None,
-    marketer_name: str,
-    ref_code: str,
-    site_url: str,
-    qr_url: str,
-) -> Image.Image:
-    """Compose the card — all drawing in LTR space (x grows rightward)."""
-    card = _metal_base(CARD_W, CARD_H)
-    d = ImageDraw.Draw(card)
-
-    # white QR tile, right side of the card (visual centre for the eye)
-    qr = qr_image(qr_url, scale=14, border=4)
-    tile = 78  # padding around the QR inside the tile
-    tw, th = qr.width + 2 * tile, qr.height + 2 * tile
-    tx, ty = CARD_W - tw - 140, (CARD_H - th) // 2
-    d.rounded_rectangle((tx, ty, tx + tw, ty + th), radius=36, fill=_TILE)
-    card.paste(qr, (tx + tile, ty + tile))
-
-    # left column — logo/wordmark, name, code, url
-    lx = 170
-    cy = CARD_H // 2
-    if logo is not None:
-        lh = 340
-        lr = lh / logo.height
-        lg = logo.resize((int(logo.width * lr), lh), Image.LANCZOS)
-        card.paste(lg, (lx, cy - lh - 40), lg)
-    else:
-        d.text((lx, cy - 330), _fa("دادنوین"), font=_font(150, display=True), fill=_INK)
-
-    d.text(
-        (lx, cy - 90),
-        _fa(marketer_name or "بازاریاب همکار"),
-        font=_font(76, wght=700),
-        fill=_INK,
+    # plaque sits inside the inner border with proportional padding
+    pp = round(min(iw, ih) * pl["padding_ratio"])
+    px0, py0 = ix + pp, iy + pp
+    px1, py1 = ix + iw - pp, iy + ih - pp
+    radius = round((px1 - px0) * pl["radius_ratio"])
+    plaque = Image.new("RGBA", (px1 - px0, py1 - py0), (0, 0, 0, 0))
+    ImageDraw.Draw(plaque).rounded_rectangle(
+        (0, 0, plaque.width, plaque.height), radius=radius, fill=pl["fill"]
     )
-    d.text((lx, cy + 30), _fa("کد معرف"), font=_font(52), fill=_MUTED)
-    # ref code in latin — LTR box
-    code_f = _font(96, wght=700)
-    d.text((lx, cy + 150), ref_code, font=code_f, fill=_GOLD)
-    d.text(
-        (lx, CARD_H - 220),
-        site_url.replace("https://", "").replace("http://", ""),
-        font=_font(56),
-        fill=_MUTED,
+    card.paste(plaque, (px0, py0), plaque)
+
+    # QR fills the plaque minus its own padding — always ≥ configured size
+    qp = round(plaque.width * pl["qr_padding_ratio"])
+    target = plaque.width - 2 * qp
+    qr = qr_image(
+        qr_url,
+        scale=max(1, round(target / 21)),
+        border=_CARD_CFG["qr"]["quiet_zone_modules"],
     )
-    d.text(
-        (lx, CARD_H - 320),
-        _fa("گروه حقوقی دادنوین"),
-        font=_font(48, display=True),
-        fill=_MUTED,
-    )
+    if qr.width != target:
+        qr = qr.resize((target, target), Image.LANCZOS)
+    card.paste(qr, (px0 + qp, py0 + qp))
     return card
+
+
+def _cache_dir() -> Path:
+    d = Path(get_settings().storage_dir) / "cards"
+    d.mkdir(parents=True, exist_ok=True)
+    return d
+
+
+def _cache_key(url: str) -> str:
+    raw = f"{_CACHE_VERSION}|{url}|{_TEMPLATE.stat().st_mtime_ns}"
+    return hashlib.sha256(raw.encode()).hexdigest()[:24]
 
 
 async def card_png(
     db: AsyncSession, prof: MarketerProfile, user: User, url: str, buf: io.BytesIO
 ) -> None:
-    logo = await _brand_logo(db)
-    site = get_settings().public_base_url
-    card = render_card(logo, user.full_name or user.username, prof.ref_code, site, url)
-    card.save(buf, "PNG", optimize=True, dpi=(300, 300))
+    path = _cache_dir() / f"{_cache_key(url)}.png"
+    if not path.exists():
+        card = render_card(url)
+        card.save(path, "PNG", optimize=True, dpi=(300, 300))
+    buf.write(path.read_bytes())
 
 
 async def card_pdf(
     db: AsyncSession, prof: MarketerProfile, user: User, url: str, buf: io.BytesIO
 ) -> None:
-    logo = await _brand_logo(db)
-    site = get_settings().public_base_url
-    card = render_card(logo, user.full_name or user.username, prof.ref_code, site, url)
-    card.save(buf, "PDF", resolution=300.0)
+    path = _cache_dir() / f"{_cache_key(url)}.pdf"
+    if not path.exists():
+        card = render_card(url)
+        card.save(path, "PDF", resolution=300.0)
+    buf.write(path.read_bytes())

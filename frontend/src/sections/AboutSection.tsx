@@ -10,8 +10,6 @@ const PRINCIPLE_ICONS: Record<string, LucideIcon> = {
   'shield-check': ShieldCheck,
 }
 
-const faNum = new Intl.NumberFormat('fa-IR', { minimumIntegerDigits: 2 })
-
 export function AboutSection() {
   const { about } = home
   return (
@@ -19,7 +17,7 @@ export function AboutSection() {
       <div className="container about__grid">
         <div className="about__side">
           <Reveal>
-            <ChapterHead index="۰۱" eyebrow="گروه حقوقی دادنوین" title={about.title} id="about-title" />
+            <ChapterHead eyebrow="گروه حقوقی دادنوین" title={about.title} id="about-title" />
           </Reveal>
           <Reveal delay={90}>
             <div className="about__body">
@@ -55,9 +53,6 @@ export function AboutSection() {
               <li key={item.title}>
                 <Reveal delay={i * 110} variant="x-end">
                   <div className="ledger__row">
-                    <span className="ledger__no" aria-hidden="true">
-                      {faNum.format(i + 1)}
-                    </span>
                     <div className="ledger__main">
                       <h3 className="ledger__title">{item.title}</h3>
                       <p className="ledger__text">{item.text}</p>

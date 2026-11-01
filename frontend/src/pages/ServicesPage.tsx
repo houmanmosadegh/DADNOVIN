@@ -78,11 +78,8 @@ export function ServicesPage() {
           <Reveal>
             <h2 className="how-strip__heading">{servicesPage.stepsTitle}</h2>
             <ol className="how-strip" role="list">
-              {consultationPage.steps.map((step, i) => (
+              {consultationPage.steps.map((step) => (
                 <li key={step.title} className="how-strip__item">
-                  <span className="how-strip__no" aria-hidden="true">
-                    {new Intl.NumberFormat('fa-IR').format(i + 1)}
-                  </span>
                   <div>
                     <h3 className="how-strip__title">{step.title}</h3>
                     <p className="how-strip__text">{step.text}</p>

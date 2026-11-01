@@ -23,6 +23,7 @@ from pydantic import BaseModel, Field
 from sqlalchemy import and_, func, or_, select
 from sqlalchemy.ext.asyncio import AsyncSession
 
+from ....core.config import get_settings
 from ....db.session import get_db
 from ....models.account import (
     CaseFeeReceipt,
@@ -294,6 +295,27 @@ async def profile_referrals(db: DbDep, profile_id: uuid.UUID) -> list[dict]:
                 )
         out.append(item)
     return out
+
+
+@router.get("/{profile_id}/card.png")
+async def profile_card_png(db: DbDep, profile_id: uuid.UUID) -> Response:
+    """Admin preview of a marketer's branded referral card (same render as theirs)."""
+    from ....services import cards
+
+    prof = await db.get(MarketerProfile, profile_id)
+    if prof is None:
+        raise HTTPException(404, {"code": "not_found", "message": "بازاریاب یافت نشد."})
+    user = await db.get(User, prof.user_id)
+    if user is None:
+        raise HTTPException(404, {"code": "not_found", "message": "کاربر یافت نشد."})
+    buf = io.BytesIO()
+    url = f"{get_settings().public_base_url}/r/{prof.ref_code}"
+    await cards.card_png(db, prof, user, url, buf)
+    return Response(
+        buf.getvalue(),
+        media_type="image/png",
+        headers={"Content-Disposition": 'inline; filename="card.png"'},
+    )
 
 
 @router.get("/{profile_id}/commissions")

@@ -966,7 +966,8 @@ async def marketer_qr_pdf(
 
 @router.get("/marketer/card.png")
 async def marketer_card_png(db: DbDep, user: CurrentUser) -> Response:
-    """Downloadable silver referral card — matte metal, QR tile, ~300 DPI."""
+    """Branded referral card — template + QR in the empty gold box (~300 DPI).
+    Served inline so the panel can preview it; <a download> still saves it."""
     import io
 
     from ...services import cards
@@ -982,7 +983,7 @@ async def marketer_card_png(db: DbDep, user: CurrentUser) -> Response:
     return Response(
         buf.getvalue(),
         media_type="image/png",
-        headers={"Content-Disposition": 'attachment; filename="dadnovin-card.png"'},
+        headers={"Content-Disposition": 'inline; filename="dadnovin-card.png"'},
     )
 
 

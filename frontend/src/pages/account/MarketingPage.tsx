@@ -3,7 +3,19 @@
 
 import { useEffect, useState } from 'react'
 import { useSearchParams } from 'react-router-dom'
-import { BadgePercent, Clock3, Copy, Plus, QrCode, Send, Share2, Trash2, XCircle } from 'lucide-react'
+import {
+  BadgePercent,
+  Clock3,
+  Copy,
+  Download,
+  IdCard,
+  Plus,
+  QrCode,
+  Send,
+  Share2,
+  Trash2,
+  XCircle,
+} from 'lucide-react'
 import { api, apiAsset } from '../../services/api'
 import { useAuth } from '../../services/auth'
 import type { CommissionsView, MarketerHome, MarketerLink, PaymentsView, Referral } from './types'
@@ -215,25 +227,45 @@ function OverviewTab({
           >
             <QrCode size={13} /> QR
           </a>
+        </div>
+        <p className="acc__muted acc__hint">
+          اعتبار کوکی ارجاع {fa(home.cookie_days ?? 30)} روز است — هر بازدیدکننده‌ای که در این بازه ثبت
+          درخواست کند به شما منسوب می‌شود.
+        </p>
+      </div>
+
+      {/* کارت من — قالب برند + QR اختصاصی همین بازاریاب */}
+      <div className="acc__card">
+        <h2>
+          <IdCard size={16} /> کارت من
+        </h2>
+        <p className="acc__muted">
+          کارت معرفی اختصاصی شما — QR به لینک ارجاع خودتان وصل است. برای چاپ نسخهٔ PDF را بگیرید.
+        </p>
+        <div className="acc__mycard">
+          <img
+            src={apiAsset('/api/v1/account/marketer/card.png')}
+            alt={`کارت معرفی ${home.ref_code}`}
+            loading="lazy"
+            decoding="async"
+          />
+        </div>
+        <div className="acc__share">
           <a
-            className="btn btn--ghost btn--sm"
+            className="btn btn--primary btn--sm"
             href={apiAsset('/api/v1/account/marketer/card.png')}
             download={`card-${home.ref_code}.png`}
           >
-            کارت معرفی (PNG)
+            <Download size={13} /> دانلود PNG
           </a>
           <a
             className="btn btn--ghost btn--sm"
             href={apiAsset('/api/v1/account/marketer/card.pdf')}
             download={`card-${home.ref_code}.pdf`}
           >
-            کارت چاپی (PDF)
+            <Download size={13} /> دانلود PDF (چاپی)
           </a>
         </div>
-        <p className="acc__muted acc__hint">
-          اعتبار کوکی ارجاع {fa(home.cookie_days ?? 30)} روز است — هر بازدیدکننده‌ای که در این بازه ثبت
-          درخواست کند به شما منسوب می‌شود.
-        </p>
       </div>
 
       {/* آمار به تفکیک کانال */}

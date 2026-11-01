@@ -59,7 +59,7 @@ export function HeroSection() {
           <h1 id="hero-title" className="hero__title">
             <AccentTitle text={home.hero.title} accent={home.hero.titleAccent} />
           </h1>
-          <span className="hero__rule" aria-hidden="true" />
+
           <p className="hero__hook">{home.hero.hook}</p>
           <p className="hero__subtitle">{home.hero.subtitle}</p>
           <div className="hero__ctas">

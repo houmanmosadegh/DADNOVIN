@@ -105,16 +105,7 @@
   letter-spacing: 0;
   text-shadow: none; /* emboss is for dark bands — panel is light */
 }
-/* short gradient rule — in-flow, under the whole title */
-.hero__rule {
-  display: block;
-  width: 56px;
-  height: 3px;
-  margin-top: 1.25rem; /* ← 20px under the H1 */
-  border-radius: 2px;
-  background: linear-gradient(90deg, rgb(122 92 22 / 0.9), rgb(212 168 75 / 0.95));
-}
-/* the hook — one strong line between rule and subtitle, set off by
+/* the hook — one strong line under the title, set off by
    a gold bar so it reads as a pull-quote, not body copy */
 .hero-panel .hero__hook {
   margin-top: 1.5rem; /* ← 24px under the rule */
@@ -478,7 +469,6 @@
   }
 }
 .hero__title,
-.hero__rule,
 .hero__hook,
 .hero__subtitle,
 .hero__ctas,
@@ -488,11 +478,8 @@
 .hero__title {
   animation-delay: 0.08s;
 }
-.hero__rule {
-  animation-delay: 0.16s;
-}
 .hero__hook {
-  animation-delay: 0.22s;
+  animation-delay: 0.16s;
 }
 .hero__subtitle {
   animation-delay: 0.3s;
@@ -553,14 +540,6 @@
 }
 .ledger__row:hover {
   background: rgb(var(--gold-rgb) / 0.04);
-}
-.ledger__no {
-  flex: none;
-  font-size: 1.65rem;
-  font-weight: 700;
-  line-height: 1.35;
-  color: transparent;
-  -webkit-text-stroke: 1px rgb(var(--gold-rgb) / 0.45);
 }
 .ledger__main {
   flex: 1;

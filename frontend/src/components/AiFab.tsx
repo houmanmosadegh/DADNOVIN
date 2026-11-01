@@ -9,12 +9,8 @@ import './AiFab.css'
 type Msg = { id: number; from: 'ai' | 'user'; text: string }
 
 const SESSION_KEY = 'dn_ai_session'
-/**
- * Public AI consultant is not wired to the backend yet — the panel renders
- * a «به‌زودی» state. Flip to true once /ai/chat is ready for the public site;
- * the chat flow (send(), session key, message list) is already in place.
- */
-const AI_LIVE = false
+/** /ai/chat streams SSE deltas — the panel appends them as they arrive. */
+const AI_LIVE = true
 
 /**
  * Floating AI-consultant button + chat panel — backed by the site's
@@ -64,22 +60,64 @@ export function AiFab() {
     if (!text || busy) return
     setDraft('')
     setBusy(true)
+    const history = msgs
+      .slice(-10)
+      .map((m) => ({ role: m.from === 'user' ? 'user' : 'assistant', content: m.text }))
     setMsgs((m) => [...m, { id: nextId.current++, from: 'user', text }])
-    try {
-      const res = await api.post<{ reply: string; session_key: string }>('/ai/chat', {
-        session_key: sessionKey.current,
-        messages: [{ role: 'user', content: text }],
-      })
-      sessionKey.current = res.session_key
-      try {
-        localStorage.setItem(SESSION_KEY, res.session_key)
-      } catch {
-        /* private mode */
+    const aiId = nextId.current++
+    let started = false
+    const push = (t: string) => {
+      if (!started) {
+        started = true
+        setMsgs((m) => [...m, { id: aiId, from: 'ai', text: t }])
+      } else {
+        setMsgs((m) => m.map((x) => (x.id === aiId ? { ...x, text: x.text + t } : x)))
       }
-      setMsgs((m) => [...m, { id: nextId.current++, from: 'ai', text: res.reply }])
+    }
+    try {
+      const res = await api.postStream('/ai/chat', {
+        session_key: sessionKey.current,
+        messages: [...history, { role: 'user', content: text }],
+      })
+      if (!res.ok || !res.body) throw new Error(`http ${res.status}`)
+      const reader = res.body.getReader()
+      const decoder = new TextDecoder()
+      let buf = ''
+      for (;;) {
+        const { done, value } = await reader.read()
+        if (done) break
+        buf += decoder.decode(value, { stream: true })
+        let i = buf.indexOf('\n\n')
+        while (i >= 0) {
+          const block = buf.slice(0, i)
+          buf = buf.slice(i + 2)
+          for (const line of block.split('\n')) {
+            if (!line.startsWith('data:')) continue
+            try {
+              const ev = JSON.parse(line.slice(5).trim())
+              if (ev.type === 'meta') {
+                sessionKey.current = ev.session_key
+                try {
+                  localStorage.setItem(SESSION_KEY, ev.session_key)
+                } catch {
+                  /* private mode */
+                }
+              } else if (ev.type === 'delta') {
+                push(ev.text)
+              } else if (ev.type === 'error') {
+                push(started ? `\n\n${ev.message}` : ev.message)
+              }
+            } catch {
+              /* malformed event line — skip */
+            }
+          }
+          i = buf.indexOf('\n\n')
+        }
+      }
+      if (!started) throw new Error('empty stream')
     } catch {
       // offline/API down — honest canned fallback, not a fake AI answer
-      setMsgs((m) => [...m, { id: nextId.current++, from: 'ai', text: c.reply }])
+      if (!started) setMsgs((m) => [...m, { id: aiId, from: 'ai', text: c.reply }])
     } finally {
       setBusy(false)
     }
@@ -148,12 +186,7 @@ export function AiFab() {
                 ) : null}
               </>
             ) : (
-              <>
-                <p className="ai-chat__msg ai-chat__msg--ai">{c.welcome}</p>
-                <p className="ai-chat__soon" aria-hidden="true">
-                  {c.soon}
-                </p>
-              </>
+              <p className="ai-chat__msg ai-chat__msg--ai">{c.welcome}</p>
             )}
             <Link className="ai-chat__cta" to={aiConsultant.to} onClick={() => setOpen(false)}>
               {c.cta}

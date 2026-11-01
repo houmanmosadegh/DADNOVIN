@@ -62,7 +62,7 @@ erDiagram
 | `contact_requests` | درخواست‌های تماس — مدیریت یکپارچه با consultations در admin |
 | `request_messages` / `request_events` | رشته‌ی پیام و تایم‌لاین رویداد برای همه‌ی انواع درخواست |
 | `request_labels` / `labels` | برچسب‌گذاری درخواست‌ها در ادمین |
-| `case_fee_receipts` | فیش‌های حق‌الوکاله دریافتی از موکل (تومان، ≥0) — مبنای کمیسیون |
+| `case_fee_receipts` | فیش‌های حق‌الوکاله دریافتی از موکل (تومان، ≥0) — مبنای کمیسیون؛ `file_id` → `media_assets` (فیش بانکی خصوصی، SET NULL) |
 | `marketer_applications` | درخواست عضویت بازاریاب + نسخه‌ی قوانین پذیرفته‌شده |
 | `marketer_profiles` | بازاریاب تأییدشده — ref_code یکتا، بانک رمزنگاری‌شده، custom_rate 0..100 |
 | `marketing_terms` | متن قوانین بازاریابی — نسخه‌بندی append-only |

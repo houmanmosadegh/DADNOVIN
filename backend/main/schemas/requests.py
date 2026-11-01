@@ -116,6 +116,8 @@ class RequestPatchIn(BaseModel):
     priority: str | None = None
     assigned_to: UUID | None = None
     label_ids: list[UUID] | None = None
+    # agreed case price (تومان) — consultation only; editable anytime
+    fee_amount: int | None = Field(default=None, ge=0)
 
     @field_validator("priority")
     @classmethod

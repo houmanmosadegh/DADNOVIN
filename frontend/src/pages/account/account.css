@@ -1480,6 +1480,18 @@ a.acc__stat:hover .acc__stat-ico {
   margin-block-start: 0.8rem;
 }
 
+.acc__mycard {
+  margin-block-start: 0.9rem;
+  max-width: 34rem;
+}
+.acc__mycard img {
+  display: block;
+  width: 100%;
+  height: auto;
+  border-radius: 0.75rem;
+  border: 1px solid rgb(var(--gold-rgb) / 0.28);
+}
+
 .acc__hint {
   display: block;
   font-size: 0.88rem;

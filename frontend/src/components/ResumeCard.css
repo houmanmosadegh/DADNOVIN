@@ -172,12 +172,7 @@
   font-weight: 700;
   color: var(--color-gold);
 }
-.rcard__sec-title::after {
-  content: '';
-  flex: 1;
-  height: 1px;
-  background: linear-gradient(to left, rgb(var(--gold-rgb) / 0.4), rgb(var(--gold-rgb) / 0.06));
-}
+
 .rcard__cols {
   columns: 2;
   column-gap: 1.4rem;

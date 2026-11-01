@@ -44,13 +44,23 @@ class Settings(BaseSettings):
     # OpenAPI docs — disable in production
     expose_docs: bool = True
 
-    # AI provider — OpenAI-compatible chat-completions endpoint.
+    # LLM provider — OpenRouter (OpenAI-compatible chat completions).
     # Empty api key ⇒ assistant runs in retrieval-only "unavailable" mode.
-    ai_base_url: str = "https://api.openai.com/v1"
-    ai_api_key: str = ""
-    ai_model: str = "gpt-4o-mini"
+    llm_api_key: str = ""
+    llm_base_url: str = "https://openrouter.ai/api/v1"
+    # comma-separated model fallback chain — update via LLM_MODELS env as
+    # OpenRouter's free tier rotates; only zero-cost (:free) models belong here
+    llm_models: str = (
+        "nvidia/nemotron-3-ultra-550b-a55b:free,"
+        "thinkingmachines/inkling:free,"
+        "google/gemma-4-31b-it:free,"
+        "nvidia/nemotron-3.5-super-vl:free,"
+        "openrouter/free"
+    )
+    llm_history_messages: int = 16  # keep last N user/assistant turns
+    llm_cooldown_seconds: int = 120  # skip a failing model this long
     ai_enabled: bool = True
-    ai_timeout_seconds: float = 20.0
+    ai_timeout_seconds: float = 25.0  # connect + first-token budget per model
     ai_max_reply_chars: int = 1800
 
     # outbound notifications — mock|smtp|sms_http provider for customer replies
@@ -89,8 +99,12 @@ class Settings(BaseSettings):
         return [o.strip() for o in self.cors_origins.split(",") if o.strip()]
 
     @property
+    def llm_model_list(self) -> list[str]:
+        return [m.strip() for m in self.llm_models.split(",") if m.strip()]
+
+    @property
     def ai_configured(self) -> bool:
-        return self.ai_enabled and bool(self.ai_api_key)
+        return self.ai_enabled and bool(self.llm_api_key) and bool(self.llm_model_list)
 
 
 @lru_cache

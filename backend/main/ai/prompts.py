@@ -61,4 +61,7 @@ FALLBACK_REPLY = (
     "می‌توانید از فرم «درخواست مشاوره» یا شماره‌های صفحهٔ تماس استفاده کنید."
 )
 
+# returned verbatim when every configured LLM model fails (spec wording)
+BUSY_REPLY = "الان سرویس شلوغ است، لطفاً کمی بعد تلاش کنید."
+
 GROUNDING_NOTE = "برای تحلیل دقیق پرونده، حتماً با وکیل مشاوره کنید."

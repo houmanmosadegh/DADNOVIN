@@ -36,9 +36,9 @@ services:
       BOOTSTRAP_ADMIN_NAME: ${BOOTSTRAP_ADMIN_NAME:-مدیر مجموعه}
       BOOTSTRAP_ADMIN_EMAIL: ${BOOTSTRAP_ADMIN_EMAIL:-}
       AI_ENABLED: ${AI_ENABLED:-true}
-      AI_BASE_URL: ${AI_BASE_URL:-https://api.openai.com/v1}
-      AI_API_KEY: ${AI_API_KEY:-}
-      AI_MODEL: ${AI_MODEL:-gpt-4o-mini}
+      LLM_API_KEY: ${LLM_API_KEY:-}
+      LLM_BASE_URL: ${LLM_BASE_URL:-https://openrouter.ai/api/v1}
+      LLM_MODELS: ${LLM_MODELS:-nvidia/nemotron-3-ultra-550b-a55b:free,thinkingmachines/inkling:free,google/gemma-4-31b-it:free,nvidia/nemotron-3.5-super-vl:free,openrouter/free}
       # content seed — dev convenience; production compose leaves this off
       SEED_ON_BOOT: ${SEED_ON_BOOT:-true}
     volumes:

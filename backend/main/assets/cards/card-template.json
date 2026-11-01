@@ -1,0 +1,26 @@
+{
+  "template": "dadnovin-card-template.png",
+  "size": [1559, 1009],
+  "qr_box": {
+    "comment": "empty gold frame, left side — outer edge of the double-line border",
+    "x": 118,
+    "y": 256,
+    "w": 434,
+    "h": 425,
+    "inner_border_inset": 12,
+    "comment2": "inner gold line ≈12px inside the outer — plaque must stay within it"
+  },
+  "plaque": {
+    "comment": "light rounded plaque inside inner border, then QR on top",
+    "padding_ratio": 0.065,
+    "fill": "#F6F3EC",
+    "radius_ratio": 0.09,
+    "qr_padding_ratio": 0.10
+  },
+  "qr": {
+    "error_correction": "q",
+    "quiet_zone_modules": 4,
+    "dark": "#1C1917",
+    "min_px": 350
+  }
+}

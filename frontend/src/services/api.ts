@@ -51,6 +51,14 @@ export const api = {
     request<T>(path, { method: 'PATCH', body: JSON.stringify(body) }),
   put: <T>(path: string, body: unknown) => request<T>(path, { method: 'PUT', body: JSON.stringify(body) }),
   del: <T>(path: string) => request<T>(path, { method: 'DELETE' }),
+  /** Raw POST for SSE endpoints — caller reads res.body as an event stream. */
+  postStream: (path: string, body: unknown) =>
+    fetch(`${BASE}${path}`, {
+      method: 'POST',
+      credentials: 'include',
+      headers: { 'Content-Type': 'application/json', 'X-Requested-With': 'fetch' },
+      body: JSON.stringify(body),
+    }),
 }
 
 /** Absolute URL for API-hosted assets (media files) — handles cross-origin dev. */

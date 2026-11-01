@@ -285,43 +285,14 @@ img {
   top: 0.75rem;
 }
 
-/* ---------- Chapter headers (numbered editorial sections) ---------- */
+/* ---------- Chapter headers (editorial sections) ---------- */
 .chapter-head {
-  display: flex;
-  align-items: flex-start;
-  gap: clamp(1rem, 2.4vw, 1.6rem);
   max-width: 56rem;
 }
-.chapter-head__no {
-  flex: none;
-  margin-top: 0.45rem;
-  font-size: clamp(2.3rem, 1.6rem + 2.2vw, 3.4rem);
-  font-weight: 700;
-  line-height: 1;
-  color: transparent;
-  -webkit-text-stroke: 1px rgb(var(--gold-rgb) / 0.5);
-}
 .chapter-head__eyebrow {
-  display: inline-flex;
-  align-items: center;
-  gap: 0.65rem;
   font-size: 0.8125rem;
   font-weight: 600;
   letter-spacing: 0.03em;
-  color: var(--color-gold);
-}
-.chapter-head__eyebrow::before {
-  content: '';
-  width: 1.6rem;
-  height: 1px;
-  background: var(--color-gold);
-  opacity: 0.7;
-}
-/* inline chapter number used inside standalone eyebrows (picture / cta-band) */
-.chapter-head__eyebrow .chapter-head__no {
-  margin-top: 0;
-  font-size: 1rem;
-  -webkit-text-stroke: 0;
   color: var(--color-gold);
 }
 .chapter-head__title {
@@ -330,22 +301,6 @@ img {
   font-weight: 400;
   line-height: 1.5;
   text-wrap: balance;
-}
-/* gold underline drawn under the title on section entrance */
-.chapter-head__title::after {
-  content: '';
-  display: block;
-  width: 3.4rem;
-  height: 2px;
-  margin-top: 0.7rem;
-  border-radius: 2px;
-  background: linear-gradient(90deg, var(--color-gold), rgb(var(--gold-rgb) / 0));
-  transform: scaleX(0);
-  transform-origin: right center;
-  transition: transform 0.6s var(--ease-out) 0.3s;
-}
-.reveal.is-visible .chapter-head__title::after {
-  transform: scaleX(1);
 }
 .chapter-head__lead {
   margin-top: 0.9rem;
@@ -366,19 +321,20 @@ img {
   align-items: center;
   justify-content: center;
   gap: 0.55rem;
-  min-height: 48px;
-  padding: 0.9rem 2rem;
+  min-height: 46px;
+  padding: 0.78rem 1.9rem;
   border: 0;
   border-radius: 12px;
   font-family: inherit;
-  font-size: 0.95rem;
-  font-weight: 800;
+  font-size: 0.94rem;
+  font-weight: 700;
   line-height: 1.4;
   cursor: pointer;
   overflow: hidden;
+  text-decoration: none;
   transition:
-    transform 0.18s ease,
-    box-shadow 0.18s ease,
+    transform 0.22s var(--ease-out),
+    box-shadow 0.28s var(--ease-out),
     filter 0.18s ease;
 }
 /* shine sweep — travels right→left, matching the RTL reading direction */
@@ -386,20 +342,20 @@ img {
   content: '';
   position: absolute;
   inset: 0;
-  background: linear-gradient(115deg, transparent 35%, rgb(255 255 255 / 0.35) 50%, transparent 65%);
+  background: linear-gradient(115deg, transparent 38%, rgb(255 255 255 / 0.18) 50%, transparent 62%);
   transform: translateX(120%);
-  transition: transform 0.6s ease;
+  transition: transform 0.7s ease;
   pointer-events: none;
 }
 .btn:hover::after {
   transform: translateX(-120%);
 }
 .btn:hover {
-  transform: translateY(-2px);
+  transform: translateY(-1px);
 }
 .btn:active {
-  transform: translateY(4px);
-  filter: brightness(0.95);
+  transform: translateY(0);
+  filter: brightness(0.96);
 }
 .btn:focus-visible {
   outline: 3px solid #d4a84b;
@@ -412,30 +368,41 @@ img {
   cursor: not-allowed;
   transform: none;
 }
+/* forward-direction arrow (RTL: left) — nudges outward on hover */
+.btn__arrow {
+  flex: none;
+  margin-inline-start: 0.1rem;
+  transition: transform 0.22s var(--ease-out);
+}
+.btn:hover .btn__arrow {
+  transform: translateX(-4px);
+}
 
 /* navy plate — the primary on light surfaces (hero panel, light bands) */
 .btn--primary,
 .btn-navy {
   color: #f1e7c8;
-  background: linear-gradient(180deg, #2a3a63 0%, #1a2547 55%, #0f1731 100%);
+  background: linear-gradient(180deg, #26375f 0%, #1a2547 60%, #131d3c 100%);
   box-shadow:
-    inset 0 1px 0 rgb(255 255 255 / 0.18),
-    inset 0 -2px 0 rgb(0 0 0 / 0.3),
-    0 6px 0 #070b1a,
-    0 14px 24px rgb(10 14 30 / 0.35);
+    inset 0 1px 0 rgb(255 255 255 / 0.14),
+    inset 0 -1px 0 rgb(0 0 0 / 0.2),
+    0 1px 2px rgb(10 14 30 / 0.22),
+    0 10px 24px rgb(10 14 30 / 0.22);
 }
 .btn--primary:hover,
 .btn-navy:hover {
+  filter: brightness(1.08);
   box-shadow:
-    inset 0 1px 0 rgb(255 255 255 / 0.18),
-    0 8px 0 #070b1a,
-    0 18px 30px rgb(10 14 30 / 0.4);
+    inset 0 1px 0 rgb(255 255 255 / 0.16),
+    inset 0 -1px 0 rgb(0 0 0 / 0.2),
+    0 2px 4px rgb(10 14 30 / 0.2),
+    0 14px 32px rgb(10 14 30 / 0.3);
 }
 .btn--primary:active,
 .btn-navy:active {
   box-shadow:
-    inset 0 2px 4px rgb(0 0 0 / 0.35),
-    0 2px 0 #070b1a;
+    inset 0 2px 5px rgb(0 0 0 / 0.3),
+    0 2px 8px rgb(10 14 30 / 0.25);
 }
 
 /* molten gold — only inside dark bands / dark cards, never on bone
@@ -445,51 +412,50 @@ img {
   .btn--primary:not(.btn-navy):not(.hero-panel *),
 :is(.dark-panel, .contact-card, .svc, .sg-card, .rcard) .btn--primary:not(.btn-navy) {
   color: #1a1408;
-  background: linear-gradient(180deg, #f6e3a1 0%, #d4a84b 50%, #b88a32 100%);
-  text-shadow: 0 1px 0 rgb(255 255 255 / 0.3);
+  background: linear-gradient(180deg, #f0d68f 0%, #d4a84b 55%, #c1903a 100%);
   box-shadow:
-    inset 0 1px 0 rgb(255 255 255 / 0.5),
-    inset 0 -2px 0 rgb(0 0 0 / 0.15),
-    0 6px 0 #7a5a1c,
-    0 14px 24px rgb(0 0 0 / 0.35),
-    0 0 24px rgb(212 168 75 / 0.25);
+    inset 0 1px 0 rgb(255 255 255 / 0.45),
+    inset 0 -1px 0 rgb(0 0 0 / 0.12),
+    0 1px 2px rgb(0 0 0 / 0.3),
+    0 10px 28px rgb(212 168 75 / 0.22);
 }
 :is(.band--ink, .band--navy, .band--goldblack, .band--goldwhite, .acc)
   .btn--primary:not(.btn-navy):not(.hero-panel *):hover,
 :is(.dark-panel, .contact-card, .svc, .sg-card, .rcard) .btn--primary:not(.btn-navy):hover {
+  filter: brightness(1.06);
   box-shadow:
     inset 0 1px 0 rgb(255 255 255 / 0.5),
-    0 8px 0 #7a5a1c,
-    0 18px 30px rgb(0 0 0 / 0.4),
-    0 0 32px rgb(212 168 75 / 0.4);
+    inset 0 -1px 0 rgb(0 0 0 / 0.12),
+    0 2px 4px rgb(0 0 0 / 0.28),
+    0 14px 36px rgb(212 168 75 / 0.32);
 }
 :is(.band--ink, .band--navy, .band--goldblack, .band--goldwhite, .acc)
   .btn--primary:not(.btn-navy):not(.hero-panel *):active,
 :is(.dark-panel, .contact-card, .svc, .sg-card, .rcard) .btn--primary:not(.btn-navy):active {
   box-shadow:
-    inset 0 2px 4px rgb(0 0 0 / 0.25),
-    0 2px 0 #7a5a1c;
+    inset 0 2px 5px rgb(0 0 0 / 0.22),
+    0 2px 8px rgb(0 0 0 / 0.3);
 }
 
 /* ghost — dark hairline on light surfaces, light hairline on dark */
 .btn--ghost {
   background: transparent;
   color: #14161a;
-  border: 1.5px solid rgb(20 22 26 / 0.45);
-  box-shadow: 0 3px 0 rgb(20 22 26 / 0.12);
+  border: 1px solid rgb(20 22 26 / 0.35);
 }
 .btn--ghost:hover {
-  border-color: rgb(20 22 26 / 0.7);
+  border-color: rgb(20 22 26 / 0.6);
+  background: rgb(20 22 26 / 0.04);
 }
 :is(.band--ink, .band--navy, .band--goldblack, .band--goldwhite, .acc) .btn--ghost:not(.hero-panel *),
 :is(.dark-panel, .contact-card, .svc, .sg-card, .rcard) .btn--ghost {
   color: #e9e4d6;
-  border-color: rgb(233 228 214 / 0.45);
-  box-shadow: 0 3px 0 rgb(0 0 0 / 0.35);
+  border-color: rgb(233 228 214 / 0.35);
 }
 :is(.band--ink, .band--navy, .band--goldblack, .band--goldwhite, .acc) .btn--ghost:not(.hero-panel *):hover,
 :is(.dark-panel, .contact-card, .svc, .sg-card, .rcard) .btn--ghost:hover {
-  border-color: rgb(233 228 214 / 0.75);
+  border-color: rgb(233 228 214 / 0.65);
+  background: rgb(233 228 214 / 0.06);
 }
 
 /* ---------- Section reveal ---------- */

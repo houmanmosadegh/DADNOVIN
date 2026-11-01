@@ -324,6 +324,7 @@ function MarketerDetail({ profile }: { profile: ProfileOut }) {
   const [payFile, setPayFile] = useState<File | null>(null);
   const [revealed, setRevealed] = useState<{ account_name: string; iban: string; card: string } | null>(null);
   const [copied, setCopied] = useState(false);
+  const [showCard, setShowCard] = useState(false);
 
   const q = useQuery({
     queryKey: ["marketer-detail", profile.id],
@@ -421,8 +422,28 @@ function MarketerDetail({ profile }: { profile: ProfileOut }) {
           >
             چرخش کد
           </button>
+          <button className="btn-ghost btn-sm" onClick={() => setShowCard((v) => !v)}>
+            {showCard ? "بستن کارت" : "کارت معرفی"}
+          </button>
         </div>
       </div>
+      {showCard && (
+        <div className="rounded-lg border border-gold-1/30 p-3">
+          <img
+            src={`/api/v1/admin/marketers/${profile.id}/card.png`}
+            alt={`کارت معرفی ${profile.ref_code}`}
+            loading="lazy"
+            className="w-full rounded-md"
+          />
+          <a
+            className="btn-ghost btn-sm mt-2 inline-flex"
+            href={`/api/v1/admin/marketers/${profile.id}/card.png`}
+            download={`card-${profile.ref_code}.png`}
+          >
+            دانلود PNG
+          </a>
+        </div>
+      )}
 
       {/* payment registration */}
       {payable > 0 && (

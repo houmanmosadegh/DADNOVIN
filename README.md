@@ -58,7 +58,10 @@ docker compose exec api python -m main.cli bootstrap-admin \
 | `PUBLIC_BASE_URL` | origin مطلق سایت — در لینک ارجاع/QR | `http://localhost:8080` |
 | `HTTP_PORT` | پورت gateway | `8080` |
 | `PAYOUT_ENC_KEY` | کلید AES-256-GCM بانک (fallback: مشتق از SECRET_KEY) | خالی |
-| `AI_ENABLED` / `AI_API_KEY` / `AI_BASE_URL` / `AI_MODEL` | دستیار AI — بدون کلید، حالت retrieval-only | `true` / خالی |
+| `AI_ENABLED` | سوییچ کلی دستیار AI | `true` |
+| `LLM_API_KEY` / `LLM_BASE_URL` | اتصال OpenRouter — بدون کلید، حالت retrieval-only | خالی / `https://openrouter.ai/api/v1` |
+| `LLM_MODELS` | زنجیرهٔ fallback مدل‌ها (کاما-separated، فقط `:free`) — از `/api/v1/models` اوپن‌روتر به‌روز کنید | ۵ مدل پیش‌فرض |
+| `LLM_COOLDOWN_SECONDS` / `LLM_HISTORY_MESSAGES` | کول‌داون مدلِ خطادار (۶۰–۳۰۰ثانیه) / سقف تاریخچهٔ گفتگو | `120` / `16` |
 | `BOOTSTRAP_ADMIN_*` | ساخت خودکار ادمین ران اول (اختیاری — CLI ترجیح دارد) | خالی |
 | `SEED_ON_BOOT` | سید محتوای اولیه در استارت | `false` |
 | `UVICORN_WORKERS` | تعداد ورکر | `1` (prod: `2`) |
@@ -75,9 +78,9 @@ docker compose exec api python -m main.cli bootstrap-admin \
 ├── backend/
 │   ├── main/          api/router · services · repositories · models · schemas
 │   │                  security · ai · core (config/rate-limit) · seed·cli
-│   ├── alembic/       زنجیره‌ی migration (0001→0012، idempotent)
+│   ├── alembic/       زنجیره‌ی migration (0001→0013، idempotent)
 │   ├── seed/          site_content.json (محتوای واقعی سایت)
-│   └── tests/         ۱۰۱ تست pytest
+│   └── tests/         ۱۱۳ تست pytest
 ├── infrastructure/nginx/   gateway/web/panel server blocks
 ├── scripts/           backup.sh · restore.sh
 ├── docs/              architecture · database(ERD) · api · deployment · referral
@@ -106,7 +109,7 @@ make seed-dev       # داده‌ی دموی ساختگی — فقط توسعه 
 | `make bootstrap-admin U=.. P=..` | ساخت super_admin |
 | `make backup` / `make restore FILE=..` | dump/restore دیتابیس |
 
-تست‌ها: `cd backend && python -m pytest -q` (۱۰۱ تست) ·
+تست‌ها: `cd backend && python -m pytest -q` (۱۱۳ تست) ·
 `cd frontend && npm test` (۲۳ تست) · `frontend/e2e` سناریوهای Playwright
 (به مرورگر محلی نیاز دارد).
 

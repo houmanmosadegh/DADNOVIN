@@ -35,12 +35,7 @@ export function PictureSection() {
         {/* text column — از سمت چپ (مقابل تصویر) وارد می‌شود */}
         <Reveal variant="x-end" className="picture__text">
           <div className="picture__copy">
-            <span className="chapter-head__eyebrow">
-              <span className="chapter-head__no" aria-hidden="true">
-                ۰۲
-              </span>
-              {picture.eyebrow}
-            </span>
+            <span className="chapter-head__eyebrow">{picture.eyebrow}</span>
             <h2 id="picture-title" className="picture__title">
               {picture.title}
             </h2>

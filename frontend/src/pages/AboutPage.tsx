@@ -24,11 +24,7 @@ export function AboutPage() {
             <header className="page__head">
               <h1 className="page__title">{aboutPage.title}</h1>
               <p className="page__lead">{aboutPage.lead}</p>
-              <p className="about-hero__motto">
-                <span className="about-hero__rule" aria-hidden="true" />
-                {aboutPage.tagline}
-                <span className="about-hero__rule" aria-hidden="true" />
-              </p>
+              <p className="about-hero__motto">{aboutPage.tagline}</p>
             </header>
           </Reveal>
 

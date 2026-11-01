@@ -59,6 +59,24 @@ privacy-safe فقط نام (در صورت رضایت)، وضعیت قراردا�
   به‌ترتیب قدیم‌ترین allocate می‌شود (`payout_id` + `status=paid`).
 - بیشتر از مانده ⇒ 409. تخصیص و پرداخت در یک تراکنش انجام می‌شود.
 
+## صفحه‌ی پرونده در پنل ادمین
+
+- در صفحه‌ی جزئیات هر مشاوره، کارت «بازاریاب» نام و کد معرف را نشان می‌دهد
+  (خودکار از `ReferralAttribution`؛ اگر ردیف ارجاع نباشد ولی `ref_code`/
+  `referrer_id` روی پرونده باشد، fallback همان را نشان می‌دهد).
+- ثبت دریافتی: مبلغ + فیش واریزی اختیاری (JPG/PNG/WebP/PDF،
+  `purpose=receipt` — خصوصی). فایل اول با
+  `POST /requests/consultation/{id}/fee-receipts/file` آپلود و `file_id` آن
+  در POST رسید می‌آید؛ دانلود با `GET /admin/fee-receipts/{id}/file`.
+- اتصال/تغییر دستی معرف برای پشتیبانی/ادمین (بدون نیاز به super_admin):
+  `GET /admin/referral-marketers` (لیست مینیمال بازاریاب‌های فعال) و
+  `POST /requests/consultation/{id}/referral` — همان منطق
+  `/marketers/referrals/attach` (reassign با audit کامل).
+- «قیمت توافق‌شدهٔ پرونده» (`consultation_requests.fee_amount`) هر زمان با
+  `PATCH /requests/{rtype}/{id}` {fee_amount} یا موقع پذیرش (`StatusIn`)
+  قابل ویرایش است — مبنای درصدی کمیسیون نیست (مبنا فقط فیش‌های دریافتی‌ست)
+  و صرفاً مرجع مبلغ قرارداد است.
+
 ## ملاحظات حقوقی/حریمی
 
 - بدون رضایت صریح، هیچ داده‌ی شناسایی موکل به بازاریاب نمی‌رسد.

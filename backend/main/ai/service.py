@@ -1,14 +1,16 @@
 """Assistant orchestration: retrieve → guard → generate → persist."""
 
 import uuid
+from collections.abc import AsyncIterator
 
 from sqlalchemy import select
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from ..core.config import get_settings
 from ..models.ai import AIConversation, AIMessage
-from .provider import ProviderError, chat_complete
+from .provider import ProviderError, chat_complete, chat_stream
 from .prompts import (
+    BUSY_REPLY,
     FALLBACK_REPLY,
     GROUNDING_NOTE,
     SYSTEM_PROMPT,
@@ -17,7 +19,7 @@ from .prompts import (
 )
 from .render import sanitize_display_text
 from .retrieval import search_knowledge
-from .schemas import ChatIn, ChatOut
+from .schemas import ChatIn
 
 
 async def _get_or_create_conversation(
@@ -37,6 +39,20 @@ async def _get_or_create_conversation(
     return conv
 
 
+def _build_messages(settings, context: str, history: list[dict] | None) -> list[dict]:
+    """System prompt + knowledge block + last N sanitized turns (spec: 10–20)."""
+    messages = [
+        {"role": "system", "content": SYSTEM_PROMPT},
+        {"role": "system", "content": context},
+    ]
+    for m in (history or [])[-settings.llm_history_messages :]:
+        content = sanitize_chunk(m.get("content", ""))
+        role = m.get("role", "user")
+        if content and role in {"user", "assistant"}:
+            messages.append({"role": role, "content": content})
+    return messages
+
+
 async def generate_reply(
     db: AsyncSession, user_text: str, history: list[dict] | None = None
 ) -> tuple[str, str, list[str]]:
@@ -47,16 +63,8 @@ async def generate_reply(
 
     reply: str
     provider: str
-    if settings.ai_configured and settings.ai_enabled:
-        messages = [
-            {"role": "system", "content": SYSTEM_PROMPT},
-            {"role": "system", "content": context},
-        ]
-        for m in (history or [])[-8:]:
-            content = sanitize_chunk(m.get("content", ""))
-            role = m.get("role", "user")
-            if content and role in {"user", "assistant"}:
-                messages.append({"role": role, "content": content})
+    if settings.ai_configured:
+        messages = _build_messages(settings, context, history)
         try:
             reply = await chat_complete(settings, messages)
             provider = "model"
@@ -92,27 +100,70 @@ async def consultation_draft(
     return reply
 
 
-async def answer(db: AsyncSession, payload: ChatIn) -> ChatOut:
-    conv = await _get_or_create_conversation(db, payload.session_key)
+async def stream_answer(db: AsyncSession, payload: ChatIn) -> AsyncIterator[dict]:
+    """SSE event stream for /ai/chat: meta → delta* → done|error.
 
+    Persists the user message up front and the full assistant reply after the
+    stream ends; the router commits once the generator completes. When every
+    model fails, the polite BUSY_REPLY is sent instead — provider internals
+    and model names never reach the client.
+    """
+    settings = get_settings()
+    conv = await _get_or_create_conversation(db, payload.session_key)
     last_user = next(
         (m.content for m in reversed(payload.messages) if m.role == "user"), ""
     )
-
     db.add(AIMessage(conversation_id=conv.id, role="user", content=last_user))
+    await db.flush()
 
-    reply, provider, source_titles = await generate_reply(
-        db, last_user, [m.model_dump() for m in payload.messages]
-    )
+    sources = await search_knowledge(db, last_user)
+    yield {
+        "type": "meta",
+        "session_key": conv.session_key,
+        "sources": [s.title for s in sources][:5],
+    }
+
+    parts: list[str] = []
+    provider = "model"
+    if settings.ai_configured:
+        context = knowledge_block([(s.title, s.body) for s in sources])
+        messages = _build_messages(
+            settings, context, [m.model_dump() for m in payload.messages]
+        )
+        cap = settings.ai_max_reply_chars
+        try:
+            async for delta in chat_stream(settings, messages):
+                parts.append(delta)
+                yield {"type": "delta", "text": delta}
+                if sum(len(p) for p in parts) >= cap:
+                    break
+        except ProviderError:
+            if parts:
+                # mid-stream failure: keep what was shown, end with a clean error
+                yield {"type": "error", "message": BUSY_REPLY}
+            else:
+                provider = "unavailable"
+                parts = [BUSY_REPLY]
+                yield {"type": "delta", "text": BUSY_REPLY}
+    else:
+        provider = "retrieval" if sources else "unavailable"
+        parts = [_retrieval_fallback(sources)]
+        yield {"type": "delta", "text": parts[0]}
+
+    reply = "".join(parts).strip()
+    if (
+        provider != "unavailable"
+        and reply
+        and GROUNDING_NOTE not in reply
+        and len(reply) < settings.ai_max_reply_chars
+    ):
+        note = "\n\n" + GROUNDING_NOTE
+        reply += note
+        yield {"type": "delta", "text": note}
 
     db.add(AIMessage(conversation_id=conv.id, role="assistant", content=reply))
     await db.flush()
-    return ChatOut(
-        reply=reply,
-        session_key=conv.session_key,
-        sources=source_titles[:5],
-        provider=provider,
-    )
+    yield {"type": "done", "provider": provider}
 
 
 def _retrieval_fallback(sources) -> str:

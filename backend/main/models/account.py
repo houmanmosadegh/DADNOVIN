@@ -199,6 +199,10 @@ class CaseFeeReceipt(Base):
     )
     amount: Mapped[int] = mapped_column(BigInteger)  # تومان received by the office
     note: Mapped[str] = mapped_column(String(300), default="")
+    # فیش بانکی — MediaAsset با purpose=receipt (خصوصی)
+    file_id: Mapped[uuid.UUID | None] = mapped_column(
+        Uuid, ForeignKey("media_assets.id", ondelete="SET NULL"), nullable=True
+    )
     created_by: Mapped[uuid.UUID | None] = mapped_column(Uuid, nullable=True)
     created_at: Mapped[datetime] = created_at_col()
 

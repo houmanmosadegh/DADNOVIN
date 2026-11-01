@@ -8,12 +8,7 @@ export function CtaBand() {
       <div className="container cta-band__grid">
         <Reveal>
           <div className="cta-band__copy">
-            <span className="chapter-head__eyebrow">
-              <span className="chapter-head__no" aria-hidden="true">
-                ۰۵
-              </span>
-              گام بعدی
-            </span>
+            <span className="chapter-head__eyebrow">گام بعدی</span>
             <h2 id="cta-band-title" className="cta-band__title">
               مسیر قانونی خود را با اطمینان آغاز کنید
             </h2>

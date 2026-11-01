@@ -299,6 +299,13 @@ export interface RequestDetail {
     sla_due_at: string | null;
     created_at: string;
     updated_at: string;
+    referral?: {
+      attribution_id: string | null;
+      marketer_id: string | null;
+      full_name: string;
+      ref_code: string;
+      flag: string;
+    } | null;
   };
   messages: MessageOut[];
   events: EventOut[];

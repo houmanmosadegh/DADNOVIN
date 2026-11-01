@@ -271,19 +271,6 @@
   }
 }
 
-/* «به‌زودی» — نشان و وضعیت غیرفعال تا زمان اتصال به بک‌اند */
-.ai-chat__soon {
-  display: inline-flex;
-  align-items: center;
-  align-self: flex-start;
-  gap: 0.4rem;
-  padding: 0.3rem 0.85rem;
-  border: 1px solid rgb(var(--gold-rgb) / 0.4);
-  border-radius: 999px;
-  background: rgb(var(--gold-rgb) / 0.1);
-  color: var(--color-gold);
-  font-size: 0.75rem;
-}
 .ai-chat__composer[data-disabled] textarea,
 .ai-chat__composer[data-disabled] .ai-chat__send {
   opacity: 0.55;

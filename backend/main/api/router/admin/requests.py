@@ -3,13 +3,27 @@
 import uuid
 from typing import Annotated
 
-from fastapi import APIRouter, Depends, HTTPException, Query, Request, Response
+from fastapi import (
+    APIRouter,
+    Depends,
+    HTTPException,
+    Query,
+    Request,
+    Response,
+    UploadFile,
+)
+from fastapi.responses import FileResponse
 from pydantic import BaseModel, Field
 from sqlalchemy import select
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from ....db.session import get_db
-from ....models.account import CaseFeeReceipt, Commission
+from ....models.account import (
+    CaseFeeReceipt,
+    Commission,
+    MarketerProfile,
+    ReferralAttribution,
+)
 from ....models.consultation import ConsultationRequest
 from ....models.request_ops import (
     REQUEST_TYPES,
@@ -28,6 +42,7 @@ from ....schemas.common import Page
 from ....services import commissions as commissions_svc
 from ....services import inbox as inbox_svc
 from ....services import notify_user as notify_svc
+from ....services import referrals as referrals_svc
 from ....schemas.requests import (
     DeliveryOut,
     EventOut,
@@ -62,8 +77,10 @@ class FeeReceiptIn(BaseModel):
     """Office's received attorney fee on the case — whole or an installment.
     Each receipt accrues one commission entry for the referring marketer."""
 
-    amount: int = Field(gt=0, le=10_000_000_000_000)  # rials
+    amount: int = Field(gt=0, le=10_000_000_000_000)  # تومان
     note: str = Field(default="", max_length=300)
+    # optional bank-slip file uploaded via …/fee-receipts/file first
+    file_id: uuid.UUID | None = None
 
 
 def _request_dict(row) -> dict:
@@ -196,9 +213,46 @@ async def request_detail(
             )
         )
     ).all()
+    req = _request_dict(row)
+    req["referral"] = None
+    if rtype == "consultation":
+        attr = (
+            await db.execute(
+                select(ReferralAttribution).where(
+                    ReferralAttribution.request_type == "consultation",
+                    ReferralAttribution.request_id == request_id,
+                )
+            )
+        ).scalar_one_or_none()
+        if attr is not None:
+            prof = await db.get(MarketerProfile, attr.marketer_id)
+            muser = await db.get(User, prof.user_id) if prof else None
+            req["referral"] = {
+                "attribution_id": str(attr.id),
+                "marketer_id": str(attr.marketer_id),
+                "full_name": muser.full_name if muser else "",
+                "ref_code": attr.ref_code,
+                "flag": attr.flag,
+            }
+        elif getattr(row, "referrer_id", None) or getattr(row, "ref_code", ""):
+            # پرونده خودش معرف را می‌داند (ثبت با لینک/کد) ولی ردیف ارجاع
+            # ندارد — همان را نشان بده تا ادمین مجبور به انتخاب دستی نباشد.
+            prof = (
+                await db.get(MarketerProfile, row.referrer_id)
+                if row.referrer_id
+                else None
+            )
+            muser = await db.get(User, prof.user_id) if prof else None
+            req["referral"] = {
+                "attribution_id": None,
+                "marketer_id": str(row.referrer_id) if row.referrer_id else None,
+                "full_name": muser.full_name if muser else "",
+                "ref_code": row.ref_code or "",
+                "flag": "",
+            }
     return RequestDetailOut(
         type=rtype,
-        request=_request_dict(row),
+        request=req,
         messages=[MessageOut.model_validate(m) for m in thread["messages"]],
         events=[EventOut.model_validate(e) for e in thread["events"]],
         deliveries=[DeliveryOut.model_validate(d) for d in deliveries],
@@ -360,7 +414,13 @@ async def patch_request(
     db: DbDep,
 ) -> dict:
     row = await thread_svc.load_request(db, rtype, request_id)
-    before = {"priority": row.priority, "assigned_to": str(row.assigned_to or "")}
+    before = {
+        "priority": row.priority,
+        "assigned_to": str(row.assigned_to or ""),
+        "fee_amount": getattr(row, "fee_amount", 0),
+    }
+    if payload.fee_amount is not None and rtype == "consultation":
+        row.fee_amount = payload.fee_amount
     if payload.priority is not None:
         row.priority = payload.priority
     if "assigned_to" in payload.model_fields_set:
@@ -414,6 +474,7 @@ async def patch_request(
         after={
             "priority": row.priority,
             "assigned_to": str(row.assigned_to or ""),
+            "fee_amount": getattr(row, "fee_amount", 0),
         },
         request=request,
     )
@@ -541,6 +602,7 @@ async def fee_receipts(request_id: uuid.UUID, _: SupportDep, db: DbDep) -> dict:
                 "id": str(r.id),
                 "amount": r.amount,
                 "note": r.note,
+                "has_file": r.file_id is not None,
                 "created_at": r.created_at.isoformat(),
             }
             for r in receipts
@@ -575,6 +637,7 @@ async def add_fee_receipt(
         request_id=row.id,
         amount=payload.amount,
         note=payload.note.strip(),
+        file_id=payload.file_id,
         created_by=user.id,
     )
     db.add(receipt)
@@ -608,3 +671,162 @@ async def add_fee_receipt(
         "commission_id": str(comm.id) if comm else None,
         "commission_amount": comm.amount if comm else 0,
     }
+
+
+@router.post("/requests/consultation/{request_id}/fee-receipts/file", status_code=201)
+async def upload_fee_receipt_file(
+    request_id: uuid.UUID,
+    file: UploadFile,
+    request: Request,
+    user: SupportDep,
+    db: DbDep,
+) -> dict:
+    """Upload a bank-slip file (JPG/PNG/WebP/PDF) for a fee receipt — private
+    media (purpose=receipt), never served publicly. Returns file_id to include
+    in the receipt POST."""
+    from ....services import media as media_svc
+
+    await thread_svc.load_request(db, "consultation", request_id)
+    asset = await media_svc.store_upload(db, file, user, purpose="receipt")
+    await audit(
+        db,
+        actor=user,
+        action="fee_receipt.file_upload",
+        entity="consultation",
+        entity_id=request_id,
+        detail={"name": asset.original_name, "size": asset.size_bytes},
+        request=request,
+    )
+    await db.commit()
+    return {"file_id": str(asset.id)}
+
+
+@router.get("/fee-receipts/{receipt_id}/file")
+async def fee_receipt_file(
+    receipt_id: uuid.UUID, _: SupportDep, db: DbDep
+) -> FileResponse:
+    """Admin download of a fee receipt's bank slip (private)."""
+    from ....services import media as media_svc
+
+    receipt = await db.get(CaseFeeReceipt, receipt_id)
+    if receipt is None or receipt.file_id is None:
+        raise HTTPException(404, {"code": "not_found", "message": "فیش یافت نشد."})
+    return await media_svc.file_response(db, receipt.file_id)
+
+
+# ─── case-level referral attribution (support/admin — lighter than the
+# super-admin /marketers management router) ──────────────────────────
+
+
+class ReferralIn(BaseModel):
+    ref_code: str = Field(min_length=4, max_length=24)
+    flag: str = Field(default="", pattern="^(|review)$")
+
+
+@router.get("/referral-marketers")
+async def referral_marketers(_: SupportDep, db: DbDep) -> list[dict]:
+    """Active marketers for the case-attribution picker — minimal fields only."""
+    rows = (
+        await db.execute(
+            select(MarketerProfile, User.full_name)
+            .join(User, User.id == MarketerProfile.user_id)
+            .where(MarketerProfile.is_active.is_(True))
+            .order_by(User.full_name)
+        )
+    ).all()
+    return [
+        {"id": str(p.id), "ref_code": p.ref_code, "full_name": name or ""}
+        for p, name in rows
+    ]
+
+
+@router.post("/requests/consultation/{request_id}/referral", status_code=201)
+async def attach_case_referral(
+    request_id: uuid.UUID,
+    payload: ReferralIn,
+    request: Request,
+    user: SupportDep,
+    db: DbDep,
+) -> dict:
+    """Attach (or reassign) the case's referring marketer from the request
+    page — mirrors /marketers/referrals/attach but for support staff."""
+    case = await thread_svc.load_request(db, "consultation", request_id)
+    prof = (
+        await referrals_svc.resolve_code(db, payload.ref_code)
+        or (
+            await db.execute(
+                select(MarketerProfile).where(
+                    MarketerProfile.ref_code == payload.ref_code.strip().upper()
+                )
+            )
+        ).scalar_one_or_none()
+    )
+    if prof is None or not prof.is_active:
+        raise HTTPException(404, {"code": "not_found", "message": "کد معرف یافت نشد."})
+    existing = (
+        await db.execute(
+            select(ReferralAttribution).where(
+                ReferralAttribution.request_type == "consultation",
+                ReferralAttribution.request_id == case.id,
+            )
+        )
+    ).scalar_one_or_none()
+    if existing is not None:
+        before = {
+            "marketer_id": str(existing.marketer_id),
+            "ref_code": existing.ref_code,
+        }
+        await referrals_svc.reassign(db, existing, prof)
+        if payload.flag:
+            existing.flag = payload.flag
+        await audit(
+            db,
+            actor=user,
+            action="referral.reassign",
+            entity="referral_attribution",
+            entity_id=existing.id,
+            before=before,
+            after={
+                "marketer_id": str(prof.id),
+                "ref_code": prof.ref_code,
+                "flag": existing.flag,
+            },
+            request=request,
+        )
+        await db.commit()
+        return {"id": str(existing.id), "ref_code": prof.ref_code, "reassigned": True}
+    attr = await referrals_svc.attribute(
+        db,
+        prof,
+        request_type="consultation",
+        request_id=case.id,
+        ip="",
+        ua="",
+        flag=payload.flag,
+    )
+    case.ref_code = prof.ref_code
+    case.referrer_id = prof.id
+    await thread_svc.add_event(
+        db,
+        "consultation",
+        case.id,
+        "referred",
+        actor=user,
+        payload={"ref_code": prof.ref_code, "manual": True},
+    )
+    await audit(
+        db,
+        actor=user,
+        action="referral.attach",
+        entity="referral_attribution",
+        entity_id=attr.id,
+        after={
+            "marketer_id": str(prof.id),
+            "ref_code": prof.ref_code,
+            "request_id": str(case.id),
+            "flag": attr.flag,
+        },
+        request=request,
+    )
+    await db.commit()
+    return {"id": str(attr.id), "ref_code": prof.ref_code, "reassigned": False}

@@ -53,9 +53,17 @@
 | روش | مسیر | توضیح |
 |---|---|---|
 | GET | `/admin/requests` | لیست یکپارچه‌ی درخواست‌ها + صفحه‌بندی |
+| GET | `/admin/requests/{type}/{id}` | جزئیات — شامل `request.referral` (بازاریاب معرف) |
+| PATCH | `/admin/requests/{type}/{id}` | ویرایش اولویت/برچسب/`fee_amount` (مبلغ پرونده) |
+| POST | `/admin/requests/consultation/{id}/fee-receipts` | ثبت دریافتی → accrual کمیسیون |
+| POST | `/admin/requests/consultation/{id}/fee-receipts/file` | آپلود فیش واریزی (خصوصی) |
+| GET | `/admin/fee-receipts/{id}/file` | دانلود فیش رسید دریافتی |
+| GET | `/admin/referral-marketers` | بازاریاب‌های فعال برای انتخابگر (مینیمال) |
+| POST | `/admin/requests/consultation/{id}/referral` | اتصال/تغییر معرف پرونده (support+) |
 | GET | `/admin/marketers` | بازاریاب‌ها + مانده‌ی قابل پرداخت |
 | POST | `/admin/marketers/{id}/payouts` | ثبت تسویه + فیش (کمیسیون‌ها allocated می‌شوند) |
 | POST | `/admin/marketers/{id}/rotate-code` | چرخش کد ارجاع (قدیمی در retired می‌ماند) |
+| GET | `/admin/marketers/{id}/card.png` | کارت بازاریاب با QR روی قالب برند |
 | CRUD | `/admin/articles` | مقالات + sanitize سمت سرور + نسخه‌ها |
 | GET/PUT | `/admin/settings` | برند/لوگو/سئو/شبکه‌های اجتماعی/کمیسیون |
 | GET | `/admin/audit` | لاگ حسابرسی |

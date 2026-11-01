@@ -1,6 +1,27 @@
 """AI assistant: grounded retrieval, no-provider honesty, injection defense."""
 
+import json
+
 from main.ai.knowledge import sync_knowledge
+
+
+def parse_sse(text: str) -> dict:
+    """Collapse the /ai/chat SSE stream into a single result dict for asserts."""
+    out = {"session_key": "", "sources": [], "reply": "", "provider": "", "errors": []}
+    for line in text.splitlines():
+        if not line.startswith("data:"):
+            continue
+        ev = json.loads(line[5:].strip())
+        if ev["type"] == "meta":
+            out["session_key"] = ev["session_key"]
+            out["sources"] = ev["sources"]
+        elif ev["type"] == "delta":
+            out["reply"] += ev["text"]
+        elif ev["type"] == "done":
+            out["provider"] = ev["provider"]
+        elif ev["type"] == "error":
+            out["errors"].append(ev["message"])
+    return out
 
 
 async def test_chat_unconfigured_provider_falls_back(client, seeded_session):
@@ -11,7 +32,7 @@ async def test_chat_unconfigured_provider_falls_back(client, seeded_session):
         json={"messages": [{"role": "user", "content": "شماره تماس دفتر چیست؟"}]},
     )
     assert resp.status_code == 200
-    body = resp.json()
+    body = parse_sse(resp.text)
     assert body["provider"] in ("retrieval", "unavailable")
     # retrieval path should surface the contact record
     assert body["reply"]
@@ -26,7 +47,7 @@ async def test_chat_empty_knowledge_still_honest(client):
         json={"messages": [{"role": "user", "content": "هزینه وکالت چقدر است؟"}]},
     )
     assert resp.status_code == 200
-    body = resp.json()
+    body = parse_sse(resp.text)
     assert "در دسترس نیست" in body["reply"] or "اطلاعات" in body["reply"]
 
 
@@ -46,7 +67,7 @@ async def test_chat_persists_conversation(client, seeded_session, admin_client):
         "/api/v1/ai/chat",
         json={"messages": [{"role": "user", "content": "سلام"}]},
     )
-    key = r1.json()["session_key"]
+    key = parse_sse(r1.text)["session_key"]
     r2 = await client.post(
         "/api/v1/ai/chat",
         json={
@@ -54,7 +75,7 @@ async def test_chat_persists_conversation(client, seeded_session, admin_client):
             "messages": [{"role": "user", "content": "دوباره سلام"}],
         },
     )
-    assert r2.json()["session_key"] == key
+    assert parse_sse(r2.text)["session_key"] == key
 
     convs = await admin_client.get("/api/v1/admin/ai/conversations")
     assert convs.status_code == 200

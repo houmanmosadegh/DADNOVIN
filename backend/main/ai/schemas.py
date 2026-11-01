@@ -13,7 +13,8 @@ class ChatMessageIn(BaseModel):
 
 class ChatIn(BaseModel):
     session_key: str = Field(default="", max_length=80)
-    messages: list[ChatMessageIn] = Field(min_length=1, max_length=12)
+    # spec: keep history within 10–20 messages
+    messages: list[ChatMessageIn] = Field(min_length=1, max_length=20)
 
 
 class ChatOut(BaseModel):

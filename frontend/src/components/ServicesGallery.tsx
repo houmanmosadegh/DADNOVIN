@@ -114,10 +114,7 @@ export function ServicesGallery({ variant = 'home' }: { variant?: 'home' | 'page
             </Reveal>
           ) : null}
           <Reveal className="sg__text">
-            <span className="sg__eyebrow">
-              {isPage ? null : <b aria-hidden="true">۰۳</b>}
-              {head.eyebrow}
-            </span>
+            <span className="sg__eyebrow">{head.eyebrow}</span>
             <Title className="sg__title" id={isPage ? 'services-page-title' : 'services-title'}>
               {head.title}
             </Title>

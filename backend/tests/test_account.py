@@ -642,7 +642,8 @@ class TestReferralLinks:
         from PIL import Image
 
         img = Image.open(io.BytesIO(r.content))
-        assert img.width == 2362 and img.height == 1476  # ~300dpi card
+        # branded template — original 1559×1009 artwork preserved
+        assert img.width == 1559 and img.height == 1009
         r = await client.get("/api/v1/account/marketer/card.pdf")
         assert r.status_code == 200 and r.content[:5] == b"%PDF-"
 
@@ -879,3 +880,104 @@ class TestPayoutsBankConsent:
                 sel(AuditLog).where(AuditLog.action == "marketer.reveal_bank")
             )
         ).scalar_one()
+
+
+class TestCaseReferralAndFee:
+    """Case detail: who's the marketer, case price, فیش attachment."""
+
+    def _png(self) -> bytes:
+        from io import BytesIO
+
+        from PIL import Image
+
+        buf = BytesIO()
+        Image.new("RGB", (30, 20), (200, 180, 120)).save(buf, "PNG")
+        return buf.getvalue()
+
+    async def test_referral_marketers_list(self, client, seeded_session):
+        code = await _make_marketer(client, seeded_session, PHONE_M)
+        await _admin(client)
+        r = await client.get("/api/v1/admin/referral-marketers")
+        assert r.status_code == 200, r.text
+        rows = r.json()
+        assert any(m["ref_code"] == code for m in rows)
+        assert all("full_name" in m and "id" in m for m in rows)
+
+    async def test_attach_and_detail_shows_marketer(self, client, seeded_session):
+        code = await _make_marketer(client, seeded_session, PHONE_M)
+        row = await _consult_row(seeded_session, client, PHONE_B)
+        await _admin(client)
+        r = await client.post(
+            f"/api/v1/admin/requests/consultation/{row.id}/referral",
+            json={"ref_code": code},
+        )
+        assert r.status_code == 201, r.text
+        assert r.json()["reassigned"] is False
+        d = await client.get(f"/api/v1/admin/requests/consultation/{row.id}")
+        ref = d.json()["request"]["referral"]
+        assert ref["ref_code"] == code
+        assert ref["full_name"] == "بازاریاب تست"
+
+    async def test_reassign_marketer(self, client, seeded_session):
+        code1 = await _make_marketer(client, seeded_session, PHONE_M)
+        row = await _consult_row(seeded_session, client, PHONE_B, ref=code1)
+        code2 = await _make_marketer(client, seeded_session, "09309999999")
+        await _admin(client)
+        r = await client.post(
+            f"/api/v1/admin/requests/consultation/{row.id}/referral",
+            json={"ref_code": code2},
+        )
+        assert r.status_code == 201, r.text
+        assert r.json()["reassigned"] is True
+        d = await client.get(f"/api/v1/admin/requests/consultation/{row.id}")
+        assert d.json()["request"]["referral"]["ref_code"] == code2
+
+    async def test_attach_bad_code_404(self, client, seeded_session):
+        row = await _consult_row(seeded_session, client, PHONE_B)
+        await _admin(client)
+        r = await client.post(
+            f"/api/v1/admin/requests/consultation/{row.id}/referral",
+            json={"ref_code": "DN-NOPE99"},
+        )
+        assert r.status_code == 404
+
+    async def test_fee_amount_patch(self, client, seeded_session):
+        row = await _consult_row(seeded_session, client, PHONE_B)
+        await _admin(client)
+        r = await client.patch(
+            f"/api/v1/admin/requests/consultation/{row.id}",
+            json={"fee_amount": 40_000_000},
+        )
+        assert r.status_code == 200, r.text
+        g = await client.get(
+            f"/api/v1/admin/requests/consultation/{row.id}/fee-receipts"
+        )
+        assert g.json()["fee_amount"] == 40_000_000
+        r = await client.patch(
+            f"/api/v1/admin/requests/consultation/{row.id}",
+            json={"fee_amount": -1},
+        )
+        assert r.status_code == 422
+
+    async def test_receipt_with_slip_file(self, client, seeded_session):
+        row = await _consult_row(seeded_session, client, PHONE_B)
+        await _admin(client)
+        up = await client.post(
+            f"/api/v1/admin/requests/consultation/{row.id}/fee-receipts/file",
+            files={"file": ("fish.png", self._png(), "image/png")},
+        )
+        assert up.status_code == 201, up.text
+        file_id = up.json()["file_id"]
+        r = await client.post(
+            f"/api/v1/admin/requests/consultation/{row.id}/fee-receipts",
+            json={"amount": 5_000_000, "note": "قسط اول", "file_id": file_id},
+        )
+        assert r.status_code == 201, r.text
+        g = await client.get(
+            f"/api/v1/admin/requests/consultation/{row.id}/fee-receipts"
+        )
+        assert g.json()["receipts"][0]["has_file"] is True
+        rid = g.json()["receipts"][0]["id"]
+        dl = await client.get(f"/api/v1/admin/fee-receipts/{rid}/file")
+        assert dl.status_code == 200
+        assert dl.headers["content-type"] == "image/png"

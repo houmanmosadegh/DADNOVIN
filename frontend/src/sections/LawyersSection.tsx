@@ -9,7 +9,6 @@ export function LawyersSection() {
       <div className="container">
         <Reveal>
           <ChapterHead
-            index="۰۴"
             eyebrow="تیم حقوقی"
             title="وکلا و مشاوران دادنوین"
             id="lawyers-title"
